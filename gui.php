@@ -1056,6 +1056,10 @@ async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
     const nextSecure = !currentSecure;
     
     checkbox.disabled = true;
+
+    let success = false;
+    let errMsg = '';
+
     try {
         const fd = new FormData();
         fd.append('path', s.path);
@@ -1066,16 +1070,26 @@ async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
         const d = await r.json();
         
         if (d.success) {
-            toast(`${nextSecure ? 'Kích hoạt' : 'Hủy kích hoạt'} bảo mật thành công!`, 'success');
+            success = true;
         } else {
-            toast(d.error || 'Thao tác thất bại.', 'error');
+            errMsg = d.error || 'Thao tác thất bại.';
         }
     } catch (err) {
-        toast('Lỗi kết nối đến máy chủ.', 'error');
-    } finally {
-        checkbox.disabled = false;
-        loadSecurity(siteIdx);
+        errMsg = 'Lỗi kết nối đến máy chủ.';
     }
+
+    if (success) {
+        toast(`${nextSecure ? '✅ Đã bật' : '⛔ Đã tắt'} tính năng bảo mật thành công!`, 'success');
+    } else {
+        toast('❌ ' + errMsg, 'error');
+        checkbox.checked = currentSecure; // revert toggle state on error
+        checkbox.disabled = false;
+        return;
+    }
+
+    // Reload security tab after a short delay so user can read the toast
+    checkbox.disabled = false;
+    setTimeout(() => loadSecurity(siteIdx), 800);
 }
 
 async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) {
@@ -1106,6 +1120,7 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
         }
         
         checkbox.disabled = true;
+        let ok = false;
         try {
             const fd = new FormData();
             fd.append('path', s.path);
@@ -1117,17 +1132,17 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
             const d = await r.json();
             
             if (d.success) {
-                toast("Đã thay đổi tiền tố database thành công!", "success");
+                toast("✅ Đã thay đổi tiền tố database thành công!", "success");
                 s.db_prefix = cleanPrefix;
+                ok = true;
             } else {
-                toast(d.error || "Lỗi khi đổi tiền tố database.", "error");
+                toast("❌ " + (d.error || "Lỗi khi đổi tiền tố database."), "error");
             }
         } catch (err) {
-            toast("Lỗi kết nối máy chủ.", "error");
-        } finally {
-            checkbox.disabled = false;
-            loadSecurity(siteIdx);
+            toast("❌ Lỗi kết nối máy chủ.", "error");
         }
+        checkbox.disabled = false;
+        setTimeout(() => loadSecurity(siteIdx), ok ? 800 : 300);
         
     } else if (measureKey === 'rename_admin_user') {
         if (currentSecure) {
@@ -1159,6 +1174,7 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
         }
         
         checkbox.disabled = true;
+        let ok2 = false;
         try {
             const fd = new FormData();
             fd.append('path', s.path);
@@ -1170,16 +1186,16 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
             const d = await r.json();
             
             if (d.success) {
-                toast("Đã đổi tên tài khoản 'admin' thành công!", "success");
+                toast(`✅ Đã đổi tên tài khoản 'admin' thành '${cleanUsername}' thành công!`, "success");
+                ok2 = true;
             } else {
-                toast(d.error || "Lỗi khi đổi tên tài khoản admin.", "error");
+                toast("❌ " + (d.error || "Lỗi khi đổi tên tài khoản admin."), "error");
             }
         } catch (err) {
-            toast("Lỗi kết nối máy chủ.", "error");
-        } finally {
-            checkbox.disabled = false;
-            loadSecurity(siteIdx);
+            toast("❌ Lỗi kết nối máy chủ.", "error");
         }
+        checkbox.disabled = false;
+        setTimeout(() => loadSecurity(siteIdx), ok2 ? 800 : 300);
     }
 }
 
