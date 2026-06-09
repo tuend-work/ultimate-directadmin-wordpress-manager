@@ -38,6 +38,14 @@ mkdir -p "$PLUGIN_DIR"
 rm -rf "$PLUGIN_DIR"/*
 cp -rf "$EXTRACTED_DIR"/* "$PLUGIN_DIR/"
 
+# Copy custom php.ini from resource manager template if exists
+if [ -f "/usr/local/directadmin/plugins/ultimate_da_resource_manager/php.ini" ]; then
+  cp -f "/usr/local/directadmin/plugins/ultimate_da_resource_manager/php.ini" "$PLUGIN_DIR/php.ini"
+else
+  # Fallback to default php.ini
+  cp -f /usr/local/lib/php.ini "$PLUGIN_DIR/php.ini" 2>/dev/null
+fi
+
 echo -e "\e[34m[4/4] Configuring ownership and permissions...\e[0m"
 # Change ownership to diradmin:diradmin
 chown -R diradmin:diradmin "$PLUGIN_DIR"

@@ -1,4 +1,4 @@
-#!/usr/local/bin/php
+#!/usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini
 <?php
 require_once dirname(__DIR__) . '/app.php';
 run_api();
