@@ -842,6 +842,17 @@ $isAdmin = is_admin_user();
         const DA_USERNAME = '<?php echo $username; ?>';
         let allSites = [];
         
+        // Calculate the correct relative API URL path to handle both with and without trailing slashes in the browser URL
+        const getApiUrl = (action = '') => {
+            let base = window.location.pathname.split('?')[0];
+            if (base.endsWith('.html') || base.endsWith('.raw')) {
+                base = base.substring(0, base.lastIndexOf('/') + 1);
+            } else if (!base.endsWith('/')) {
+                base = base + '/';
+            }
+            return base + 'index.raw' + (action ? '?action=' + action : '');
+        };
+        
         // Show floating message
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
@@ -880,7 +891,7 @@ $isAdmin = is_admin_user();
         // Fetch domains and render
         async function loadDomains() {
             try {
-                const response = await fetch('index.raw?action=get_domains');
+                const response = await fetch(getApiUrl('get_domains'));
                 const data = await response.json();
                 const select = document.getElementById('inst-domain');
                 select.innerHTML = '';
@@ -908,7 +919,7 @@ $isAdmin = is_admin_user();
             
             try {
                 const action = triggerScanOnMissing ? 'scan' : 'list';
-                const response = await fetch(`index.raw?action=${action}`);
+                const response = await fetch(getApiUrl(action));
                 const data = await response.json();
                 
                 if (data.success) {
@@ -1090,7 +1101,7 @@ $isAdmin = is_admin_user();
                 installParams.append('admin_email', document.getElementById('inst-adminemail').value);
                 installParams.append('protocol', document.getElementById('inst-protocol').value);
                 
-                const response = await fetch('index.raw', {
+                const response = await fetch(getApiUrl(), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
@@ -1125,7 +1136,7 @@ $isAdmin = is_admin_user();
                 params.append('action', 'magic_login');
                 params.append('path', sitePath);
                 
-                const response = await fetch('index.raw', {
+                const response = await fetch(getApiUrl(), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
@@ -1213,7 +1224,7 @@ $isAdmin = is_admin_user();
                 params.append('action', 'delete');
                 params.append('path', activeDeletePath);
                 
-                const response = await fetch('index.raw', {
+                const response = await fetch(getApiUrl(), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
@@ -1272,7 +1283,7 @@ $isAdmin = is_admin_user();
                 const params = new URLSearchParams();
                 params.append('action', 'update_plugin');
                 
-                const response = await fetch('index.raw', {
+                const response = await fetch(getApiUrl(), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
