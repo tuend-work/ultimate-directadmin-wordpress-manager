@@ -296,7 +296,7 @@ div#iframe-container{
     border: 1px solid var(--border);
     border-radius: 10px;
     box-shadow: 0 16px 64px rgba(0,0,0,.5);
-    width: 100%; max-width: 560px;
+    width: 100%; max-width: 750px;
     max-height: 92vh; overflow-y: auto;
 }
 .modal-head {
@@ -604,7 +604,7 @@ input:disabled + .slider {
 
         <div class="form-section">
             <div class="form-section-title">Website Location</div>
-            <div class="form-row">
+            <div style="display: grid; grid-template-columns: 1.2fr 3fr 2fr; gap: 12px;">
                 <div class="form-group">
                     <label>Protocol</label>
                     <select id="inst-protocol" class="form-control">
@@ -618,10 +618,30 @@ input:disabled + .slider {
                         <option value="" disabled selected>Loading…</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Directory <span style="font-weight:400;color:var(--text3)">(optional)</span></label>
+                    <input type="text" id="inst-subdir" class="form-control" placeholder="e.g. blog">
+                </div>
             </div>
-            <div class="form-group">
-                <label>Directory <span style="font-weight:400;color:var(--text3)">(leave blank for domain root)</span></label>
-                <input type="text" id="inst-subdir" class="form-control" placeholder="e.g. blog">
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title">Nguồn Cài Đặt (Source)</div>
+            <div style="display: flex; gap: 20px; margin-bottom: 12px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
+                    <input type="radio" name="inst-source" value="fresh" checked onchange="toggleInstallSource('fresh')" style="width:14px; height:14px; accent-color: var(--blue);">
+                    <span>Cài đặt mới (Fresh WP)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
+                    <input type="radio" name="inst-source" value="zip" onchange="toggleInstallSource('zip')" style="width:14px; height:14px; accent-color: var(--blue);">
+                    <span>Cài đặt từ tệp ZIP (From ZIP)</span>
+                </label>
+            </div>
+            
+            <div id="inst-zip-wrapper" style="display: none;" class="form-group">
+                <label>Chọn tệp ZIP source code <span style="font-weight:400;color:var(--red)">*</span></label>
+                <input type="file" id="inst-zip-file" class="form-control" accept=".zip">
+                <span style="font-size:11px;color:var(--text3)">Tệp ZIP chứa mã nguồn WordPress ở thư mục gốc và tệp cơ sở dữ liệu (.sql.gz, .sql, .gz).</span>
             </div>
         </div>
 
@@ -652,7 +672,7 @@ input:disabled + .slider {
             </div>
         </div>
 
-        <div class="form-section">
+        <div class="form-section" id="inst-admin-section">
             <div class="form-section-title">WordPress Admin</div>
             <div class="form-group">
                 <label>Site Title</label>
@@ -1519,11 +1539,39 @@ async function fetchSubdomains(domain) {
     } catch { return []; }
 }
 
+function toggleInstallSource(mode) {
+    const zipWrapper = document.getElementById('inst-zip-wrapper');
+    const zipInput = document.getElementById('inst-zip-file');
+    const adminSec = document.getElementById('inst-admin-section');
+    const adminInputs = adminSec.querySelectorAll('input');
+
+    if (mode === 'zip') {
+        zipWrapper.style.display = 'block';
+        zipInput.required = true;
+        adminSec.style.display = 'none';
+        adminInputs.forEach(i => i.required = false);
+    } else {
+        zipWrapper.style.display = 'none';
+        zipInput.required = false;
+        adminSec.style.display = 'block';
+        adminInputs.forEach(i => i.required = true);
+    }
+}
+
 function openInstallModal() {
     openModal('modal-install');
     loadDomains();
     genPass('inst-dbpass');
     genPass('inst-adminpass');
+    
+    // Reset install source selection to 'fresh'
+    const radios = document.getElementsByName('inst-source');
+    if (radios.length) radios[0].checked = true;
+    toggleInstallSource('fresh');
+    
+    // Clear zip input file
+    const zipFile = document.getElementById('inst-zip-file');
+    if (zipFile) zipFile.value = '';
 }
 
 /* ─── Install: create DB + install WP ─── */
@@ -1539,6 +1587,11 @@ async function createDB(name, user, pass) {
 async function executeInstall(e) {
     e.preventDefault();
     const btn = document.getElementById('btn-install-submit');
+    
+    // Determine the source mode
+    const sourceRadio = document.querySelector('input[name="inst-source"]:checked');
+    const mode = sourceRadio ? sourceRadio.value : 'fresh';
+    
     btn.disabled=true; btn.textContent='Creating database…';
     try {
         const db = await createDB(
@@ -1547,30 +1600,50 @@ async function executeInstall(e) {
             document.getElementById('inst-dbpass').value
         );
         toast('1/3 Database created.', 'success');
-        btn.textContent='Installing WordPress…';
+        
+        btn.textContent = mode === 'zip' ? 'Extracting ZIP & Importing database…' : 'Installing WordPress…';
 
-        const p = new URLSearchParams({
-            action:'install',
-            domain:      document.getElementById('inst-domain').value,
-            subdir:      document.getElementById('inst-subdir').value,
-            db_name:     db.db_name,
-            db_user:     db.db_user,
-            db_pass:     document.getElementById('inst-dbpass').value,
-            site_title:  document.getElementById('inst-title').value,
-            admin_user:  document.getElementById('inst-adminuser').value,
-            admin_pass:  document.getElementById('inst-adminpass').value,
-            admin_email: document.getElementById('inst-adminemail').value,
-            protocol:    document.getElementById('inst-protocol').value,
+        const fd = new FormData();
+        fd.append('action', 'install');
+        fd.append('mode', mode);
+        fd.append('domain', document.getElementById('inst-domain').value);
+        fd.append('subdir', document.getElementById('inst-subdir').value);
+        fd.append('db_name', db.db_name);
+        fd.append('db_user', db.db_user);
+        fd.append('db_pass', document.getElementById('inst-dbpass').value);
+        fd.append('protocol', document.getElementById('inst-protocol').value);
+
+        if (mode === 'zip') {
+            const zipInput = document.getElementById('inst-zip-file');
+            if (zipInput.files.length === 0) {
+                throw new Error("Vui lòng chọn tệp ZIP source code!");
+            }
+            fd.append('zip_file', zipInput.files[0]);
+        } else {
+            fd.append('site_title', document.getElementById('inst-title').value);
+            fd.append('admin_user', document.getElementById('inst-adminuser').value);
+            fd.append('admin_pass', document.getElementById('inst-adminpass').value);
+            fd.append('admin_email', document.getElementById('inst-adminemail').value);
+        }
+
+        const r = await fetch(apiUrl(), {
+            method: 'POST',
+            body: fd
         });
-        const r = await fetch(apiUrl(),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
         const d = await r.json();
         if (d.success) {
-            toast('WordPress installed successfully!', 'success');
+            toast(mode === 'zip' ? 'Cài đặt WordPress từ ZIP thành công!' : 'WordPress installed successfully!', 'success');
             closeModal('modal-install');
             fetchSites(false);
-        } else toast(d.error||'Installation failed.', 'error');
-    } catch(err) { toast(err.message||'Error.', 'error'); }
-    finally { btn.disabled=false; btn.textContent='Install WordPress'; }
+        } else {
+            toast(d.error || 'Installation failed.', 'error');
+        }
+    } catch(err) { 
+        toast(err.message || 'Error.', 'error'); 
+    } finally { 
+        btn.disabled=false; 
+        btn.textContent='Install WordPress'; 
+    }
 }
 
 /* ─── Magic Login ─── */

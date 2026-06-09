@@ -21,9 +21,9 @@ if ($QUERY_STRING != "") {
     }
 }
 
-$_POST = [];
 $POST_STRING = getenv('POST');
 if ($POST_STRING != "") {
+    $_POST = [];
     parse_str(html_entity_decode($POST_STRING), $post_array);
     foreach ($post_array as $key => $value) {
         $_POST[urldecode($key)] = urldecode($value);
@@ -1535,15 +1535,12 @@ function resolve_domain_path($domain_str, $home) {
  * Core WordPress programmatic Installer
  */
 function install_wordpress_instance($params, $home) {
+    $mode = $params['mode'] ?? 'fresh';
     $domain = $params['domain'];
     $subdir = $params['subdir'] ?? '';
     $db_name = $params['db_name'];
     $db_user = $params['db_user'];
     $db_pass = $params['db_pass'];
-    $site_title = $params['site_title'];
-    $admin_user = $params['admin_user'];
-    $admin_pass = $params['admin_pass'];
-    $admin_email = $params['admin_email'];
     $protocol = $params['protocol'] ?? 'http';
     
     // Sanitize path inputs
@@ -1559,7 +1556,6 @@ function install_wordpress_instance($params, $home) {
     }
     
     $site_host = $domain_clean;
-    $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
     
     // Security check: must reside inside home directory
     $check_path = realpath($target_dir) ?: $target_dir;
@@ -1575,79 +1571,222 @@ function install_wordpress_instance($params, $home) {
         throw new Exception("WordPress is already configured in this folder.");
     }
     
-    // Download & Unpack
-    download_and_extract_wordpress($target_dir, $home);
-    
-    // Fetch security keys
-    $salts = '';
-    $ch = curl_init('https://api.wordpress.org/secret-key/1.1/salt/');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-    $salts = curl_exec($ch);
-    curl_close($ch);
-    
-    if (!$salts || strpos($salts, 'define') === false) {
-        $salts = '';
-        $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
-        foreach ($keys as $key) {
-            $random_salt = bin2hex(random_bytes(32));
-            $salts .= "define('{$key}', '{$random_salt}');\n";
+    if ($mode === 'zip') {
+        // Zip install
+        if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception("Không nhận được tệp ZIP tải lên hoặc tệp bị lỗi.");
         }
+        
+        $zip_tmp = $_FILES['zip_file']['tmp_name'];
+        $zip = new ZipArchive;
+        if ($zip->open($zip_tmp) === TRUE) {
+            $zip->extractTo($target_dir);
+            $zip->close();
+        } else {
+            throw new Exception("Không thể giải nén tệp ZIP source code.");
+        }
+        
+        // Scan for database file
+        $files = scandir($target_dir);
+        $db_file = null;
+        
+        // Priority 1: *.sql.gz
+        foreach ($files as $f) {
+            if (preg_match('/\.sql\.gz$/i', $f)) {
+                $db_file = $f;
+                break;
+            }
+        }
+        // Priority 2: *.sql
+        if (!$db_file) {
+            foreach ($files as $f) {
+                if (preg_match('/\.sql$/i', $f)) {
+                    $db_file = $f;
+                    break;
+                }
+            }
+        }
+        // Priority 3: *.gz (excluding *.sql.gz)
+        if (!$db_file) {
+            foreach ($files as $f) {
+                if (preg_match('/\.gz$/i', $f) && !preg_match('/\.sql\.gz$/i', $f)) {
+                    $db_file = $f;
+                    break;
+                }
+            }
+        }
+        
+        $db_imported = false;
+        $db_prefix = 'wp_';
+        
+        if ($db_file) {
+            $db_file_path = $target_dir . '/' . $db_file;
+            
+            // Build MySQL command
+            if (preg_match('/\.gz$/i', $db_file)) {
+                $cmd = sprintf(
+                    'gunzip -c %s | mysql -h %s -u %s -p%s %s 2>&1',
+                    escapeshellarg($db_file_path),
+                    escapeshellarg('localhost'),
+                    escapeshellarg($db_user),
+                    escapeshellarg($db_pass),
+                    escapeshellarg($db_name)
+                );
+            } else {
+                $cmd = sprintf(
+                    'mysql -h %s -u %s -p%s %s < %s 2>&1',
+                    escapeshellarg('localhost'),
+                    escapeshellarg($db_user),
+                    escapeshellarg($db_pass),
+                    escapeshellarg($db_name),
+                    escapeshellarg($db_file_path)
+                );
+            }
+            
+            $output = [];
+            $retval = null;
+            exec($cmd, $output, $retval);
+            
+            // Delete the database file immediately for security
+            @unlink($db_file_path);
+            
+            if ($retval !== 0) {
+                $err_detail = implode("\n", $output);
+                throw new Exception("Lỗi khi nhập database backup: " . $err_detail);
+            }
+            $db_imported = true;
+        }
+        
+        // Update wp-config.php with new database details
+        $wp_config_path = $target_dir . '/wp-config.php';
+        if (file_exists($wp_config_path)) {
+            $content = file_get_contents($wp_config_path);
+            
+            // Extract db table prefix
+            if (preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match)) {
+                $db_prefix = $prefix_match[1];
+            }
+            
+            $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
+            $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
+            $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
+            $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
+            
+            file_put_contents($wp_config_path, $content);
+            @chmod($wp_config_path, 0600);
+        }
+        
+        // Update siteurl and home in database
+        if ($db_imported) {
+            $new_siteurl = ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : '');
+            try {
+                $dsn = "mysql:host=localhost;dbname={$db_name};charset=utf8mb4";
+                $pdo = new PDO($dsn, $db_user, $db_pass, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_TIMEOUT => 5
+                ]);
+                
+                $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name IN ('siteurl', 'home')");
+                $stmt->execute([$new_siteurl]);
+            } catch (Exception $e) {
+                wp_manager_log("Failed to update siteurl/home: " . $e->getMessage());
+            }
+        }
+        
+        // Force cache refresh
+        $cache_file = $home . '/.ultimate_wp_manager.json';
+        if (file_exists($cache_file)) {
+            @unlink($cache_file);
+        }
+        
+        return [
+            'success' => true,
+            'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
+            'details' => 'Cài đặt từ ZIP hoàn tất.'
+        ];
+        
+    } else {
+        // Fresh install
+        $site_title = $params['site_title'];
+        $admin_user = $params['admin_user'];
+        $admin_pass = $params['admin_pass'];
+        $admin_email = $params['admin_email'];
+        $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
+        
+        // Download & Unpack
+        download_and_extract_wordpress($target_dir, $home);
+        
+        // Fetch security keys
+        $salts = '';
+        $ch = curl_init('https://api.wordpress.org/secret-key/1.1/salt/');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 6);
+        $salts = curl_exec($ch);
+        curl_close($ch);
+        
+        if (!$salts || strpos($salts, 'define') === false) {
+            $salts = '';
+            $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
+            foreach ($keys as $key) {
+                $random_salt = bin2hex(random_bytes(32));
+                $salts .= "define('{$key}', '{$random_salt}');\n";
+            }
+        }
+        
+        // Write wp-config.php
+        $wp_config_content = "<?php\n" .
+             "define('DB_NAME', '" . addslashes($db_name) . "');\n" .
+             "define('DB_USER', '" . addslashes($db_user) . "');\n" .
+             "define('DB_PASSWORD', '" . addslashes($db_pass) . "');\n" .
+             "define('DB_HOST', 'localhost');\n" .
+             "define('DB_CHARSET', 'utf8mb4');\n" .
+             "define('DB_COLLATE', '');\n\n" .
+             $salts . "\n" .
+             "\$table_prefix = 'wp_';\n\n" .
+             "define('WP_DEBUG', false);\n\n" .
+             "if (!defined('ABSPATH')) {\n" .
+             "    define('ABSPATH', __DIR__ . '/');\n" .
+             "}\n\n" .
+             "require_once ABSPATH . 'wp-settings.php';\n";
+             
+        file_put_contents($target_dir . '/wp-config.php', $wp_config_content);
+        @chmod($target_dir . '/wp-config.php', 0600);
+        
+        // Mock server context for installation script
+        $_SERVER['HTTP_HOST'] = $site_host;
+        $_SERVER['SERVER_NAME'] = $site_host;
+        $_SERVER['REQUEST_URI'] = $request_uri;
+        $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        if ($protocol === 'https') {
+            $_SERVER['HTTPS'] = 'on';
+        }
+        
+        define('WP_INSTALLING', true);
+        
+        if (!file_exists($target_dir . '/wp-load.php')) {
+            throw new Exception("Critical error: core extraction check failed.");
+        }
+        
+        // Run installer programmatically
+        require_once $target_dir . '/wp-load.php';
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        
+        $install_result = wp_install($site_title, $admin_user, $admin_email, true, '', $admin_pass);
+        
+        // Force cache refresh
+        $cache_file = $home . '/.ultimate_wp_manager.json';
+        if (file_exists($cache_file)) {
+            @unlink($cache_file);
+        }
+        
+        return [
+            'success' => true,
+            'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
+            'details' => $install_result
+        ];
     }
-    
-    // Write wp-config.php
-    $wp_config_content = "<?php\n" .
-         "define('DB_NAME', '" . addslashes($db_name) . "');\n" .
-         "define('DB_USER', '" . addslashes($db_user) . "');\n" .
-         "define('DB_PASSWORD', '" . addslashes($db_pass) . "');\n" .
-         "define('DB_HOST', 'localhost');\n" .
-         "define('DB_CHARSET', 'utf8mb4');\n" .
-         "define('DB_COLLATE', '');\n\n" .
-         $salts . "\n" .
-         "\$table_prefix = 'wp_';\n\n" .
-         "define('WP_DEBUG', false);\n\n" .
-         "if (!defined('ABSPATH')) {\n" .
-         "    define('ABSPATH', __DIR__ . '/');\n" .
-         "}\n\n" .
-         "require_once ABSPATH . 'wp-settings.php';\n";
-         
-    file_put_contents($target_dir . '/wp-config.php', $wp_config_content);
-    @chmod($target_dir . '/wp-config.php', 0600);
-    
-    // Mock server context for installation script
-    $_SERVER['HTTP_HOST'] = $site_host;
-    $_SERVER['SERVER_NAME'] = $site_host;
-    $_SERVER['REQUEST_URI'] = $request_uri;
-    $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
-    $_SERVER['REQUEST_METHOD'] = 'GET';
-    $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
-    if ($protocol === 'https') {
-        $_SERVER['HTTPS'] = 'on';
-    }
-    
-    define('WP_INSTALLING', true);
-    
-    if (!file_exists($target_dir . '/wp-load.php')) {
-        throw new Exception("Critical error: core extraction check failed.");
-    }
-    
-    // Run installer programmatically
-    require_once $target_dir . '/wp-load.php';
-    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-    
-    $install_result = wp_install($site_title, $admin_user, $admin_email, true, '', $admin_pass);
-    
-    // Force cache refresh
-    $cache_file = $home . '/.ultimate_wp_manager.json';
-    if (file_exists($cache_file)) {
-        @unlink($cache_file);
-    }
-    
-    return [
-        'success' => true,
-        'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
-        'details' => $install_result
-    ];
 }
 
 /**
