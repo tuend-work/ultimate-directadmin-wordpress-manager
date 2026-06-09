@@ -906,7 +906,6 @@ async function toggleLock(i) {
         btn.disabled = false;
     }
 }
-}
 
 /* ─── Refresh screenshot ─── */
 function refreshShot(i) {
