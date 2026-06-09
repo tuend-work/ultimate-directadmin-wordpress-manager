@@ -39,18 +39,12 @@ int main(int argc, char *argv[]) {
     }
     
     // 2. Validate arguments
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <lock|unlock> <site_path>\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "Usage:\n  %s <lock|unlock> <site_path>\n  %s get_domain_config <domain> <subdomains|conf>\n", argv[0], argv[0]);
         return 1;
     }
     
     const char *action = argv[1];
-    const char *site_path = argv[2];
-    
-    if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
-        fprintf(stderr, "Error: Invalid action. Use 'lock' or 'unlock'.\n");
-        return 1;
-    }
     
     // 3. Identify the calling user (real UID)
     uid_t uid = getuid();
@@ -59,6 +53,56 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error: Failed to identify user from UID %d.\n", uid);
         return 1;
     }
+    
+    // Handle get_domain_config subcommand
+    if (strcmp(action, "get_domain_config") == 0) {
+        if (argc != 4) {
+            fprintf(stderr, "Usage: %s get_domain_config <domain> <subdomains|conf>\n", argv[0]);
+            return 1;
+        }
+        const char *domain = argv[2];
+        const char *type = argv[3];
+        if (strcmp(type, "subdomains") != 0 && strcmp(type, "conf") != 0) {
+            fprintf(stderr, "Error: Invalid config type. Use 'subdomains' or 'conf'.\n");
+            return 1;
+        }
+        
+        // Validate domain name to prevent path traversal
+        for (const char *p = domain; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '.' || *p == '-')) {
+                fprintf(stderr, "Error: Invalid domain name characters.\n");
+                return 1;
+            }
+        }
+        
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path), "/usr/local/directadmin/data/users/%s/domains/%s.%s", pw->pw_name, domain, type);
+        
+        FILE *f = fopen(path, "r");
+        if (!f) {
+            // File might not exist (e.g. no subdomains configured yet), exit silently
+            return 0;
+        }
+        
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), f)) {
+            printf("%s", buf);
+        }
+        fclose(f);
+        return 0;
+    }
+    
+    if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
+        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', or 'get_domain_config'.\n");
+        return 1;
+    }
+    
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <lock|unlock> <site_path>\n", argv[0]);
+        return 1;
+    }
+    
+    const char *site_path = argv[2];
     
     // 4. Resolve the target path to absolute canonical path
     char real_site_path[PATH_MAX];

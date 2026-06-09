@@ -742,13 +742,34 @@ function download_and_extract_wordpress($target_dir, $home) {
 function resolve_domain_path($domain_str, $home) {
     $domains_dir = $home . '/domains';
     
-    // First, check if the domain_str exists directly as a main domain folder
+    // First, check if the domain_str exists directly as a main domain folder or a custom domain folder
     if (is_dir($domains_dir . '/' . $domain_str)) {
+        $doc_root = $domains_dir . '/' . $domain_str;
+        if (is_dir($doc_root . '/public_html')) {
+            $doc_root .= '/public_html';
+        }
+        
+        $parts = explode('.', $domain_str);
+        $is_subdomain = false;
+        $parent = $domain_str;
+        $subdomain = '';
+        
+        // Determine if it looks like a subdomain structure
+        for ($i = 1; $i < count($parts) - 1; $i++) {
+            $p = implode('.', array_slice($parts, $i));
+            if (is_dir($domains_dir . '/' . $p)) {
+                $is_subdomain = true;
+                $parent = $p;
+                $subdomain = implode('.', array_slice($parts, 0, $i));
+                break;
+            }
+        }
+        
         return [
-            'is_subdomain' => false,
-            'parent_domain' => $domain_str,
-            'subdomain_prefix' => '',
-            'doc_root' => $domains_dir . '/' . $domain_str . '/public_html'
+            'is_subdomain' => $is_subdomain,
+            'parent_domain' => $parent,
+            'subdomain_prefix' => $subdomain,
+            'doc_root' => $doc_root
         ];
     }
     
@@ -758,6 +779,75 @@ function resolve_domain_path($domain_str, $home) {
         $parent = implode('.', array_slice($parts, $i));
         if (is_dir($domains_dir . '/' . $parent)) {
             $subdomain = implode('.', array_slice($parts, 0, $i));
+            
+            // Query DirectAdmin config files via SUID wrapper to check for custom document root
+            $custom_docroot = '';
+            $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
+            if (!file_exists($wrapper)) {
+                $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+            }
+            if (file_exists($wrapper)) {
+                $subdomain_config = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($parent) . " subdomains 2>/dev/null");
+                $domain_config = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($parent) . " conf 2>/dev/null");
+                
+                if ($subdomain_config) {
+                    $lines = explode("\n", $subdomain_config);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (empty($line)) continue;
+                        $parts_line = explode('=', $line, 2);
+                        if (count($parts_line) === 2 && trim($parts_line[0]) === $subdomain) {
+                            $val = trim($parts_line[1]);
+                            if (strpos($val, '/') === 0) {
+                                $custom_docroot = $val;
+                            } else {
+                                if (strpos($val, 'public_html/') === 0) {
+                                    $custom_docroot = $domains_dir . '/' . $parent . '/' . $val;
+                                } else {
+                                    $custom_docroot = $home . '/' . $val;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                if (empty($custom_docroot) && $domain_config) {
+                    $lines = explode("\n", $domain_config);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if (empty($line)) continue;
+                        $parts_line = explode('=', $line, 2);
+                        if (count($parts_line) === 2) {
+                            $key = trim($parts_line[0]);
+                            $val = trim($parts_line[1]);
+                            if ($key === 'subdomain_docroot_' . $subdomain || 
+                                $key === 'subdomain_public_html_' . $subdomain || 
+                                $key === 'subdomain_private_html_' . $subdomain) {
+                                if (strpos($val, '/') === 0) {
+                                    $custom_docroot = $val;
+                                } else {
+                                    if (strpos($val, 'public_html/') === 0) {
+                                        $custom_docroot = $domains_dir . '/' . $parent . '/' . $val;
+                                    } else {
+                                        $custom_docroot = $home . '/' . $val;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!empty($custom_docroot)) {
+                return [
+                    'is_subdomain' => true,
+                    'parent_domain' => $parent,
+                    'subdomain_prefix' => $subdomain,
+                    'doc_root' => $custom_docroot
+                ];
+            }
             
             // Now check standard subdomain directories
             $subdomain_dir = $domains_dir . '/' . $parent . '/subdomains/' . $subdomain . '/public_html';

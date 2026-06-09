@@ -1053,7 +1053,7 @@ function renderSites(sites) {
                 <!-- Quick actions -->
                 <div class="card-actions" onclick="event.stopPropagation()">
                     <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Login</button>
-                    <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${i})">🗑</button>
+                 
                 </div>
                 <span class="chevron" id="cv-${i}">▶</span>
             </div>
@@ -1143,7 +1143,7 @@ function renderSites(sites) {
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
                     <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
-                    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete</button>
+                    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
             </div>
         </div>`;
