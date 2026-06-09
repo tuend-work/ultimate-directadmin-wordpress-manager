@@ -211,9 +211,22 @@ function scan_wordpress_installations($home, $username) {
             $domain_path = $domains_dir . '/' . $domain;
             if (!is_dir($domain_path)) continue;
             
+            // 1. Scan standard public_html folder
             $public_html = $domain_path . '/public_html';
             if (is_dir($public_html)) {
                 scan_directory_for_wp($public_html, $domain, '', $installations);
+            }
+            
+            // 2. Scan dedicated subdomains folder if it exists
+            $subdomains_dir = $domain_path . '/subdomains';
+            if (is_dir($subdomains_dir)) {
+                $subdomains = array_diff(scandir($subdomains_dir), ['.', '..']);
+                foreach ($subdomains as $subdomain) {
+                    $sub_pub_html = $subdomains_dir . '/' . $subdomain . '/public_html';
+                    if (is_dir($sub_pub_html)) {
+                        scan_directory_for_wp($sub_pub_html, $subdomain . '.' . $domain, '', $installations);
+                    }
+                }
             }
         }
     }
@@ -314,9 +327,25 @@ function install_wordpress_instance($params, $home) {
     $subdir_clean = str_replace(['..', '\\'], '', $subdir);
     $subdir_clean = trim($subdir_clean, '/');
     
-    $target_dir = $home . '/domains/' . $domain_clean . '/public_html';
-    if ($subdir_clean !== '') {
-        $target_dir .= '/' . $subdir_clean;
+    $is_subdomain = !empty($params['is_subdomain']) && ($params['is_subdomain'] === 'true' || $params['is_subdomain'] === '1' || $params['is_subdomain'] === true);
+    
+    if ($is_subdomain) {
+        $subdomain_host = $subdir_clean . '.' . $domain_clean;
+        $subdomain_dir = $home . '/domains/' . $domain_clean . '/subdomains/' . $subdir_clean . '/public_html';
+        if (is_dir($home . '/domains/' . $domain_clean . '/subdomains/' . $subdir_clean)) {
+            $target_dir = $subdomain_dir;
+        } else {
+            $target_dir = $home . '/domains/' . $domain_clean . '/public_html/' . $subdir_clean;
+        }
+        $site_host = $subdomain_host;
+        $request_uri = '/';
+    } else {
+        $target_dir = $home . '/domains/' . $domain_clean . '/public_html';
+        if ($subdir_clean !== '') {
+            $target_dir .= '/' . $subdir_clean;
+        }
+        $site_host = $domain_clean;
+        $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
     }
     
     // Security check: must reside inside home directory
@@ -355,27 +384,27 @@ function install_wordpress_instance($params, $home) {
     
     // Write wp-config.php
     $wp_config_content = "<?php\n" .
-        "define('DB_NAME', '" . addslashes($db_name) . "');\n" .
-        "define('DB_USER', '" . addslashes($db_user) . "');\n" .
-        "define('DB_PASSWORD', '" . addslashes($db_pass) . "');\n" .
-        "define('DB_HOST', 'localhost');\n" .
-        "define('DB_CHARSET', 'utf8mb4');\n" .
-        "define('DB_COLLATE', '');\n\n" .
-        $salts . "\n" .
-        "\$table_prefix = 'wp_';\n\n" .
-        "define('WP_DEBUG', false);\n\n" .
-        "if (!defined('ABSPATH')) {\n" .
-        "    define('ABSPATH', __DIR__ . '/');\n" .
-        "}\n\n" .
-        "require_once ABSPATH . 'wp-settings.php';\n";
-        
+         "define('DB_NAME', '" . addslashes($db_name) . "');\n" .
+         "define('DB_USER', '" . addslashes($db_user) . "');\n" .
+         "define('DB_PASSWORD', '" . addslashes($db_pass) . "');\n" .
+         "define('DB_HOST', 'localhost');\n" .
+         "define('DB_CHARSET', 'utf8mb4');\n" .
+         "define('DB_COLLATE', '');\n\n" .
+         $salts . "\n" .
+         "\$table_prefix = 'wp_';\n\n" .
+         "define('WP_DEBUG', false);\n\n" .
+         "if (!defined('ABSPATH')) {\n" .
+         "    define('ABSPATH', __DIR__ . '/');\n" .
+         "}\n\n" .
+         "require_once ABSPATH . 'wp-settings.php';\n";
+         
     file_put_contents($target_dir . '/wp-config.php', $wp_config_content);
     @chmod($target_dir . '/wp-config.php', 0600);
     
     // Mock server context for installation script
-    $_SERVER['HTTP_HOST'] = $domain;
-    $_SERVER['SERVER_NAME'] = $domain;
-    $_SERVER['REQUEST_URI'] = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
+    $_SERVER['HTTP_HOST'] = $site_host;
+    $_SERVER['SERVER_NAME'] = $site_host;
+    $_SERVER['REQUEST_URI'] = $request_uri;
     $_SERVER['SERVER_PROTOCOL'] = 'HTTP/1.1';
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
@@ -403,7 +432,7 @@ function install_wordpress_instance($params, $home) {
     
     return [
         'success' => true,
-        'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $domain . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
+        'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($is_subdomain ? '' : ''),
         'details' => $install_result
     ];
 }
@@ -473,9 +502,22 @@ PHP;
         $parts = explode('/', $relative);
         if (count($parts) > 0) {
             $domain = $parts[0];
-            $pub_index = array_search('public_html', $parts);
-            if ($pub_index !== false && $pub_index < count($parts) - 1) {
-                $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+            
+            // Check if it's in a subdomains directory: e.g. domain.com/subdomains/sub/public_html
+            $subdomains_index = array_search('subdomains', $parts);
+            if ($subdomains_index !== false && isset($parts[$subdomains_index + 1])) {
+                $subdomain_name = $parts[$subdomains_index + 1];
+                $domain = $subdomain_name . '.' . $domain;
+                
+                $pub_index = array_search('public_html', $parts);
+                if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                    $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+                }
+            } else {
+                $pub_index = array_search('public_html', $parts);
+                if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                    $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+                }
             }
         }
     }
