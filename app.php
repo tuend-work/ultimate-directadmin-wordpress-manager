@@ -737,18 +737,36 @@ function download_and_extract_wordpress($target_dir, $home) {
 }
 
 /**
+ * Debug logging helper
+ */
+function wp_manager_log($msg) {
+    $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+    $home = getenv('HOME') ?: "/home/{$username}";
+    $log_file = $home . '/.ultimate_wp_manager_debug.log';
+    $timestamp = date('Y-m-d H:i:s');
+    @file_put_contents($log_file, "[{$timestamp}] {$msg}\n", FILE_APPEND);
+}
+
+/**
  * Helper to resolve dynamic path overrides from DirectAdmin config files.
  */
 function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
+    wp_manager_log("get_custom_docroot_from_configs: domain={$domain}, subdomain={$subdomain}");
     $domains_dir = $home . '/domains';
     
     // Check subdomains, conf, and custom HTTPD configurations via wrapper
     $types = ['subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache', 'subdomains.docroot.override'];
     $config_contents = [];
     foreach ($types as $type) {
-        $content = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>/dev/null");
-        if ($content) {
+        $cmd = escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>&1";
+        $content = @shell_exec($cmd);
+        wp_manager_log("  wrapper query '{$type}': status=" . ($content !== null ? "success" : "failed") . ", length=" . strlen((string)$content));
+        if ($content && strpos($content, 'Error:') === false) {
             $config_contents[$type] = $content;
+        } else {
+            if ($content) {
+                wp_manager_log("    wrapper error: " . trim($content));
+            }
         }
     }
     
@@ -756,20 +774,25 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
     
     // 1. Search in subdomains.docroot.override file if resolving a subdomain
     if (empty($custom_docroot) && !empty($subdomain) && !empty($config_contents['subdomains.docroot.override'])) {
+        wp_manager_log("  parsing subdomains.docroot.override");
         $lines = explode("\n", $config_contents['subdomains.docroot.override']);
         foreach ($lines as $line) {
             $line = trim($line);
             if (empty($line)) continue;
+            wp_manager_log("    line: {$line}");
             $parts_line = explode('=', $line, 2);
             if (count($parts_line) === 2 && trim($parts_line[0]) === $subdomain) {
                 $val = trim($parts_line[1]);
                 $query_params = [];
                 parse_str($val, $query_params);
+                wp_manager_log("      matched subdomain '{$subdomain}', query_params: " . json_encode($query_params));
                 if (!empty($query_params['public_html'])) {
                     $custom_docroot = $query_params['public_html'];
+                    wp_manager_log("      found public_html override: {$custom_docroot}");
                     break;
                 } elseif (!empty($query_params['private_html'])) {
                     $custom_docroot = $query_params['private_html'];
+                    wp_manager_log("      found private_html override: {$custom_docroot}");
                     break;
                 }
             }
@@ -868,36 +891,35 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
     
     // Resolve absolute path (handles relative paths like /domains/sub... or public_html/...)
     if (!empty($custom_docroot)) {
+        wp_manager_log("  raw resolved custom_docroot: {$custom_docroot}");
         $custom_docroot = rtrim(trim($custom_docroot), '/');
+        $resolved = '';
         if (strpos($custom_docroot, $home) === 0) {
-            return $custom_docroot;
-        }
-        if (strpos($custom_docroot, '/home/') === 0) {
-            return $custom_docroot;
-        }
-        if (strpos($custom_docroot, '/domains/') === 0) {
-            return $home . $custom_docroot;
-        }
-        if (strpos($custom_docroot, 'domains/') === 0) {
-            return $home . '/' . $custom_docroot;
-        }
-        if (strpos($custom_docroot, '/public_html/') === 0) {
-            return $home . $custom_docroot;
-        }
-        if (strpos($custom_docroot, 'public_html/') === 0) {
-            return $home . '/' . $custom_docroot;
-        }
-        
-        // Relative to home directory if it starts with slash
-        if (strpos($custom_docroot, '/') === 0) {
+            $resolved = $custom_docroot;
+        } elseif (strpos($custom_docroot, '/home/') === 0) {
+            $resolved = $custom_docroot;
+        } elseif (strpos($custom_docroot, '/domains/') === 0) {
+            $resolved = $home . $custom_docroot;
+        } elseif (strpos($custom_docroot, 'domains/') === 0) {
+            $resolved = $home . '/' . $custom_docroot;
+        } elseif (strpos($custom_docroot, '/public_html/') === 0) {
+            $resolved = $home . $custom_docroot;
+        } elseif (strpos($custom_docroot, 'public_html/') === 0) {
+            $resolved = $home . '/' . $custom_docroot;
+        } elseif (strpos($custom_docroot, '/') === 0) {
             if (is_dir($custom_docroot)) {
-                return $custom_docroot;
+                $resolved = $custom_docroot;
+            } else {
+                $resolved = $home . $custom_docroot;
             }
-            return $home . $custom_docroot;
+        } else {
+            $resolved = $home . '/' . $custom_docroot;
         }
-        return $home . '/' . $custom_docroot;
+        wp_manager_log("  absolute resolved custom_docroot: {$resolved}");
+        return $resolved;
     }
     
+    wp_manager_log("  no custom_docroot found in configs");
     return '';
 }
 
@@ -905,6 +927,7 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
  * Resolves a selected domain string into parent domain, subdomain prefix (if any), and its document root directory.
  */
 function resolve_domain_path($domain_str, $home) {
+    wp_manager_log("resolve_domain_path: domain_str={$domain_str}");
     $domains_dir = $home . '/domains';
     
     $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
@@ -914,6 +937,7 @@ function resolve_domain_path($domain_str, $home) {
     
     // First, check if the domain_str exists directly as a main domain folder or a custom domain folder
     if (is_dir($domains_dir . '/' . $domain_str)) {
+        wp_manager_log("  domain_str exists directly as directory: {$domain_str}");
         $custom_docroot = get_custom_docroot_from_configs($domain_str, '', $home, $wrapper);
         if (!empty($custom_docroot)) {
             $doc_root = $custom_docroot;
@@ -940,12 +964,14 @@ function resolve_domain_path($domain_str, $home) {
             }
         }
         
-        return [
+        $res = [
             'is_subdomain' => $is_subdomain,
             'parent_domain' => $parent,
             'subdomain_prefix' => $subdomain,
             'doc_root' => $doc_root
         ];
+        wp_manager_log("  resolved to: " . json_encode($res));
+        return $res;
     }
     
     // If not, it could be a subdomain. Let's find if a parent domain matches the suffix.
@@ -954,16 +980,19 @@ function resolve_domain_path($domain_str, $home) {
         $parent = implode('.', array_slice($parts, $i));
         if (is_dir($domains_dir . '/' . $parent)) {
             $subdomain = implode('.', array_slice($parts, 0, $i));
+            wp_manager_log("  matched parent domain folder: {$parent}, subdomain_prefix: {$subdomain}");
             
             // Query DirectAdmin configs via SUID wrapper to check for custom document root
             $custom_docroot = get_custom_docroot_from_configs($parent, $subdomain, $home, $wrapper);
             if (!empty($custom_docroot)) {
-                return [
+                $res = [
                     'is_subdomain' => true,
                     'parent_domain' => $parent,
                     'subdomain_prefix' => $subdomain,
                     'doc_root' => $custom_docroot
                 ];
+                wp_manager_log("  resolved to: " . json_encode($res));
+                return $res;
             }
             
             // Now check standard subdomain directories
@@ -979,22 +1008,26 @@ function resolve_domain_path($domain_str, $home) {
                 $doc_root = $parent_docroot . '/' . $subdomain;
             }
             
-            return [
+            $res = [
                 'is_subdomain' => true,
                 'parent_domain' => $parent,
                 'subdomain_prefix' => $subdomain,
                 'doc_root' => $doc_root
             ];
+            wp_manager_log("  resolved to fallback: " . json_encode($res));
+            return $res;
         }
     }
     
     // Fallback: treat it as a main domain, even if folder doesn't exist yet
-    return [
+    $res = [
         'is_subdomain' => false,
         'parent_domain' => $domain_str,
         'subdomain_prefix' => '',
         'doc_root' => $domains_dir . '/' . $domain_str . '/public_html'
     ];
+    wp_manager_log("  resolved to absolute fallback: " . json_encode($res));
+    return $res;
 }
 
 
