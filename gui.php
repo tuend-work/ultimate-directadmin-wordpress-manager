@@ -48,7 +48,9 @@ body {
 .plugin-legacy-host {
     padding:0px;
 }
-
+div#iframe-container{
+    width: 100%;
+}
 /* ── Top bar ── */
 .topbar {
     background: var(--bg2);
