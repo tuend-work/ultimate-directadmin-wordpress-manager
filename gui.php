@@ -246,7 +246,8 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 12px;
-    padding: 16px;
+    padding: 0;
+    margin-top: 12px;
 }
 .detail-item label {
     display: block;
@@ -398,7 +399,7 @@ body {
     border: none;
     border-bottom: 2px solid transparent;
     color: var(--text2);
-    padding: 10px 16px;
+    padding: 12px 16px;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
@@ -407,6 +408,7 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin-bottom: -1px;
 }
 .tab-btn:hover {
     color: var(--text);
@@ -417,6 +419,7 @@ body {
 }
 .card-tab-content {
     display: none;
+    padding: 16px;
 }
 .card-tab-content.active {
     display: block;
@@ -424,7 +427,7 @@ body {
 .tab-grid-details {
     display: grid;
     grid-template-columns: 1.2fr 1fr;
-    gap: 16px;
+    gap: 24px;
 }
 .card-sec-title {
     font-size: 13px;
@@ -432,7 +435,7 @@ body {
     color: var(--text);
     border-bottom: 1px solid var(--border);
     padding-bottom: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 0px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -444,6 +447,7 @@ body {
     max-height: 250px;
     overflow-y: auto;
     padding-right: 4px;
+    margin-top: 12px;
 }
 .plugin-item {
     background: var(--bg);
@@ -1075,7 +1079,7 @@ function renderSites(sites) {
                         </div>
                         <div>
                             <div class="card-sec-title">🛡️ Security & Protection</div>
-                            <div class="plugin-item">
+                            <div class="plugin-item" style="margin-top: 12px;">
                                 <div class="plugin-info">
                                     <div class="plugin-name" id="lock-label-${i}">${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}</div>
                                     <div class="plugin-desc">Protects core files and plugins from modifications or unauthorized writes.</div>
