@@ -725,11 +725,35 @@ function esc(s) {
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
     const chev = document.getElementById('cv-'+i);
-    const isOpen = body.classList.toggle('open');
+    body.classList.toggle('open');
     chev.classList.toggle('open');
-    if (isOpen) {
-        loadPlugins(i);
-        loadThemes(i);
+}
+
+/* ─── Switch tab ─── */
+function switchTab(siteIdx, tabName, event) {
+    if (event) event.stopPropagation();
+    
+    const contents = document.querySelectorAll(`#cb-${siteIdx} .card-tab-content`);
+    contents.forEach(el => el.classList.remove('active'));
+    
+    const buttons = document.querySelectorAll(`#cb-${siteIdx} .tab-btn`);
+    buttons.forEach(el => el.classList.remove('active'));
+    
+    document.getElementById(`tab-content-${siteIdx}-${tabName}`).classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    }
+    
+    if (tabName === 'plugins') {
+        const list = document.getElementById(`plugin-list-${siteIdx}`);
+        if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load plugins')) {
+            loadPlugins(siteIdx);
+        }
+    } else if (tabName === 'themes') {
+        const list = document.getElementById(`theme-list-${siteIdx}`);
+        if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load themes')) {
+            loadThemes(siteIdx);
+        }
     }
 }
 
