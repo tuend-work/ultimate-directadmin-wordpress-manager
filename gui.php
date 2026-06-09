@@ -5,6 +5,24 @@
  */
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 $isAdmin  = is_admin_user();
+
+// Fetch server IP and hostname
+$hostname = gethostname();
+$server_ip = gethostbyname($hostname);
+if ($server_ip === '127.0.0.1' || $server_ip === '127.0.1.1' || !filter_var($server_ip, FILTER_VALIDATE_IP)) {
+    $server_ip = $_SERVER['SERVER_ADDR'] ?? $_SERVER['LOCAL_ADDR'] ?? '';
+    if (empty($server_ip) && strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+        $server_ip = trim(shell_exec("hostname -I | awk '{print $1}'"));
+    }
+}
+if (empty($server_ip)) {
+    $server_ip = $_SERVER['HTTP_HOST'] ?? 'Unknown IP';
+}
+// Strip port from HTTP_HOST if it's there
+if (strpos($server_ip, ':') !== false) {
+    $parts = explode(':', $server_ip);
+    $server_ip = $parts[0];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -566,7 +584,12 @@ input:disabled + .slider {
         <div class="logo-icon">W</div>
         WordPress Manager
     </div>
-    <span style="color:var(--text3);font-size:11px;">DirectAdmin Edition</span>
+    <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
+        <span><?php echo htmlspecialchars($server_ip); ?> | <?php echo htmlspecialchars($hostname); ?></span>
+        <a href="/" class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);">
+            ← Back to DirectAdmin
+        </a>
+    </span>
     <div class="user">
         <span>👤 <?php echo htmlspecialchars($username); ?></span>
         <?php if ($isAdmin): ?>
