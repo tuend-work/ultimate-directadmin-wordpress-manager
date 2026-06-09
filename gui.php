@@ -647,7 +647,7 @@ input:disabled + .slider {
 
         <div class="form-section">
             <div class="form-section-title">Database</div>
-            <div class="form-row">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px;">
                 <div class="form-group">
                     <label>DB Name</label>
                     <div class="input-group">
@@ -662,12 +662,12 @@ input:disabled + .slider {
                         <input type="text" id="inst-dbuser" class="form-control" placeholder="wpuser" required maxlength="16">
                     </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>DB Password</label>
-                <div class="input-group-btn">
-                    <input type="text" id="inst-dbpass" class="form-control" required placeholder="Password">
-                    <button type="button" class="btn btn-secondary" onclick="genPass('inst-dbpass')">Generate</button>
+                <div class="form-group">
+                    <label>DB Password</label>
+                    <div class="input-group-btn">
+                        <input type="text" id="inst-dbpass" class="form-control" required placeholder="Password">
+                        <button type="button" class="btn btn-secondary" onclick="genPass('inst-dbpass')">Gen</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -678,7 +678,7 @@ input:disabled + .slider {
                 <label>Site Title</label>
                 <input type="text" id="inst-title" class="form-control" required placeholder="My WordPress Site">
             </div>
-            <div class="form-row">
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr 1.2fr; gap: 12px; margin-top: 12px;">
                 <div class="form-group">
                     <label>Admin Username</label>
                     <input type="text" id="inst-adminuser" class="form-control" required placeholder="admin">
@@ -690,10 +690,10 @@ input:disabled + .slider {
                         <button type="button" class="btn btn-secondary" onclick="genPass('inst-adminpass')">Gen</button>
                     </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>Admin Email</label>
-                <input type="email" id="inst-adminemail" class="form-control" required value="admin@<?php echo htmlspecialchars($username); ?>.com">
+                <div class="form-group">
+                    <label>Admin Email</label>
+                    <input type="email" id="inst-adminemail" class="form-control" required value="admin@<?php echo htmlspecialchars($username); ?>.com">
+                </div>
             </div>
         </div>
 
