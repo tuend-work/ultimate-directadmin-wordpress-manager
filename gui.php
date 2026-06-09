@@ -1051,57 +1051,67 @@ function renderSites(sites) {
                     </div>
                 </div>
 
-                <div class="card-expanded-grid">
-                    <!-- Left Column: Details & Security -->
-                    <div>
-                        <div class="card-sec-title">ℹ️ Installation Details</div>
-                        <div class="card-details" style="margin-bottom: 16px;">
-                            <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
-                            <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
-                            <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
-                            <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
-                            <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
-                            <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
-                            <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
-                        </div>
+                <!-- Tabs headers -->
+                <div class="card-tabs" onclick="event.stopPropagation()">
+                    <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)">ℹ️ Details & Security</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
+                </div>
 
-                        <div class="card-sec-title">🛡️ Security & Protection</div>
-                        <div class="plugin-item">
-                            <div class="plugin-info">
-                                <div class="plugin-name" id="lock-label-${i}">${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}</div>
-                                <div class="plugin-desc">Protects core files and plugins from modifications or unauthorized writes.</div>
+                <!-- Tab 1: Details & Security -->
+                <div class="card-tab-content active" id="tab-content-${i}-details">
+                    <div class="tab-grid-details">
+                        <div>
+                            <div class="card-sec-title">ℹ️ Installation Details</div>
+                            <div class="card-details">
+                                <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
+                                <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
+                                <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
+                                <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
+                                <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
+                                <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
+                                <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
                             </div>
-                            <div class="plugin-toggle">
-                                <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                                    ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
-                                </button>
+                        </div>
+                        <div>
+                            <div class="card-sec-title">🛡️ Security & Protection</div>
+                            <div class="plugin-item">
+                                <div class="plugin-info">
+                                    <div class="plugin-name" id="lock-label-${i}">${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}</div>
+                                    <div class="plugin-desc">Protects core files and plugins from modifications or unauthorized writes.</div>
+                                </div>
+                                <div class="plugin-toggle">
+                                    <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
+                                        ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right Column: Plugin Manager -->
-                    <div>
-                        <div class="card-sec-title">
-                            <span>🔌 Installed Plugins</span>
-                            <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
-                        </div>
-                        <div class="plugin-list" id="plugin-list-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
-                                Expanding card will load plugins...
-                            </div>
+                <!-- Tab 2: Plugins -->
+                <div class="card-tab-content" id="tab-content-${i}-plugins">
+                    <div class="card-sec-title">
+                        <span>🔌 Installed Plugins</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
+                    </div>
+                    <div class="plugin-list" id="plugin-list-${i}">
+                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                            Clicking Plugins tab or Refresh will load plugins...
                         </div>
                     </div>
+                </div>
 
-                    <!-- Third Column: Theme Manager -->
-                    <div>
-                        <div class="card-sec-title">
-                            <span>🎨 Installed Themes</span>
-                            <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
-                        </div>
-                        <div class="plugin-list" id="theme-list-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
-                                Expanding card will load themes...
-                            </div>
+                <!-- Tab 3: Themes -->
+                <div class="card-tab-content" id="tab-content-${i}-themes">
+                    <div class="card-sec-title">
+                        <span>🎨 Installed Themes</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
+                    </div>
+                    <div class="plugin-list" id="theme-list-${i}">
+                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                            Clicking Themes tab or Refresh will load themes...
                         </div>
                     </div>
                 </div>
