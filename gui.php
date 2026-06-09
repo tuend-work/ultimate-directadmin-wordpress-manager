@@ -639,9 +639,14 @@ input:disabled + .slider {
             </div>
             
             <div id="inst-zip-wrapper" style="display: none;" class="form-group">
-                <label>Chọn tệp ZIP source code <span style="font-weight:400;color:var(--red)">*</span></label>
-                <input type="file" id="inst-zip-file" class="form-control" accept=".zip">
-                <span style="font-size:11px;color:var(--text3)">Tệp ZIP chứa mã nguồn WordPress ở thư mục gốc và tệp cơ sở dữ liệu (.sql.gz, .sql, .gz).</span>
+                <label>Chọn tệp ZIP source code từ hosting <span style="font-weight:400;color:var(--red)">*</span></label>
+                <div class="input-group-btn">
+                    <select id="inst-zip-path" class="form-control">
+                        <option value="" disabled selected>Đang quét tệp .zip...</option>
+                    </select>
+                    <button type="button" class="btn btn-secondary" onclick="loadUserZipFiles()">⟳ Quét lại</button>
+                </div>
+                <span style="font-size:11px;color:var(--text3)">Hãy upload tệp ZIP sao lưu của bạn lên hosting (qua FTP/File Manager) rồi chọn từ danh sách trên. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
             </div>
         </div>
 
@@ -1539,20 +1544,43 @@ async function fetchSubdomains(domain) {
     } catch { return []; }
 }
 
+async function loadUserZipFiles() {
+    const select = document.getElementById('inst-zip-path');
+    select.innerHTML = '<option value="" disabled selected>Đang quét các tệp ZIP trên hosting...</option>';
+    try {
+        const r = await fetch(apiUrl('list_zips'));
+        const d = await r.json();
+        if (d.success && d.zips && d.zips.length) {
+            select.innerHTML = '<option value="" disabled selected>Chọn tệp ZIP backup...</option>';
+            d.zips.forEach(z => {
+                const opt = document.createElement('option');
+                opt.value = z.absolute_path;
+                opt.textContent = z.display_path;
+                select.appendChild(opt);
+            });
+        } else {
+            select.innerHTML = '<option value="" disabled selected>Không tìm thấy tệp .zip nào trong tài khoản hosting của bạn.</option>';
+        }
+    } catch {
+        select.innerHTML = '<option value="" disabled selected>Lỗi khi kết nối để quét tệp ZIP.</option>';
+    }
+}
+
 function toggleInstallSource(mode) {
     const zipWrapper = document.getElementById('inst-zip-wrapper');
-    const zipInput = document.getElementById('inst-zip-file');
+    const zipSelect = document.getElementById('inst-zip-path');
     const adminSec = document.getElementById('inst-admin-section');
     const adminInputs = adminSec.querySelectorAll('input');
 
     if (mode === 'zip') {
         zipWrapper.style.display = 'block';
-        zipInput.required = true;
+        zipSelect.required = true;
         adminSec.style.display = 'none';
         adminInputs.forEach(i => i.required = false);
+        loadUserZipFiles();
     } else {
         zipWrapper.style.display = 'none';
-        zipInput.required = false;
+        zipSelect.required = false;
         adminSec.style.display = 'block';
         adminInputs.forEach(i => i.required = true);
     }
@@ -1568,10 +1596,6 @@ function openInstallModal() {
     const radios = document.getElementsByName('inst-source');
     if (radios.length) radios[0].checked = true;
     toggleInstallSource('fresh');
-    
-    // Clear zip input file
-    const zipFile = document.getElementById('inst-zip-file');
-    if (zipFile) zipFile.value = '';
 }
 
 /* ─── Install: create DB + install WP ─── */
@@ -1614,11 +1638,11 @@ async function executeInstall(e) {
         fd.append('protocol', document.getElementById('inst-protocol').value);
 
         if (mode === 'zip') {
-            const zipInput = document.getElementById('inst-zip-file');
-            if (zipInput.files.length === 0) {
-                throw new Error("Vui lòng chọn tệp ZIP source code!");
+            const zipPath = document.getElementById('inst-zip-path').value;
+            if (!zipPath) {
+                throw new Error("Vui lòng chọn một tệp ZIP backup để tiến hành cài đặt!");
             }
-            fd.append('zip_file', zipInput.files[0]);
+            fd.append('zip_path', zipPath);
         } else {
             fd.append('site_title', document.getElementById('inst-title').value);
             fd.append('admin_user', document.getElementById('inst-adminuser').value);

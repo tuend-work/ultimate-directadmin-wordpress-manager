@@ -1572,22 +1572,21 @@ function install_wordpress_instance($params, $home) {
     }
     
     if ($mode === 'zip') {
-        // Zip install
-        if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception("Không nhận được tệp ZIP tải lên hoặc tệp bị lỗi.");
+        // Zip install from path
+        $zip_path = $params['zip_path'] ?? '';
+        if (empty($zip_path) || !file_exists($zip_path)) {
+            throw new Exception("Không tìm thấy tệp ZIP cấu hình tại đường dẫn: " . $zip_path);
         }
-        
-        $zip_tmp = $_FILES['zip_file']['tmp_name'];
         
         // Save copy to .wp-cache for debugging
         $cache_dir = $home . '/.wp-cache';
         if (!is_dir($cache_dir)) {
             mkdir($cache_dir, 0755, true);
         }
-        @copy($zip_tmp, $cache_dir . '/uploaded_backup.zip');
+        @copy($zip_path, $cache_dir . '/uploaded_backup.zip');
         
         $zip = new ZipArchive;
-        if ($zip->open($zip_tmp) === TRUE) {
+        if ($zip->open($zip_path) === TRUE) {
             $zip->extractTo($target_dir);
             $zip->close();
         } else {
@@ -2094,18 +2093,14 @@ function run_api() {
                 break;
                 
             case 'install':
-                wp_manager_log("Install API triggered. POST: " . json_encode($_POST) . " | FILES: " . json_encode($_FILES) . " | CONTENT_TYPE: " . ($_SERVER['CONTENT_TYPE'] ?? '') . " | CONTENT_LENGTH: " . ($_SERVER['CONTENT_LENGTH'] ?? ''));
+                wp_manager_log("Install API triggered. POST: " . json_encode($_POST) . " | CONTENT_TYPE: " . ($_SERVER['CONTENT_TYPE'] ?? '') . " | CONTENT_LENGTH: " . ($_SERVER['CONTENT_LENGTH'] ?? ''));
                 $mode = $_POST['mode'] ?? 'fresh';
                 if ($mode === 'zip') {
-                    $required = ['domain', 'db_name', 'db_user', 'db_pass'];
+                    $required = ['domain', 'db_name', 'db_user', 'db_pass', 'zip_path'];
                     foreach ($required as $field) {
                         if (empty($_POST[$field])) {
                             throw new Exception("Required parameter missing: {$field}");
                         }
-                    }
-                    if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
-                        $err_code = $_FILES['zip_file']['error'] ?? 'missing';
-                        throw new Exception("Vui lòng tải lên tệp ZIP source code hợp lệ! (Mã lỗi: {$err_code})");
                     }
                 } else {
                     $required = ['domain', 'db_name', 'db_user', 'db_pass', 'site_title', 'admin_user', 'admin_pass', 'admin_email'];
@@ -2117,6 +2112,11 @@ function run_api() {
                 }
                 $res = install_wordpress_instance($_POST, $home);
                 echo json_encode($res);
+                break;
+                
+            case 'list_zips':
+                $zips = list_user_zip_files($home);
+                echo json_encode(['success' => true, 'zips' => $zips]);
                 break;
                 
             case 'magic_login':
@@ -2259,4 +2259,47 @@ function run_api() {
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
+}
+
+/**
+ * Scan home folder for any .zip files
+ */
+function list_user_zip_files($home) {
+    $zip_files = [];
+    // Standard Linux find command
+    if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+        $cmd = sprintf(
+            'find %s -name "*.zip" -not -path "*/node_modules/*" -not -path "*/.git/*" -maxdepth 4 2>/dev/null',
+            escapeshellarg($home)
+        );
+        $output = [];
+        @exec($cmd, $output);
+        foreach ($output as $line) {
+            $line = trim($line);
+            if ($line !== '' && file_exists($line)) {
+                $display_path = str_replace($home . '/', '', $line);
+                $zip_files[] = [
+                    'absolute_path' => $line,
+                    'display_path' => $display_path
+                ];
+            }
+        }
+    } else {
+        // Windows fallback for local development
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($home, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($iterator as $item) {
+            if ($item->isFile() && strtolower($item->getExtension()) === 'zip') {
+                $path = str_replace('\\', '/', $item->getPathname());
+                $display_path = str_replace($home . '/', '', $path);
+                $zip_files[] = [
+                    'absolute_path' => $path,
+                    'display_path' => $display_path
+                ];
+            }
+        }
+    }
+    return $zip_files;
 }
