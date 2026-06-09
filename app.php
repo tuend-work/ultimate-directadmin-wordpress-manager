@@ -122,10 +122,23 @@ function wp_manager_htaccess_modify($htaccess_path, $marker, $rules, $enable) {
 }
 
 /**
+ * Check if wp-config.php is writable, throwing clear error if not (e.g. Chmod 400 or locked)
+ */
+function check_wp_config_writable($wp_config_path) {
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("Safety block: wp-config.php không tồn tại.");
+    }
+    if (!is_writable($wp_config_path)) {
+        throw new Exception("Không thể ghi vào file wp-config.php. File đang bị giới hạn quyền truy cập (ví dụ: Chmod 400) hoặc bị khóa ghi. Vui lòng kiểm tra và phân lại quyền cho file (ví dụ: Chmod 644) trước khi thực hiện.");
+    }
+}
+
+/**
  * Safely add/change or remove constant definitions in wp-config.php
  */
 function wp_manager_config_define_modify($wp_config_path, $constant, $value, $enable) {
     if (!file_exists($wp_config_path)) return;
+    check_wp_config_writable($wp_config_path);
     $content = file_get_contents($wp_config_path);
     
     // Remove existing define if present
@@ -293,11 +306,14 @@ function toggle_wordpress_security_measure($site_path, $measure, $enable, $param
     // Measures that need to write to wp-includes/
     $wp_includes_write_measures = ['forbid_php_includes'];
     
-    if (in_array($measure, $wp_config_write_measures) && !is_writable($wp_config_path)) {
-        throw new Exception(
-            "Không thể ghi vào wp-config.php. File đang bị khóa (immutable/chattr). " .
-            "Vui lòng tắt WP Lock trong tab 'Overview Details' trước khi thay đổi tính năng này."
-        );
+    if (in_array($measure, $wp_config_write_measures)) {
+        if (is_wordpress_locked($site_path)) {
+            throw new Exception(
+                "Không thể ghi vào wp-config.php. File đang bị khóa (immutable/chattr). " .
+                "Vui lòng tắt WP Lock trong tab 'Overview Details' trước khi thay đổi tính năng này."
+            );
+        }
+        check_wp_config_writable($wp_config_path);
     }
     
     if (in_array($measure, $wp_includes_write_measures)) {
@@ -1605,6 +1621,12 @@ function parse_wp_config($wp_config_path) {
     if (file_exists($mu_plugin_file)) {
         $disable_auto_update = true;
     }
+
+    // Extract WP Debug status
+    $wp_debug_enabled = false;
+    if (preg_match("/define\s*\(\s*['\"]WP_DEBUG['\"]\s*,\s*true\s*\)/i", $content)) {
+        $wp_debug_enabled = true;
+    }
     
     return [
         'path' => dirname($wp_config_path),
@@ -1620,7 +1642,8 @@ function parse_wp_config($wp_config_path) {
         'status' => $status,
         'locked' => is_wordpress_locked(dirname($wp_config_path)),
         'disable_wp_cron' => $disable_wp_cron,
-        'disable_auto_update' => $disable_auto_update
+        'disable_auto_update' => $disable_auto_update,
+        'wp_debug_enabled' => $wp_debug_enabled
     ];
 }
 
@@ -2501,6 +2524,7 @@ function toggle_wordpress_cron($site_path, $enable) {
     if (!file_exists($wp_config_path)) {
         throw new Exception("Safety block: wp-config.php not found.");
     }
+    check_wp_config_writable($wp_config_path);
     
     $content = file_get_contents($wp_config_path);
     
@@ -2631,6 +2655,28 @@ PHP;
         file_put_contents($mu_plugin_file, $code);
         @chmod($mu_plugin_file, 0644);
     }
+    
+}
+
+/**
+ * Toggle WP DEBUG status (WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY)
+ */
+function toggle_wordpress_debug($site_path, $enable) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before modifying WP Debug status.");
+    }
+    
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("Safety block: wp-config.php not found.");
+    }
+    
+    check_wp_config_writable($wp_config_path);
+    
+    // Modify debug constants
+    wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG', (bool)$enable, true);
+    wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG_LOG', (bool)$enable, true);
+    wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG_DISPLAY', false, true);
     
     return true;
 }
@@ -3076,6 +3122,22 @@ function run_api() {
                     @unlink($cache_file);
                 }
                 echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái tự động kiểm tra cập nhật thành công.']);
+                break;
+
+            case 'toggle_debug':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                toggle_wordpress_debug($_POST['path'], $enable);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái WP Debug thành công.']);
                 break;
 
             default:

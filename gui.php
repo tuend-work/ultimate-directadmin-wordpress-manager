@@ -1726,6 +1726,55 @@ async function toggleAutoUpdate(i) {
     }
 }
 
+/* ─── WP Debug Management ─── */
+async function toggleDebug(i) {
+    const s = allSites[i];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before modifying WP Debug status.', 'error');
+        return;
+    }
+    const isDebugEnabled = s.wp_debug_enabled;
+    const btn = document.getElementById('btn-debug-' + i);
+    const label = document.getElementById('debug-label-' + i);
+    
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const nextStatus = !isDebugEnabled;
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('enable', nextStatus ? 'true' : 'false');
+        
+        const r = await fetch(apiUrl('toggle_debug'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            s.wp_debug_enabled = nextStatus;
+            toast(d.message || 'Updated WP Debug status.', 'success');
+            
+            if (s.wp_debug_enabled) {
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.textContent = '⚙️ Tắt';
+                label.innerHTML = '⚡ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
+            } else {
+                btn.className = 'btn btn-sm btn-primary';
+                btn.textContent = '⚡ Bật';
+                label.innerHTML = '⚙️ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+            }
+        } else {
+            toast(d.error || 'Failed to update WP Debug status.', 'error');
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.textContent = originalText;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 /* ─── WordPress Core Update ─── */
 async function updateCore(i) {
     const s = allSites[i];
@@ -1907,6 +1956,16 @@ function renderSites(sites) {
                         </div>
                         <button class="btn btn-sm ${s.disable_auto_update ? 'btn-secondary' : 'btn-primary'}" id="btn-autoupdate-${i}" onclick="toggleAutoUpdate(${i})">
                             ${s.disable_auto_update ? '⚙️ Tắt' : '⚡ Bật'}
+                        </button>
+                    </div>
+                    <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
+                        <div class="lock-status-label" id="debug-label-${i}">
+                            ${s.wp_debug_enabled 
+                                ? '⚡ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '⚙️ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
+                        </div>
+                        <button class="btn btn-sm ${s.wp_debug_enabled ? 'btn-secondary' : 'btn-primary'}" id="btn-debug-${i}" onclick="toggleDebug(${i})">
+                            ${s.wp_debug_enabled ? '⚙️ Tắt' : '⚡ Bật'}
                         </button>
                     </div>
                 </div>
