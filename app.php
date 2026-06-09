@@ -737,16 +737,167 @@ function download_and_extract_wordpress($target_dir, $home) {
 }
 
 /**
+ * Helper to resolve dynamic path overrides from DirectAdmin config files.
+ */
+function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
+    $domains_dir = $home . '/domains';
+    
+    // Check subdomains, conf, and custom HTTPD configurations via wrapper
+    $types = ['subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache'];
+    $config_contents = [];
+    foreach ($types as $type) {
+        $content = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>/dev/null");
+        if ($content) {
+            $config_contents[$type] = $content;
+        }
+    }
+    
+    $custom_docroot = '';
+    
+    // 1. Search in custom overrides (.cust_*) first
+    foreach (['cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache'] as $type) {
+        if (!empty($config_contents[$type])) {
+            $content = $config_contents[$type];
+            $lines = explode("\n", $content);
+            $in_subdomain_block = false;
+            
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                
+                // If resolving a subdomain, keep track of conditional blocks:
+                // |*if SUB="subdomain"| or |*if SUB='subdomain'|
+                if (!empty($subdomain)) {
+                    if (preg_match('/\|\*if\s+SUB=["\']' . preg_quote($subdomain, '/') . '["\']\|/i', $line)) {
+                        $in_subdomain_block = true;
+                        continue;
+                    }
+                    if (strpos($line, '|*endif|') !== false) {
+                        $in_subdomain_block = false;
+                        continue;
+                    }
+                }
+                
+                // Check if target DOCROOT / SDOCROOT matches the block or main domain context
+                if (empty($subdomain) || $in_subdomain_block) {
+                    if (preg_match('/\|\?(SDOCROOT|DOCROOT)=([^\s\|]+)/i', $line, $matches)) {
+                        $val = trim($matches[2]);
+                        $val = str_replace('`HOME`', $home, $val);
+                        $val = str_replace('`DOMAIN`', $domain, $val);
+                        $val = trim($val, '`\'"');
+                        if (!empty($val)) {
+                            $custom_docroot = $val;
+                            if (!empty($subdomain)) {
+                                break 2; // Found for subdomain
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (empty($subdomain) && !empty($custom_docroot)) {
+                break;
+            }
+        }
+    }
+    
+    // 2. Search in .subdomains file if resolving a subdomain
+    if (empty($custom_docroot) && !empty($subdomain) && !empty($config_contents['subdomains'])) {
+        $lines = explode("\n", $config_contents['subdomains']);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            $parts_line = explode('=', $line, 2);
+            if (count($parts_line) === 2 && trim($parts_line[0]) === $subdomain) {
+                $custom_docroot = trim($parts_line[1]);
+                break;
+            }
+        }
+    }
+    
+    // 3. Search in .conf file
+    if (empty($custom_docroot) && !empty($config_contents['conf'])) {
+        $lines = explode("\n", $config_contents['conf']);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            $parts_line = explode('=', $line, 2);
+            if (count($parts_line) === 2) {
+                $key = trim($parts_line[0]);
+                $val = trim($parts_line[1]);
+                if (!empty($subdomain)) {
+                    if ($key === 'subdomain_docroot_' . $subdomain || 
+                        $key === 'subdomain_public_html_' . $subdomain || 
+                        $key === 'subdomain_private_html_' . $subdomain) {
+                        $custom_docroot = $val;
+                        break;
+                    }
+                } else {
+                    if ($key === 'docroot' || $key === 'public_html' || $key === 'private_html') {
+                        $custom_docroot = $val;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Resolve absolute path (handles relative paths like /domains/sub... or public_html/...)
+    if (!empty($custom_docroot)) {
+        $custom_docroot = rtrim(trim($custom_docroot), '/');
+        if (strpos($custom_docroot, $home) === 0) {
+            return $custom_docroot;
+        }
+        if (strpos($custom_docroot, '/home/') === 0) {
+            return $custom_docroot;
+        }
+        if (strpos($custom_docroot, '/domains/') === 0) {
+            return $home . $custom_docroot;
+        }
+        if (strpos($custom_docroot, 'domains/') === 0) {
+            return $home . '/' . $custom_docroot;
+        }
+        if (strpos($custom_docroot, '/public_html/') === 0) {
+            return $home . $custom_docroot;
+        }
+        if (strpos($custom_docroot, 'public_html/') === 0) {
+            return $home . '/' . $custom_docroot;
+        }
+        
+        // Relative to home directory if it starts with slash
+        if (strpos($custom_docroot, '/') === 0) {
+            if (is_dir($custom_docroot)) {
+                return $custom_docroot;
+            }
+            return $home . $custom_docroot;
+        }
+        return $home . '/' . $custom_docroot;
+    }
+    
+    return '';
+}
+
+/**
  * Resolves a selected domain string into parent domain, subdomain prefix (if any), and its document root directory.
  */
 function resolve_domain_path($domain_str, $home) {
     $domains_dir = $home . '/domains';
     
+    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
+    if (!file_exists($wrapper)) {
+        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+    }
+    
     // First, check if the domain_str exists directly as a main domain folder or a custom domain folder
     if (is_dir($domains_dir . '/' . $domain_str)) {
-        $doc_root = $domains_dir . '/' . $domain_str;
-        if (is_dir($doc_root . '/public_html')) {
-            $doc_root .= '/public_html';
+        $custom_docroot = get_custom_docroot_from_configs($domain_str, '', $home, $wrapper);
+        if (!empty($custom_docroot)) {
+            $doc_root = $custom_docroot;
+        } else {
+            $doc_root = $domains_dir . '/' . $domain_str;
+            if (is_dir($doc_root . '/public_html')) {
+                $doc_root .= '/public_html';
+            }
         }
         
         $parts = explode('.', $domain_str);
@@ -780,66 +931,8 @@ function resolve_domain_path($domain_str, $home) {
         if (is_dir($domains_dir . '/' . $parent)) {
             $subdomain = implode('.', array_slice($parts, 0, $i));
             
-            // Query DirectAdmin config files via SUID wrapper to check for custom document root
-            $custom_docroot = '';
-            $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
-            if (!file_exists($wrapper)) {
-                $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-            }
-            if (file_exists($wrapper)) {
-                $subdomain_config = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($parent) . " subdomains 2>/dev/null");
-                $domain_config = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($parent) . " conf 2>/dev/null");
-                
-                if ($subdomain_config) {
-                    $lines = explode("\n", $subdomain_config);
-                    foreach ($lines as $line) {
-                        $line = trim($line);
-                        if (empty($line)) continue;
-                        $parts_line = explode('=', $line, 2);
-                        if (count($parts_line) === 2 && trim($parts_line[0]) === $subdomain) {
-                            $val = trim($parts_line[1]);
-                            if (strpos($val, '/') === 0) {
-                                $custom_docroot = $val;
-                            } else {
-                                if (strpos($val, 'public_html/') === 0) {
-                                    $custom_docroot = $domains_dir . '/' . $parent . '/' . $val;
-                                } else {
-                                    $custom_docroot = $home . '/' . $val;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-                
-                if (empty($custom_docroot) && $domain_config) {
-                    $lines = explode("\n", $domain_config);
-                    foreach ($lines as $line) {
-                        $line = trim($line);
-                        if (empty($line)) continue;
-                        $parts_line = explode('=', $line, 2);
-                        if (count($parts_line) === 2) {
-                            $key = trim($parts_line[0]);
-                            $val = trim($parts_line[1]);
-                            if ($key === 'subdomain_docroot_' . $subdomain || 
-                                $key === 'subdomain_public_html_' . $subdomain || 
-                                $key === 'subdomain_private_html_' . $subdomain) {
-                                if (strpos($val, '/') === 0) {
-                                    $custom_docroot = $val;
-                                } else {
-                                    if (strpos($val, 'public_html/') === 0) {
-                                        $custom_docroot = $domains_dir . '/' . $parent . '/' . $val;
-                                    } else {
-                                        $custom_docroot = $home . '/' . $val;
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            
+            // Query DirectAdmin configs via SUID wrapper to check for custom document root
+            $custom_docroot = get_custom_docroot_from_configs($parent, $subdomain, $home, $wrapper);
             if (!empty($custom_docroot)) {
                 return [
                     'is_subdomain' => true,
@@ -855,7 +948,11 @@ function resolve_domain_path($domain_str, $home) {
                 $doc_root = $subdomain_dir;
             } else {
                 // Fallback to public_html/subdomain
-                $doc_root = $domains_dir . '/' . $parent . '/public_html/' . $subdomain;
+                // Check if parent domain has a custom document root
+                $parent_custom_docroot = get_custom_docroot_from_configs($parent, '', $home, $wrapper);
+                $parent_docroot = !empty($parent_custom_docroot) ? $parent_custom_docroot : ($domains_dir . '/' . $parent . '/public_html');
+                
+                $doc_root = $parent_docroot . '/' . $subdomain;
             }
             
             return [
@@ -875,6 +972,7 @@ function resolve_domain_path($domain_str, $home) {
         'doc_root' => $domains_dir . '/' . $domain_str . '/public_html'
     ];
 }
+
 
 /**
  * Core WordPress programmatic Installer
