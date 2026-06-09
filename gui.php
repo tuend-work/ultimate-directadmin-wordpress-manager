@@ -1353,6 +1353,14 @@ function renderSites(sites) {
                         <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
                         <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
                     </div>
+                    <div class="lock-section" onclick="event.stopPropagation()">
+                        <div class="lock-status-label" id="lock-label-${i}">
+                            ${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}
+                        </div>
+                        <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
+                            ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Tab 1.5: Security & Protection -->
