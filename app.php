@@ -108,6 +108,9 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
     $db_user = $db_user_match[1] ?? '';
     $db_pass = $db_pass_match[1] ?? '';
     $db_host = $db_host_match[1] ?? 'localhost';
+    if ($db_host === 'localhost') {
+        $db_host = '127.0.0.1';
+    }
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     // Extract WP Version
@@ -605,12 +608,10 @@ function update_plugin_from_github() {
  * Handle API Endpoint actions
  */
 function run_api() {
-    header("Content-Type: application/json");
-    header("Access-Control-Allow-Origin: *");
-    
-    // Explicit headers for raw mode
-    echo "HTTP/1.1 200 OK\r\n";
-    echo "Content-Type: application/json\r\n";
+    // Standard CGI headers for DirectAdmin raw mode
+    echo "Status: 200 OK\r\n";
+    echo "Content-Type: application/json; charset=utf-8\r\n";
+    echo "Access-Control-Allow-Origin: *\r\n";
     echo "\r\n";
     
     $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
