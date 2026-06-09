@@ -764,14 +764,21 @@ function wp_manager_log($msg) {
  * Helper to resolve dynamic path overrides from DirectAdmin config files.
  */
 function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
-    wp_manager_log("get_custom_docroot_from_configs: domain={$domain}, subdomain={$subdomain}");
+    $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+    if ($username === 'nobody' && strpos($home, '/home/') === 0) {
+        $parts = explode('/', $home);
+        if (isset($parts[2])) {
+            $username = $parts[2];
+        }
+    }
+    wp_manager_log("get_custom_docroot_from_configs: domain={$domain}, subdomain={$subdomain}, user={$username}");
     $domains_dir = $home . '/domains';
     
     // Check subdomains, conf, and custom HTTPD configurations via wrapper
     $types = ['subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache', 'subdomains.docroot.override'];
     $config_contents = [];
     foreach ($types as $type) {
-        $cmd = escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>&1";
+        $cmd = escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($username) . " " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>&1";
         $content = wp_exec($cmd);
         wp_manager_log("  wrapper query '{$type}': status=" . ($content !== null ? "success" : "failed") . ", length=" . strlen((string)$content));
         if ($content && strpos($content, 'Error:') === false) {

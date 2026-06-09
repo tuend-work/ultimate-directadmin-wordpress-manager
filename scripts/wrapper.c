@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     
     // 2. Validate arguments
     if (argc < 3) {
-        fprintf(stderr, "Usage:\n  %s <lock|unlock> <site_path>\n  %s get_domain_config <domain> <subdomains|conf>\n", argv[0], argv[0]);
+        fprintf(stderr, "Usage:\n  %s <lock|unlock> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0], argv[0]);
         return 1;
     }
     
@@ -56,12 +56,30 @@ int main(int argc, char *argv[]) {
     
     // Handle get_domain_config subcommand
     if (strcmp(action, "get_domain_config") == 0) {
-        if (argc != 4) {
-            fprintf(stderr, "Usage: %s get_domain_config <domain> <subdomains|conf>\n", argv[0]);
+        if (argc != 5) {
+            fprintf(stderr, "Usage: %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0]);
             return 1;
         }
-        const char *domain = argv[2];
-        const char *type = argv[3];
+        const char *target_user = argv[2];
+        const char *domain = argv[3];
+        const char *type = argv[4];
+        
+        // Security check: Only root and diradmin can query other users' domain configurations
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+            if (strcmp(target_user, pw->pw_name) != 0) {
+                fprintf(stderr, "Error: Access denied. You can only query your own configurations.\n");
+                return 1;
+            }
+        }
+        
+        // Validate target_user to prevent path traversal
+        for (const char *p = target_user; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+                fprintf(stderr, "Error: Invalid username characters.\n");
+                return 1;
+            }
+        }
+        
         if (strcmp(type, "subdomains") != 0 && strcmp(type, "conf") != 0 &&
             strcmp(type, "cust_httpd") != 0 && strcmp(type, "cust_nginx") != 0 &&
             strcmp(type, "cust_openlitespeed") != 0 && strcmp(type, "cust_apache") != 0 &&
@@ -79,7 +97,7 @@ int main(int argc, char *argv[]) {
         }
         
         char path[PATH_MAX];
-        snprintf(path, sizeof(path), "/usr/local/directadmin/data/users/%s/domains/%s.%s", pw->pw_name, domain, type);
+        snprintf(path, sizeof(path), "/usr/local/directadmin/data/users/%s/domains/%s.%s", target_user, domain, type);
         
         FILE *f = fopen(path, "r");
         if (!f) {
