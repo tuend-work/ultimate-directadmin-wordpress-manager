@@ -116,7 +116,7 @@ body {
 .btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 4px; }
 
 /* ── Content ── */
-.content { padding: 20px 24px; max-width: 1600px; }
+.content { padding: 20px 24px; max-width: 100%; width: 100%; }
 
 /* ── Search ── */
 .toolbar-search {

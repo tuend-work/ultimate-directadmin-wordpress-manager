@@ -66,6 +66,20 @@ chmod 755 "$PLUGIN_DIR"/reseller/index.raw 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/user/index.html 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/user/index.raw 2>/dev/null
 
+echo -e "\e[34m[5/5] Compiling secure SUID wrapper...\e[0m"
+if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
+  gcc -O2 "$PLUGIN_DIR/scripts/wrapper.c" -o "$PLUGIN_DIR/scripts/wrapper"
+  if [ -f "$PLUGIN_DIR/scripts/wrapper" ]; then
+    chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
+    chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
+    echo -e "\e[32m✔ Wrapper compiled and SUID permissions configured successfully.\e[0m"
+  else
+    echo -e "\e[31mError: Failed to compile wrapper binary.\e[0m"
+  fi
+else
+  echo -e "\e[31mError: wrapper.c not found.\e[0m"
+fi
+
 # Cleanup
 rm -rf "$TMP_DIR"
 

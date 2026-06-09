@@ -117,19 +117,22 @@ function lock_wordpress_instance($site_path) {
         ];
     }
     
-    $esc_path = escapeshellarg($site_path);
-    $chattr_path = trim(@shell_exec('which chattr 2>/dev/null') ?: '/usr/bin/chattr');
+    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
+    if (!file_exists($wrapper)) {
+        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+    }
     
-    $output1 = @shell_exec("sudo {$chattr_path} +i {$esc_path}/wp-config.php 2>&1");
-    $output2 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-includes 2>&1");
-    $output3 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-admin 2>&1");
-    $output4 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-content/plugins 2>&1");
-    $output5 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-content/themes 2>&1");
+    if (!file_exists($wrapper)) {
+        throw new Exception("Lock failed: SUID wrapper binary not found. Please run the install script (install.sh) as root to compile the binary.");
+    }
+    
+    $esc_path = escapeshellarg($site_path);
+    $esc_wrapper = escapeshellarg($wrapper);
+    $output = @shell_exec("{$esc_wrapper} lock {$esc_path} 2>&1");
     
     if (!is_wordpress_locked($site_path)) {
-        $errors = array_filter(array_map('trim', [$output1, $output2, $output3, $output4, $output5]));
-        $err_msg = !empty($errors) ? implode(" | ", $errors) : "lsattr did not detect the lock. Please check if sudo requires a password.";
-        throw new Exception("Lock failed: " . $err_msg);
+        $err_msg = $output ? trim($output) : "lsattr did not detect the lock. SUID permissions might be missing.";
+        throw new Exception("Lock failed: " . $err_msg . "\n\nPlease ensure your administrator compiled and set SUID permissions:\ngcc -O2 " . dirname($wrapper) . "/wrapper.c -o " . $wrapper . "\nchown root:diradmin " . $wrapper . "\nchmod 4755 " . $wrapper);
     }
     
     return [
@@ -153,19 +156,22 @@ function unlock_wordpress_instance($site_path) {
         ];
     }
     
-    $esc_path = escapeshellarg($site_path);
-    $chattr_path = trim(@shell_exec('which chattr 2>/dev/null') ?: '/usr/bin/chattr');
+    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
+    if (!file_exists($wrapper)) {
+        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+    }
     
-    $output1 = @shell_exec("sudo {$chattr_path} -i {$esc_path}/wp-config.php 2>&1");
-    $output2 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-includes 2>&1");
-    $output3 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-admin 2>&1");
-    $output4 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-content/plugins 2>&1");
-    $output5 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-content/themes 2>&1");
+    if (!file_exists($wrapper)) {
+        throw new Exception("Unlock failed: SUID wrapper binary not found. Please run the install script (install.sh) as root to compile the binary.");
+    }
+    
+    $esc_path = escapeshellarg($site_path);
+    $esc_wrapper = escapeshellarg($wrapper);
+    $output = @shell_exec("{$esc_wrapper} unlock {$esc_path} 2>&1");
     
     if (is_wordpress_locked($site_path)) {
-        $errors = array_filter(array_map('trim', [$output1, $output2, $output3, $output4, $output5]));
-        $err_msg = !empty($errors) ? implode(" | ", $errors) : "lsattr still detects the lock. Please check if sudo requires a password.";
-        throw new Exception("Unlock failed: " . $err_msg);
+        $err_msg = $output ? trim($output) : "lsattr still detects the lock. SUID permissions might be missing.";
+        throw new Exception("Unlock failed: " . $err_msg . "\n\nPlease ensure your administrator compiled and set SUID permissions:\ngcc -O2 " . dirname($wrapper) . "/wrapper.c -o " . $wrapper . "\nchown root:diradmin " . $wrapper . "\nchmod 4755 " . $wrapper);
     }
     
     return [
