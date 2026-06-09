@@ -983,7 +983,7 @@ function renderSites(sites) {
             <!-- Card body (expanded) -->
             <div class="card-body" id="cb-${i}">
                 <!-- Big screenshot strip -->
-                <div class="card-screenshot-bar">
+                <div style="display:none;" class="card-screenshot-bar">
                     <img id="shot-big-${i}" src="${esc(shotSrc)}"
                           alt="Website screenshot"
                           onerror="this.style.opacity='.1'">
