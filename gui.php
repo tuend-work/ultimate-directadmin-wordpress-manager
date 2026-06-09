@@ -490,6 +490,9 @@ div#iframe-container{
 }
 .plugin-toggle {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 .lock-section {
     margin-top: 16px;
@@ -918,6 +921,9 @@ async function loadPlugins(i) {
                         <div class="plugin-meta">v${esc(p.version)} | By ${esc(p.author)} | ${statusBadge}</div>
                     </div>
                     <div class="plugin-toggle">
+                        <button class="btn btn-sm btn-secondary" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
+                            ↑ Update
+                        </button>
                         <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
                             ${actionText}
                         </button>
@@ -929,6 +935,41 @@ async function loadPlugins(i) {
         }
     } catch (err) {
         container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load plugins.</div>';
+    }
+}
+
+async function updatePlugin(siteIdx, plugIdx, file) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is locked. Unlock WP Lock before updating plugins.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-plug-up-${siteIdx}-${plugIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('plugin_file', file);
+
+        const r = await fetch(apiUrl('update_wp_plugin'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'Plugin updated successfully!', 'success');
+            loadPlugins(siteIdx);
+        } else {
+            toast(d.error || 'Plugin update failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 
@@ -997,6 +1038,9 @@ async function loadThemes(i) {
                         <div class="plugin-meta">v${esc(t.version)} | By ${esc(t.author)} | ${statusBadge}</div>
                     </div>
                     <div class="plugin-toggle">
+                        <button class="btn btn-sm btn-secondary" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                            ↑ Update
+                        </button>
                         <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ${actionText}
                         </button>
@@ -1008,6 +1052,41 @@ async function loadThemes(i) {
         }
     } catch (err) {
         container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load themes.</div>';
+    }
+}
+
+async function updateTheme(siteIdx, themeIdx, folder) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is locked. Unlock WP Lock before updating themes.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-theme-up-${siteIdx}-${themeIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('theme_folder', folder);
+
+        const r = await fetch(apiUrl('update_wp_theme'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'Theme updated successfully!', 'success');
+            loadThemes(siteIdx);
+        } else {
+            toast(d.error || 'Theme update failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 
@@ -1339,6 +1418,45 @@ async function toggleLock(i) {
     }
 }
 
+/* ─── WordPress Core Update ─── */
+async function updateCore(i) {
+    const s = allSites[i];
+    if (s.locked) {
+        toast('Website is locked. Unlock WP Lock before updating WordPress core.', 'error');
+        return;
+    }
+
+    if (!confirm('Update WordPress core for this website now? A backup is strongly recommended before running core updates.')) {
+        return;
+    }
+
+    const btn = document.getElementById('btn-core-update-' + i);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating core...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+
+        const r = await fetch(apiUrl('update_core'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'WordPress core updated successfully!', 'success');
+            await fetchSites(true);
+        } else {
+            toast(d.error || 'WordPress core update failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 /* ─── Refresh screenshot ─── */
 function refreshShot(i) {
     const s   = allSites[i];
@@ -1508,6 +1626,7 @@ function renderSites(sites) {
                 <!-- Action row -->
                 <div class="card-action-row">
                     <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
+                    <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
                     <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>

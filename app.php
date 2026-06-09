@@ -947,6 +947,242 @@ function activate_theme($site_path, $theme_folder) {
 }
 
 /**
+ * Prepare a WordPress installation so internal upgrade APIs can run from DirectAdmin CGI.
+ */
+function wp_manager_bootstrap_wordpress($site_path) {
+    $wp_load = rtrim($site_path, '/') . '/wp-load.php';
+    if (!file_exists($wp_load)) {
+        throw new Exception("wp-load.php not found. This does not look like a complete WordPress installation.");
+    }
+
+    if (!defined('FS_METHOD')) {
+        define('FS_METHOD', 'direct');
+    }
+    if (!defined('WP_ADMIN')) {
+        define('WP_ADMIN', true);
+    }
+
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $_SERVER['SERVER_NAME'] = $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'];
+    $_SERVER['REQUEST_URI'] = $_SERVER['REQUEST_URI'] ?? '/wp-admin/';
+    $_SERVER['SERVER_PROTOCOL'] = $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1';
+    $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+    chdir($site_path);
+    require_once $wp_load;
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    require_once ABSPATH . 'wp-admin/includes/theme.php';
+    require_once ABSPATH . 'wp-admin/includes/update.php';
+    require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+    if (function_exists('wp_raise_memory_limit')) {
+        wp_raise_memory_limit('admin');
+    }
+    if (function_exists('wp_update_plugins')) {
+        wp_update_plugins();
+    }
+    if (function_exists('wp_update_themes')) {
+        wp_update_themes();
+    }
+}
+
+/**
+ * Copy WordPress core files from an extracted wordpress.org package.
+ */
+function wp_manager_copy_core_files($src_dir, $target_dir) {
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($src_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($iterator as $item) {
+        $sub_path = str_replace('\\', '/', $iterator->getSubPathName());
+        if ($sub_path === 'wp-content' || strpos($sub_path, 'wp-content/') === 0) {
+            continue;
+        }
+
+        $target = rtrim($target_dir, '/') . '/' . $sub_path;
+        if ($item->isDir()) {
+            if (!is_dir($target)) {
+                mkdir($target, 0755, true);
+            }
+        } else {
+            $parent = dirname($target);
+            if (!is_dir($parent)) {
+                mkdir($parent, 0755, true);
+            }
+            copy($item->getPathname(), $target);
+        }
+    }
+}
+
+/**
+ * Update WordPress core to the latest wordpress.org release.
+ */
+function update_wordpress_core($site_path, $home) {
+    if (!file_exists($site_path . '/wp-config.php')) {
+        throw new Exception("Safety block: wp-config.php not found.");
+    }
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is locked. Please unlock WP Lock before updating WordPress core.");
+    }
+
+    $cache_dir = $home . '/.wp-cache';
+    if (!is_dir($cache_dir)) {
+        mkdir($cache_dir, 0755, true);
+    }
+
+    $zip_path = $cache_dir . '/latest.zip';
+    $ch = curl_init('https://wordpress.org/latest.zip');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    $data = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code !== 200 || !$data) {
+        throw new Exception("Unable to download the latest WordPress core package.");
+    }
+    file_put_contents($zip_path, $data);
+
+    $extract_dir = $cache_dir . '/core_update_' . time();
+    $maintenance = $site_path . '/.maintenance';
+
+    try {
+        $zip = new ZipArchive;
+        if ($zip->open($zip_path) !== TRUE) {
+            throw new Exception("Failed to open WordPress core ZIP.");
+        }
+        mkdir($extract_dir, 0755, true);
+        $zip->extractTo($extract_dir);
+        $zip->close();
+
+        $src_dir = $extract_dir . '/wordpress';
+        if (!is_dir($src_dir)) {
+            throw new Exception("Downloaded WordPress package has an unexpected structure.");
+        }
+
+        file_put_contents($maintenance, "<?php \$upgrading = " . time() . ";");
+        @chmod($maintenance, 0644);
+
+        if (is_dir($site_path . '/wp-admin')) {
+            rmdir_recursive($site_path . '/wp-admin');
+        }
+        if (is_dir($site_path . '/wp-includes')) {
+            rmdir_recursive($site_path . '/wp-includes');
+        }
+
+        wp_manager_copy_core_files($src_dir, $site_path);
+
+        $buffer_level = ob_get_level();
+        ob_start();
+        try {
+            require_once $site_path . '/wp-load.php';
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            if (function_exists('wp_upgrade')) {
+                wp_upgrade();
+            }
+        } catch (Throwable $e) {
+            wp_manager_log("Core updated but database upgrade failed: " . $e->getMessage());
+        }
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    } finally {
+        if (file_exists($maintenance)) {
+            @unlink($maintenance);
+        }
+        if (is_dir($extract_dir)) {
+            rmdir_recursive($extract_dir);
+        }
+    }
+
+    $cache_file = $home . '/.ultimate_wp_manager.json';
+    if (file_exists($cache_file)) {
+        @unlink($cache_file);
+    }
+
+    return ['success' => true, 'message' => 'WordPress core updated successfully.'];
+}
+
+/**
+ * Update one installed WordPress plugin using WordPress' native upgrader.
+ */
+function update_wordpress_plugin($site_path, $plugin_file) {
+    if (!preg_match('/^[a-z0-9_\-\.\/]+\.php$/i', $plugin_file) || strpos($plugin_file, '..') !== false) {
+        throw new Exception("Invalid plugin file.");
+    }
+    if (!file_exists($site_path . '/wp-content/plugins/' . $plugin_file)) {
+        throw new Exception("Plugin file not found.");
+    }
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is locked. Please unlock WP Lock before updating plugins.");
+    }
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Plugin_Upgrader($skin);
+        $result = $upgrader->upgrade($plugin_file);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+    if (!$result) {
+        throw new Exception("Plugin update failed or no update package is available.");
+    }
+
+    return ['success' => true, 'message' => 'Plugin updated successfully.'];
+}
+
+/**
+ * Update one installed WordPress theme using WordPress' native upgrader.
+ */
+function update_wordpress_theme($site_path, $theme_folder) {
+    if (!preg_match('/^[a-z0-9_\-\.]+$/i', $theme_folder) || strpos($theme_folder, '..') !== false) {
+        throw new Exception("Invalid theme folder.");
+    }
+    if (!is_dir($site_path . '/wp-content/themes/' . $theme_folder)) {
+        throw new Exception("Theme folder not found.");
+    }
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is locked. Please unlock WP Lock before updating themes.");
+    }
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Theme_Upgrader($skin);
+        $result = $upgrader->upgrade($theme_folder);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+    if (!$result) {
+        throw new Exception("Theme update failed or no update package is available.");
+    }
+
+    return ['success' => true, 'message' => 'Theme updated successfully.'];
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -2194,6 +2430,17 @@ function run_api() {
                 toggle_plugin_status($_POST['path'], $_POST['plugin_file'], $_POST['status']);
                 echo json_encode(['success' => true, 'message' => 'Plugin status updated successfully.']);
                 break;
+
+            case 'update_wp_plugin':
+                if (empty($_POST['path']) || empty($_POST['plugin_file'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = update_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                echo json_encode($res);
+                break;
                 
             case 'list_themes':
                 if (empty($_POST['path'])) {
@@ -2223,6 +2470,17 @@ function run_api() {
                 activate_theme($_POST['path'], $_POST['theme_folder']);
                 echo json_encode(['success' => true, 'message' => 'Theme activated successfully.']);
                 break;
+
+            case 'update_wp_theme':
+                if (empty($_POST['path']) || empty($_POST['theme_folder'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = update_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                echo json_encode($res);
+                break;
                 
             case 'get_security_status':
                 if (empty($_POST['path'])) {
@@ -2245,6 +2503,17 @@ function run_api() {
                 $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
                 toggle_wordpress_security_measure($_POST['path'], $_POST['measure'], $enable, $_POST);
                 echo json_encode(['success' => true, 'message' => 'Security setting updated successfully.']);
+                break;
+
+            case 'update_core':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = update_wordpress_core($_POST['path'], $home);
+                echo json_encode($res);
                 break;
                 
             case 'update_plugin':
