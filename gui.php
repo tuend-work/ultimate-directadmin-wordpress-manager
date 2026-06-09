@@ -585,7 +585,7 @@ input:disabled + .slider {
         WordPress Manager
     </div>
     <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
-        <span><?php echo htmlspecialchars($server_ip); ?> | <?php echo htmlspecialchars($hostname); ?></span>
+        <span><?php echo htmlspecialchars($server_ip); ?></span> | <span><?php echo htmlspecialchars($hostname); ?></span>
         <a href="/" class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);">
             ← Back to DirectAdmin
         </a>
