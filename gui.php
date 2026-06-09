@@ -1692,7 +1692,7 @@ async function toggleAutoUpdate(i) {
     btn.textContent = '⏳...';
     
     try {
-        const nextStatus = !isAutoUpdateDisabled; // true to Enable (remove file), false to Disable (create file)
+        const nextStatus = isAutoUpdateDisabled; // true to Enable (remove file), false to Disable (create file)
         const fd = new FormData();
         fd.append('path', s.path);
         fd.append('enable', nextStatus ? 'true' : 'false');
