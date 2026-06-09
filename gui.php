@@ -1,7 +1,7 @@
 <?php
 /**
  * Ultimate DirectAdmin WordPress Manager
- * Front-end GUI Template
+ * Front-end GUI Template — WP Toolkit style (clean & simple)
  */
 
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
@@ -12,1367 +12,875 @@ $isAdmin = is_admin_user();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate WordPress Manager</title>
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
+    <title>WordPress Manager</title>
     <style>
-        :root {
-            --bg-color: #0b0c10;
-            --surface-color: rgba(20, 24, 38, 0.65);
-            --border-color: rgba(255, 255, 255, 0.06);
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            
-            --primary: #6366f1;
-            --primary-glow: rgba(99, 102, 241, 0.35);
-            --primary-hover: #4f46e5;
-            
-            --accent-purple: #a855f7;
-            --accent-purple-glow: rgba(168, 85, 247, 0.35);
-            
-            --success: #10b981;
-            --success-glow: rgba(16, 185, 129, 0.2);
-            --danger: #f43f5e;
-            --danger-glow: rgba(244, 63, 94, 0.2);
-            --warning: #f59e0b;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Outfit', sans-serif;
-            background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #09090b 100%);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-            padding: 2.5rem;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: 13px;
+            background: #f1f1f1;
+            color: #23282d;
             line-height: 1.5;
         }
 
-        /* Glassmorphism panel styling */
-        .glass-panel {
-            background: var(--surface-color);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.5rem 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .header-logo {
+        /* ── Top bar ── */
+        .topbar {
+            background: #1d2327;
+            color: #a7aaad;
+            padding: 0 20px;
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 16px;
+            height: 36px;
+            font-size: 12px;
         }
+        .topbar .logo { color: #fff; font-weight: 600; font-size: 14px; }
+        .topbar .user { margin-left: auto; }
 
-        .logo-icon {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+        /* ── Page header ── */
+        .page-header {
+            background: #fff;
+            border-bottom: 1px solid #dcdcde;
+            padding: 12px 20px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 20px var(--primary-glow);
-            font-size: 1.5rem;
+            gap: 12px;
+        }
+        .page-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d2327;
         }
 
-        .header-title h1 {
-            font-size: 1.6rem;
-            font-weight: 700;
-            background: linear-gradient(to right, #ffffff, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .header-title p {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* Stats Section */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            padding: 1.5rem;
+        /* ── Toolbar ── */
+        .toolbar {
+            background: #fff;
+            border-bottom: 1px solid #dcdcde;
+            padding: 8px 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            border-color: rgba(255, 255, 255, 0.12);
-        }
-
-        .stat-card::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
-        .stat-info h3 {
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-            font-weight: 500;
-            letter-spacing: 0.05em;
-        }
-
-        .stat-info p {
-            font-size: 2.2rem;
-            font-weight: 700;
-            margin-top: 0.25rem;
-        }
-
-        .stat-icon {
-            font-size: 2.5rem;
-            opacity: 0.85;
-            background: linear-gradient(135deg, #f8fafc, #94a3b8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Main Content Panel */
-        .main-panel {
-            padding: 2rem;
-        }
-
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
+            gap: 6px;
             flex-wrap: wrap;
-            gap: 1rem;
+        }
+        .toolbar .sep {
+            width: 1px;
+            height: 20px;
+            background: #dcdcde;
+            margin: 0 4px;
+        }
+        .count-label {
+            margin-left: auto;
+            color: #646970;
+            font-size: 12px;
         }
 
-        .panel-title h2 {
-            font-size: 1.3rem;
-            font-weight: 600;
-        }
-
-        .search-input-wrapper {
-            position: relative;
-        }
-
-        .search-input {
-            background: rgba(15, 18, 30, 0.8);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.6rem 1rem 0.6rem 2.5rem;
-            border-radius: 8px;
-            width: 280px;
-            font-family: inherit;
-            transition: all 0.3s;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 0.8rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
-            pointer-events: none;
-        }
-
-        /* Modern Table styling */
-        .table-responsive {
-            overflow-x: auto;
-            width: 100%;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-
-        th {
-            padding: 1rem;
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            font-weight: 600;
-            border-bottom: 1px solid var(--border-color);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        td {
-            padding: 1.25rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            font-size: 0.95rem;
-            vertical-align: middle;
-        }
-
-        tr:hover td {
-            background: rgba(255, 255, 255, 0.015);
-        }
-
-        .site-title-cell {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .site-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--primary);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .site-meta h4 {
-            font-weight: 600;
-            font-size: 1rem;
-        }
-
-        .site-meta a {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            text-decoration: none;
-            transition: color 0.2s;
+        /* ── Buttons ── */
+        .btn {
             display: inline-flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 5px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-family: inherit;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid transparent;
+            line-height: 1.6;
+            white-space: nowrap;
+        }
+        .btn:disabled { opacity: .5; cursor: not-allowed; }
+        .btn-primary {
+            background: #2271b1;
+            border-color: #2271b1;
+            color: #fff;
+        }
+        .btn-primary:hover:not(:disabled) { background: #135e96; border-color: #135e96; }
+        .btn-secondary {
+            background: #f6f7f7;
+            border-color: #dcdcde;
+            color: #2c3338;
+        }
+        .btn-secondary:hover:not(:disabled) { background: #f0f0f1; border-color: #8c8f94; }
+        .btn-danger { background: #fff; border-color: #cc1818; color: #cc1818; }
+        .btn-danger:hover:not(:disabled) { background: #cc1818; color: #fff; }
+        .btn-link { background: none; border: none; color: #2271b1; padding: 4px 6px; cursor: pointer; font-size: 12px; }
+        .btn-link:hover { color: #135e96; text-decoration: underline; }
+        .btn-sm { padding: 3px 8px; font-size: 11px; }
+
+        /* ── Content area ── */
+        .content { padding: 16px 20px; }
+
+        /* ── Site cards ── */
+        .site-card {
+            background: #fff;
+            border: 1px solid #dcdcde;
+            border-radius: 3px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .site-card-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            gap: 12px;
+            border-bottom: 1px solid #f0f0f1;
+            cursor: pointer;
+            user-select: none;
+        }
+        .site-card-header:hover { background: #f9f9f9; }
+
+        .wp-icon {
+            width: 32px;
+            height: 32px;
+            background: #0073aa;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            flex-shrink: 0;
         }
 
-        .site-meta a:hover {
-            color: var(--primary);
-            text-decoration: underline;
+        .site-info { flex: 1; min-width: 0; }
+        .site-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #1d2327;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        .site-url { color: #646970; font-size: 11px; }
+        .site-url a { color: #2271b1; text-decoration: none; }
+        .site-url a:hover { text-decoration: underline; }
+
+        .site-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
         .badge {
             display: inline-flex;
             align-items: center;
-            padding: 0.25rem 0.6rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
+            gap: 3px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+        .badge-ok { background: #edfaef; color: #1a7431; border-color: #c3e6cb; }
+        .badge-warn { background: #fff8e5; color: #996800; border-color: #f5c942; }
+        .badge-error { background: #fbeaea; color: #8a1f1f; border-color: #f5c6c6; }
+        .badge-version { background: #f0f6fc; color: #044289; border-color: #c8e1ff; }
+
+        .site-actions { display: flex; gap: 4px; align-items: center; }
+
+        /* ── Site body (expanded) ── */
+        .site-card-body {
+            display: none;
+            padding: 14px;
+            background: #fdfdfd;
+            border-top: 1px solid #f0f0f1;
+        }
+        .site-card-body.open { display: block; }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .detail-item label {
+            display: block;
+            font-size: 11px;
             font-weight: 600;
-            gap: 0.35rem;
+            text-transform: uppercase;
+            color: #646970;
+            margin-bottom: 2px;
+        }
+        .detail-item .val {
+            font-size: 12px;
+            color: #1d2327;
+            font-family: monospace;
         }
 
-        .badge-success {
-            background: var(--success-glow);
-            color: var(--success);
-            border: 1px solid rgba(16, 185, 129, 0.2);
+        .action-row {
+            display: flex;
+            gap: 6px;
+            padding-top: 10px;
+            border-top: 1px solid #f0f0f1;
+            flex-wrap: wrap;
         }
 
-        .badge-danger {
-            background: var(--danger-glow);
-            color: var(--danger);
-            border: 1px solid rgba(244, 63, 94, 0.2);
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #646970;
         }
+        .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
+        .empty-state p { margin-top: 6px; }
 
-        .path-text {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        /* Buttons & Actions */
-        .btn {
-            display: inline-flex;
+        /* ── Search ── */
+        .search-row {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px;
             align-items: center;
-            justify-content: center;
-            padding: 0.6rem 1.2rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
-            gap: 0.5rem;
+        }
+        .search-input {
+            padding: 5px 10px;
+            border: 1px solid #dcdcde;
+            border-radius: 3px;
+            font-size: 12px;
+            width: 260px;
             font-family: inherit;
         }
+        .search-input:focus { outline: none; border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
-            color: white;
-            box-shadow: 0 4px 15px var(--primary-glow);
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-        }
-
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .btn-danger {
-            background: var(--danger-glow);
-            color: var(--danger);
-            border: 1px solid rgba(244, 63, 94, 0.3);
-        }
-
-        .btn-danger:hover:not(:disabled) {
-            background: var(--danger);
-            color: white;
-            box-shadow: 0 4px 15px var(--danger-glow);
-        }
-
-        .action-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .btn-icon-only {
-            padding: 0.5rem;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-icon-only:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        .btn-icon-only.magic-login-btn:hover {
-            color: var(--accent-purple);
-            box-shadow: 0 0 10px var(--accent-purple-glow);
-            border-color: var(--accent-purple);
-        }
-
-        .btn-icon-only.delete-btn:hover {
-            color: var(--danger);
-            box-shadow: 0 0 10px var(--danger-glow);
-            border-color: var(--danger);
-        }
-
-        /* Modals */
+        /* ── Modals ── */
         .modal-overlay {
+            display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(8px);
-            z-index: 1000;
-            display: flex;
+            inset: 0;
+            background: rgba(0,0,0,.55);
+            z-index: 9000;
             align-items: center;
             justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
         }
-
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .modal-box {
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 5px 40px rgba(0,0,0,.3);
             width: 100%;
-            max-width: 600px;
-            transform: scale(0.9);
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            max-width: 540px;
             max-height: 90vh;
             overflow-y: auto;
         }
-
-        .modal-overlay.active .modal-box {
-            transform: scale(1);
-        }
-
-        .modal-header {
-            padding: 1.5rem 2rem;
-            border-bottom: 1px solid var(--border-color);
+        .modal-head {
+            padding: 14px 18px;
+            border-bottom: 1px solid #dcdcde;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
-        .modal-body {
-            padding: 2rem;
-        }
-
+        .modal-head h3 { font-size: 15px; font-weight: 600; }
+        .modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: #646970; line-height: 1; }
+        .modal-close:hover { color: #cc1818; }
+        .modal-body { padding: 18px; }
         .modal-footer {
-            padding: 1.5rem 2rem;
-            border-top: 1px solid var(--border-color);
+            padding: 12px 18px;
+            border-top: 1px solid #dcdcde;
             display: flex;
             justify-content: flex-end;
-            gap: 1rem;
-            background: rgba(0, 0, 0, 0.15);
+            gap: 8px;
         }
 
-        /* Form elements */
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.25rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.25rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .form-group.full-width {
-            grid-column: span 2;
-        }
-
-        label {
-            font-size: 0.85rem;
+        /* ── Form ── */
+        .form-section { margin-bottom: 16px; }
+        .form-section-title {
+            font-size: 12px;
             font-weight: 600;
-            color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            color: #646970;
+            border-bottom: 1px solid #f0f0f1;
+            padding-bottom: 4px;
+            margin-bottom: 10px;
         }
-
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 3px;
+            color: #2c3338;
+        }
         .form-control {
-            background: rgba(10, 12, 22, 0.8);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            color: var(--text-primary);
-            font-family: inherit;
             width: 100%;
-            transition: border-color 0.2s;
+            padding: 5px 8px;
+            border: 1px solid #dcdcde;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: inherit;
+            color: #2c3338;
         }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.15);
-        }
-
-        .input-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-
+        .form-control:focus { outline: none; border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; }
+        .input-group { display: flex; gap: 4px; }
         .input-prefix {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-color);
-            color: var(--text-secondary);
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
+            background: #f6f7f7;
+            border: 1px solid #dcdcde;
+            border-radius: 3px;
+            padding: 5px 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            border-right: none;
+            border-radius: 3px 0 0 3px;
         }
+        .input-group .form-control { border-radius: 0 3px 3px 0; }
 
-        /* Terminal updating screen */
-        .terminal-box {
-            background: #020204;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 1.5rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            color: #38bdf8;
-            height: 250px;
-            overflow-y: auto;
-            margin-top: 1rem;
+        /* ── Notice / alert ── */
+        .notice {
+            padding: 8px 12px;
+            border-left: 4px solid #dcdcde;
+            background: #f9f9f9;
+            font-size: 12px;
+            margin-bottom: 10px;
         }
+        .notice-error { border-color: #cc1818; background: #fbeaea; color: #8a1f1f; }
+        .notice-warn  { border-color: #dba617; background: #fff8e5; }
 
-        .terminal-line {
-            margin-bottom: 0.5rem;
-            white-space: pre-wrap;
-        }
-
-        .terminal-success {
-            color: var(--success);
-        }
-
-        .terminal-error {
-            color: var(--danger);
-        }
-
-        /* Empty states */
-        .empty-state {
-            padding: 4rem 2rem;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .empty-icon {
-            font-size: 4rem;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 15px var(--primary-glow));
-        }
-
-        /* Toast Notifications */
-        .toast-container {
+        /* ── Toast ── */
+        #toast-area {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
             display: flex;
             flex-direction: column;
-            gap: 0.75rem;
-            z-index: 1100;
+            gap: 6px;
         }
-
         .toast {
-            background: rgba(18, 22, 38, 0.95);
-            border: 1px solid var(--border-color);
-            border-left: 4px solid var(--primary);
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            color: var(--text-primary);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            transform: translateX(120%);
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            min-width: 300px;
+            background: #1d2327;
+            color: #fff;
+            padding: 9px 16px;
+            border-radius: 3px;
+            font-size: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.3);
+            animation: fadeIn .2s ease;
+            max-width: 320px;
         }
+        .toast.ok  { border-left: 4px solid #00a32a; }
+        .toast.err { border-left: 4px solid #cc1818; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
-        .toast.show {
-            transform: translateX(0);
+        /* ── Admin terminal ── */
+        .terminal {
+            background: #1d2327;
+            color: #a7aaad;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 12px;
+            border-radius: 3px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
         }
+        .terminal .ok  { color: #00a32a; }
+        .terminal .err { color: #cc1818; }
 
-        .toast.toast-success {
-            border-left-color: var(--success);
-        }
-
-        .toast.toast-error {
-            border-left-color: var(--danger);
-        }
+        /* ── Chevron toggle ── */
+        .chevron { font-size: 10px; color: #646970; transition: transform .2s; }
+        .chevron.open { transform: rotate(90deg); }
     </style>
 </head>
 <body>
 
-    <!-- Header Panel -->
-    <div class="glass-panel header">
-        <div class="header-logo">
-            <div class="logo-icon">✨</div>
-            <div class="header-title">
-                <h1>Ultimate WordPress Manager</h1>
-                <p>DirectAdmin Edition | Logged in as: <strong><?php echo htmlspecialchars($username); ?></strong></p>
-            </div>
-        </div>
-        <div class="header-actions">
-            <?php if ($isAdmin): ?>
-                <span class="badge badge-success" style="padding: 0.5rem 1rem;">🛡️ Administrator Mode</span>
-                <button class="btn btn-secondary" onclick="openUpdateModal()">Update from GitHub</button>
-            <?php endif; ?>
-            <button class="btn btn-primary" onclick="openInstallModal()">+ Install WordPress</button>
-        </div>
-    </div>
-
-    <!-- Stats Panel -->
-    <div class="stats-grid">
-        <div class="glass-panel stat-card">
-            <div class="stat-info">
-                <h3>Total Sites</h3>
-                <p id="stat-total">0</p>
-            </div>
-            <div class="stat-icon">🌐</div>
-        </div>
-        <div class="glass-panel stat-card">
-            <div class="stat-info">
-                <h3>Healthy Connections</h3>
-                <p id="stat-healthy">0</p>
-            </div>
-            <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">✓</div>
-        </div>
-        <div class="glass-panel stat-card">
-            <div class="stat-info">
-                <h3>Needs Action</h3>
-                <p id="stat-issues">0</p>
-            </div>
-            <div class="stat-icon" style="background: linear-gradient(135deg, #f43f5e, #fb7185); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">!</div>
-        </div>
-    </div>
-
-    <!-- Main List Panel -->
-    <div class="glass-panel main-panel">
-        <div class="panel-header">
-            <div class="panel-title">
-                <h2>Discovered WordPress Websites</h2>
-            </div>
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <div class="search-input-wrapper">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="site-search" class="search-input" placeholder="Search by name, domain, path..." oninput="filterSites()">
-                </div>
-                <button class="btn btn-secondary" id="btn-scan" onclick="triggerScan()">🔄 Scan Hosting</button>
-            </div>
-        </div>
-
-        <div class="table-responsive">
-            <table id="sites-table">
-                <thead>
-                    <tr>
-                        <th>Site Name & URL</th>
-                        <th>Connection Status</th>
-                        <th>WordPress Version</th>
-                        <th>Database Details</th>
-                        <th>Files Directory</th>
-                        <th style="text-align: right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="sites-list">
-                    <!-- Dynamic injection -->
-                </tbody>
-            </table>
-            
-            <!-- Empty state -->
-            <div class="empty-state" id="empty-state" style="display: none;">
-                <div class="empty-icon">📂</div>
-                <h3>No WordPress installations found</h3>
-                <p style="color: var(--text-secondary);">Run a hosting directory scan or install a new WordPress site to get started.</p>
-                <button class="btn btn-primary" onclick="triggerScan()">🔄 Run Directory Scan</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: Install WordPress -->
-    <div class="modal-overlay" id="modal-install">
-        <div class="glass-panel modal-box">
-            <div class="modal-header">
-                <h3>Install WordPress</h3>
-                <button class="btn-icon-only" onclick="closeInstallModal()">✕</button>
-            </div>
-            <form id="form-install" onsubmit="executeInstall(event)">
-                <div class="modal-body">
-                    <!-- Server Domain & URL Details -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Protocol</label>
-                            <select id="inst-protocol" class="form-control">
-                                <option value="https">https://</option>
-                                <option value="http">http://</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Domain / Subdomain</label>
-                            <select id="inst-domain" class="form-control" required>
-                                <option value="" disabled selected>Loading Domains...</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Subdirectory (optional)</label>
-                        <input type="text" id="inst-subdir" class="form-control" placeholder="e.g. blog (leave empty for root)">
-                    </div>
-
-                    <!-- DB details -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Database Name Suffix</label>
-                            <div class="input-group">
-                                <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
-                                <input type="text" id="inst-dbname" class="form-control" placeholder="wp1" required maxlength="16">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Database User Suffix</label>
-                            <div class="input-group">
-                                <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
-                                <input type="text" id="inst-dbuser" class="form-control" placeholder="wpuser" required maxlength="16">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Database Password</label>
-                        <div class="input-group">
-                            <input type="text" id="inst-dbpass" class="form-control" required placeholder="Choose a secure DB password">
-                            <button type="button" class="btn btn-secondary" onclick="generatePassword('inst-dbpass')">Gen</button>
-                        </div>
-                    </div>
-
-                    <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-
-                    <!-- Admin User details -->
-                    <div class="form-group">
-                        <label>Site Title</label>
-                        <input type="text" id="inst-title" class="form-control" placeholder="My Awesome WordPress Site" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>WordPress Admin Username</label>
-                            <input type="text" id="inst-adminuser" class="form-control" placeholder="admin" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Admin Password</label>
-                            <div class="input-group">
-                                <input type="text" id="inst-adminpass" class="form-control" required placeholder="Dashboard Password">
-                                <button type="button" class="btn btn-secondary" onclick="generatePassword('inst-adminpass')">Gen</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Admin Email</label>
-                        <input type="email" id="inst-adminemail" class="form-control" placeholder="admin@domain.com" required value="admin@<?php echo htmlspecialchars($username); ?>.com">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeInstallModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="btn-submit-install">Install WordPress</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Delete WordPress Confirmation -->
-    <div class="modal-overlay" id="modal-delete">
-        <div class="glass-panel modal-box" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Delete WordPress Site</h3>
-                <button class="btn-icon-only" onclick="closeDeleteModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to permanently delete the WordPress installation at the path below?</p>
-                <div class="path-text" id="del-display-path" style="background: rgba(0, 0, 0, 0.2); padding: 0.75rem 1rem; border-radius: 8px; margin: 1rem 0; border: 1px solid var(--border-color); font-weight: 500; color: #fb7185;"></div>
-                
-                <div style="margin: 1.5rem 0; display: flex; flex-direction: column; gap: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; text-transform: none; color: var(--text-primary); cursor: pointer;">
-                        <input type="checkbox" id="del-db-checkbox" checked style="width: 18px; height: 18px;">
-                        <span>Delete database <strong><span id="del-display-dbname"></span></strong></span>
-                    </label>
-                    <p style="color: var(--text-secondary); font-size: 0.8rem; padding-left: 1.5rem;">If selected, this will also use the DirectAdmin API to remove the MySQL database and associated database user.</p>
-                </div>
-                
-                <p style="color: var(--danger); font-size: 0.85rem; font-weight: 600;">⚠️ WARNING: This action is destructive and cannot be undone!</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-                <button type="button" class="btn btn-danger" id="btn-submit-delete" onclick="executeDelete()">Confirm Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: GitHub Update Console (Admin Only) -->
+<!-- Top bar -->
+<div class="topbar">
+    <span class="logo">WordPress Manager</span>
+    <span>DirectAdmin Edition</span>
+    <span class="user">👤 <?php echo htmlspecialchars($username); ?></span>
     <?php if ($isAdmin): ?>
-    <div class="modal-overlay" id="modal-update">
-        <div class="glass-panel modal-box">
-            <div class="modal-header">
-                <h3>GitHub Update console</h3>
-                <button class="btn-icon-only" id="btn-close-update" onclick="closeUpdateModal()">✕</button>
-            </div>
-            <div class="modal-body">
-                <p>Downloading latest files from the GitHub public repository and updating folder permissions...</p>
-                <div class="terminal-box" id="update-terminal">
-                    <!-- Live console logs -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="btn-ok-update" disabled onclick="closeUpdateModal()">Done</button>
-            </div>
+    <span class="badge badge-ok" style="font-size:11px;">Admin</span>
+    <?php endif; ?>
+</div>
+
+<!-- Page heading -->
+<div class="page-header">
+    <span style="font-size:22px;">⊞</span>
+    <h1>WordPress Installations</h1>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+    <button class="btn btn-primary" onclick="openInstallModal()">+ Install WordPress</button>
+    <button class="btn btn-secondary" id="btn-scan" onclick="triggerScan()">🔄 Scan Hosting</button>
+    <?php if ($isAdmin): ?>
+    <div class="sep"></div>
+    <button class="btn btn-secondary" onclick="openUpdateModal()">↑ Update Plugin</button>
+    <?php endif; ?>
+    <span class="count-label" id="count-label">Loading…</span>
+</div>
+
+<!-- Main content -->
+<div class="content">
+    <div class="search-row">
+        <input type="text" id="search-input" class="search-input" placeholder="Search by name, URL, path…" oninput="filterSites()">
+    </div>
+
+    <div id="sites-container">
+        <div class="empty-state">
+            <div class="icon">⏳</div>
+            <strong>Loading installations…</strong>
         </div>
     </div>
-    <?php endif; ?>
+</div>
 
-    <!-- Toast Notifications Area -->
-    <div class="toast-container" id="toast-container"></div>
+<!-- ═══════════════ MODAL: Install WordPress ═══════════════ -->
+<div class="modal-overlay" id="modal-install">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>Install WordPress</h3>
+            <button class="modal-close" onclick="closeModal('modal-install')">✕</button>
+        </div>
+        <form onsubmit="executeInstall(event)">
+        <div class="modal-body">
+            <div class="form-section">
+                <div class="form-section-title">Website Location</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Protocol</label>
+                        <select id="inst-protocol" class="form-control">
+                            <option value="https">https://</option>
+                            <option value="http">http://</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Domain / Subdomain</label>
+                        <select id="inst-domain" class="form-control" required>
+                            <option value="" disabled selected>Loading…</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Directory <span style="font-weight:400;color:#646970;">(optional — leave empty for domain root)</span></label>
+                    <input type="text" id="inst-subdir" class="form-control" placeholder="e.g. blog">
+                </div>
+            </div>
 
-    <!-- JS Logic -->
-    <script>
-        const DA_USERNAME = '<?php echo $username; ?>';
-        let allSites = [];
-        
-        // Calculate the correct relative API URL path to handle both with and without trailing slashes in the browser URL
-        const getApiUrl = (action = '') => {
-            let base = window.location.pathname.split('?')[0];
-            if (base.endsWith('.html') || base.endsWith('.raw')) {
-                base = base.substring(0, base.lastIndexOf('/') + 1);
-            } else if (!base.endsWith('/')) {
-                base = base + '/';
-            }
-            return base + 'index.raw' + (action ? '?action=' + action : '');
-        };
-        
-        // Show floating message
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            
-            let icon = 'ℹ️';
-            if (type === 'success') icon = '✅';
-            if (type === 'error') icon = '❌';
-            
-            toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
-            container.appendChild(toast);
-            
-            // Trigger animation
-            setTimeout(() => toast.classList.add('show'), 50);
-            
-            // Auto hide
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
-        }
-
-        // Generate strong password
-        function generatePassword(inputId) {
-            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
-            let password = '';
-            // Strong password starting with letters
-            password += 'wpAdmin';
-            for (let i = 0; i < 10; i++) {
-                password += chars.charAt(Math.floor(Math.random() * chars.length));
-            }
-            document.getElementById(inputId).value = password;
-        }
-
-
-
-        // Fetch subdomains for a domain using DirectAdmin API
-        async function fetchSubdomains(domain) {
-            try {
-                const response = await fetch(`/CMD_API_SUBDOMAINS?json=yes&domain=${encodeURIComponent(domain)}`);
-                const contentType = response.headers.get("content-type") || "";
-                if (contentType.includes("application/json")) {
-                    const data = await response.json();
-                    if (data && Array.isArray(data)) {
-                        return data;
-                    } else if (data && data.list) {
-                        return Array.isArray(data.list) ? data.list : Object.values(data.list);
-                    }
-                }
-                
-                // Fallback to URL-encoded parsing if not JSON
-                const text = await response.text();
-                const params = new URLSearchParams(text);
-                const list = [];
-                for (const [key, value] of params.entries()) {
-                    if (key === 'list[]' || key.startsWith('list[')) {
-                        list.push(value);
-                    }
-                }
-                
-                if (list.length === 0) {
-                    const subList = params.get('list');
-                    if (subList) {
-                        return subList.split(',').map(s => s.trim());
-                    }
-                }
-                
-                return list;
-            } catch (e) {
-                console.error("Failed to fetch subdomains for " + domain, e);
-                return [];
-            }
-        }
-
-        // Fetch domains and render
-        async function loadDomains() {
-            try {
-                const response = await fetch(getApiUrl('get_domains'));
-                const data = await response.json();
-                const select = document.getElementById('inst-domain');
-                select.innerHTML = '';
-                
-                if (data.success && data.domains.length > 0) {
-                    select.innerHTML = '<option value="" disabled selected>Select a Domain / Subdomain...</option>';
-                    
-                    for (const domain of data.domains) {
-                        // 1. Add main domain
-                        const opt = document.createElement('option');
-                        opt.value = domain;
-                        opt.textContent = domain;
-                        select.appendChild(opt);
-                        
-                        // 2. Fetch and add subdomains
-                        const subdomains = await fetchSubdomains(domain);
-                        if (subdomains && subdomains.length > 0) {
-                            subdomains.forEach(sub => {
-                                const subOpt = document.createElement('option');
-                                const subFullName = sub + '.' + domain;
-                                subOpt.value = subFullName;
-                                subOpt.textContent = '   └─ ' + subFullName;
-                                select.appendChild(subOpt);
-                            });
-                        }
-                    }
-                } else {
-                    select.innerHTML = '<option value="" disabled>No domains found on hosting</option>';
-                }
-            } catch (error) {
-                showToast("Failed to fetch domains list", 'error');
-            }
-        }
-
-        // Fetch WordPress installations list
-        async function fetchSites(triggerScanOnMissing = false) {
-            const tbody = document.getElementById('sites-list');
-            const emptyState = document.getElementById('empty-state');
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 3rem 0;">🔍 Fetching WordPress installations...</td></tr>';
-            
-            try {
-                const action = triggerScanOnMissing ? 'scan' : 'list';
-                const response = await fetch(getApiUrl(action));
-                const data = await response.json();
-                
-                if (data.success) {
-                    allSites = data.sites;
-                    renderSites(allSites);
-                } else {
-                    showToast(data.error || "Unable to read installations cache.", "error");
-                    tbody.innerHTML = '';
-                    emptyState.style.display = 'block';
-                }
-            } catch (error) {
-                showToast("Connection to backend lost.", "error");
-                tbody.innerHTML = '';
-                emptyState.style.display = 'block';
-            }
-        }
-
-        // Trigger scan hosting
-        async function triggerScan() {
-            const btn = document.getElementById('btn-scan');
-            btn.disabled = true;
-            btn.textContent = '🔄 Scanning directories...';
-            showToast("Directory scan started. Searching public_html folders...");
-            
-            await fetchSites(true);
-            
-            btn.disabled = false;
-            btn.textContent = '🔄 Scan Hosting';
-            showToast("Scan finished. Dashboard updated.");
-        }
-
-        // Filter sites on search
-        function filterSites() {
-            const query = document.getElementById('site-search').value.toLowerCase();
-            const filtered = allSites.filter(site => {
-                return site.blogname.toLowerCase().includes(query) ||
-                       site.siteurl.toLowerCase().includes(query) ||
-                       site.path.toLowerCase().includes(query) ||
-                       site.db_name.toLowerCase().includes(query);
-            });
-            renderSites(filtered);
-        }
-
-        // Render sites table
-        function renderSites(sites) {
-            const tbody = document.getElementById('sites-list');
-            const emptyState = document.getElementById('empty-state');
-            
-            tbody.innerHTML = '';
-            
-            // Update stats
-            document.getElementById('stat-total').textContent = sites.length;
-            const healthy = sites.filter(s => s.status === 'active').length;
-            document.getElementById('stat-healthy').textContent = healthy;
-            document.getElementById('stat-issues').textContent = sites.length - healthy;
-            
-            if (sites.length === 0) {
-                emptyState.style.display = 'block';
-                document.getElementById('sites-table').style.display = 'none';
-                return;
-            }
-            
-            emptyState.style.display = 'none';
-            document.getElementById('sites-table').style.display = 'table';
-            
-            sites.forEach(site => {
-                const tr = document.createElement('tr');
-                
-                // Status badge
-                let statusBadge = `<span class="badge badge-success">● Connected</span>`;
-                if (site.status === 'db_error') {
-                    statusBadge = `<span class="badge badge-danger">● Database Error</span>`;
-                }
-                
-                // Truncate path for visual neatness
-                const displayPath = site.path.replace(`/home/${DA_USERNAME}/`, '~/');
-                
-                tr.innerHTML = `
-                    <td>
-                        <div class="site-title-cell">
-                            <div class="site-avatar">${site.blogname.charAt(0).toUpperCase()}</div>
-                            <div class="site-meta">
-                                <h4>${site.blogname}</h4>
-                                <a href="${site.siteurl}" target="_blank">${site.siteurl} ↗</a>
-                            </div>
+            <div class="form-section">
+                <div class="form-section-title">Database</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Database Name</label>
+                        <div class="input-group">
+                            <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                            <input type="text" id="inst-dbname" class="form-control" placeholder="wp1" required maxlength="16">
                         </div>
-                    </td>
-                    <td>${statusBadge}</td>
-                    <td><strong style="color: var(--text-primary); font-size: 0.95rem;">v${site.version}</strong></td>
-                    <td>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
-                            <div>DB: <strong style="color: var(--text-primary); font-family: monospace;">${site.db_name}</strong></div>
-                            <div>Prefix: <span style="font-family: monospace;">${site.db_prefix}</span></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Database User</label>
+                        <div class="input-group">
+                            <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                            <input type="text" id="inst-dbuser" class="form-control" placeholder="wpuser" required maxlength="16">
                         </div>
-                    </td>
-                    <td class="path-text">${displayPath}</td>
-                    <td style="text-align: right;">
-                        <div class="action-group" style="justify-content: flex-end;">
-                            <button class="btn btn-secondary btn-icon-only magic-login-btn" onclick="executeMagicLogin('${site.path}')" title="Magic Login">⚡ Magic Login</button>
-                            <button class="btn btn-secondary btn-icon-only delete-btn" onclick="openDeleteModal('${site.path}', '${site.db_name}')" title="Delete Site">🗑️ Delete</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Database Password</label>
+                    <div class="input-group" style="gap:6px;">
+                        <input type="text" id="inst-dbpass" class="form-control" required placeholder="Password">
+                        <button type="button" class="btn btn-secondary" onclick="genPass('inst-dbpass')">Generate</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title">WordPress Admin</div>
+                <div class="form-group">
+                    <label>Site Title</label>
+                    <input type="text" id="inst-title" class="form-control" required placeholder="My WordPress Site">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Admin Username</label>
+                        <input type="text" id="inst-adminuser" class="form-control" required placeholder="admin">
+                    </div>
+                    <div class="form-group">
+                        <label>Admin Password</label>
+                        <div class="input-group" style="gap:6px;">
+                            <input type="text" id="inst-adminpass" class="form-control" required placeholder="Password">
+                            <button type="button" class="btn btn-secondary" onclick="genPass('inst-adminpass')">Gen</button>
                         </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Admin Email</label>
+                    <input type="email" id="inst-adminemail" class="form-control" required value="admin@<?php echo htmlspecialchars($username); ?>.com">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-install')">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-install-submit">Install WordPress</button>
+        </div>
+        </form>
+    </div>
+</div>
 
-        // Install Modal Actions
-        function openInstallModal() {
-            document.getElementById('modal-install').classList.add('active');
-            loadDomains();
-            generatePassword('inst-dbpass');
-            generatePassword('inst-adminpass');
-        }
+<!-- ═══════════════ MODAL: Delete ═══════════════ -->
+<div class="modal-overlay" id="modal-delete">
+    <div class="modal" style="max-width:440px;">
+        <div class="modal-head">
+            <h3>Delete WordPress</h3>
+            <button class="modal-close" onclick="closeModal('modal-delete')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="notice notice-error">⚠️ This action permanently deletes all files and cannot be undone.</div>
+            <p style="margin-bottom:10px;">Deleting installation at:</p>
+            <code id="del-path" style="background:#f6f7f7;display:block;padding:6px 10px;border-radius:3px;font-size:12px;word-break:break-all;"></code>
 
-        function closeInstallModal() {
-            document.getElementById('modal-install').classList.remove('active');
-        }
+            <div style="margin-top:14px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+                    <input type="checkbox" id="del-db-check" checked style="width:14px;height:14px;">
+                    Also delete database: <strong id="del-db-name"></strong>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-delete')">Cancel</button>
+            <button class="btn btn-danger" id="btn-delete-confirm" onclick="executeDelete()">Delete</button>
+        </div>
+    </div>
+</div>
 
-        // Run DirectAdmin Database Creation
-        async function createDatabaseDirectAdmin(dbNameSuffix, dbUserSuffix, dbPassword) {
-            const params = new URLSearchParams();
-            params.append('action', 'create');
-            params.append('name', dbNameSuffix);
-            params.append('user', dbUserSuffix);
-            params.append('passwd', dbPassword);
-            params.append('passwd2', dbPassword);
-            
-            const response = await fetch('/CMD_API_DATABASES', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: params.toString()
-            });
-            
-            const text = await response.text();
-            const queryParams = new URLSearchParams(text);
-            if (queryParams.get('error') === '1') {
-                throw new Error(decodeURIComponent(queryParams.get('details') || 'Failed to create database via DirectAdmin API.'));
-            }
-            
-            return {
-                db_name: queryParams.get('db') || (DA_USERNAME + '_' + dbNameSuffix),
-                db_user: queryParams.get('user') || (DA_USERNAME + '_' + dbUserSuffix)
-            };
-        }
+<?php if ($isAdmin): ?>
+<!-- ═══════════════ MODAL: Update Plugin ═══════════════ -->
+<div class="modal-overlay" id="modal-update">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-head">
+            <h3>Update Plugin from GitHub</h3>
+            <button class="modal-close" id="btn-close-update" onclick="closeModal('modal-update')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:12px;color:#646970;">Downloads the latest version from the public GitHub repository and replaces the current plugin files.</p>
+            <div class="terminal" id="update-terminal"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="btn-update-done" disabled onclick="closeModal('modal-update')">Close</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
-        // Run installation
-        async function executeInstall(event) {
-            event.preventDefault();
-            const submitBtn = document.getElementById('btn-submit-install');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating DB & Downloading WP...';
-            
-            const dbNameSuffix = document.getElementById('inst-dbname').value;
-            const dbUserSuffix = document.getElementById('inst-dbuser').value;
-            const dbPassword = document.getElementById('inst-dbpass').value;
-            
-            try {
-                // 1. Create DB via DirectAdmin session
-                showToast("1/3 Creating database via DirectAdmin API...");
-                const dbInfo = await createDatabaseDirectAdmin(dbNameSuffix, dbUserSuffix, dbPassword);
-                
-                // 2. Trigger installation backend
-                showToast("2/3 Extracting WordPress core & running setup...");
-                submitBtn.textContent = 'Installing Database Tables...';
-                
-                const installParams = new URLSearchParams();
-                installParams.append('action', 'install');
-                installParams.append('domain', document.getElementById('inst-domain').value);
-                installParams.append('subdir', document.getElementById('inst-subdir').value);
-                
-                installParams.append('db_name', dbInfo.db_name);
-                installParams.append('db_user', dbInfo.db_user);
-                installParams.append('db_pass', dbPassword);
-                installParams.append('site_title', document.getElementById('inst-title').value);
-                installParams.append('admin_user', document.getElementById('inst-adminuser').value);
-                installParams.append('admin_pass', document.getElementById('inst-adminpass').value);
-                installParams.append('admin_email', document.getElementById('inst-adminemail').value);
-                installParams.append('protocol', document.getElementById('inst-protocol').value);
-                
-                const response = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: installParams.toString()
+<!-- Toast area -->
+<div id="toast-area"></div>
+
+<script>
+const DA_USER = '<?php echo $username; ?>';
+let allSites = [];
+let deletePath = '', deleteDb = '';
+
+/* ─── API URL helper ─── */
+const apiUrl = (action = '') => {
+    let base = window.location.pathname.split('?')[0];
+    if (base.endsWith('.html') || base.endsWith('.raw'))
+        base = base.substring(0, base.lastIndexOf('/') + 1);
+    else if (!base.endsWith('/'))
+        base += '/';
+    return base + 'index.raw' + (action ? '?action=' + action : '');
+};
+
+/* ─── Toast ─── */
+function toast(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = 'toast' + (type === 'success' ? ' ok' : type === 'error' ? ' err' : '');
+    el.textContent = msg;
+    document.getElementById('toast-area').appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+}
+
+/* ─── Modal helpers ─── */
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ─── Password generator ─── */
+function genPass(id) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
+    let p = 'wp';
+    for (let i = 0; i < 12; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    document.getElementById(id).value = p;
+}
+
+/* ─── Site card expand/collapse ─── */
+function toggleCard(id) {
+    const body = document.getElementById('body-' + id);
+    const chev = document.getElementById('chev-' + id);
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
+}
+
+/* ─── Render sites ─── */
+function renderSites(sites) {
+    const cont = document.getElementById('sites-container');
+    const lbl  = document.getElementById('count-label');
+    lbl.textContent = sites.length + ' installation' + (sites.length !== 1 ? 's' : '') + ' total';
+
+    if (!sites.length) {
+        cont.innerHTML = `<div class="empty-state">
+            <div class="icon">📂</div>
+            <strong>No WordPress installations found</strong>
+            <p>Click <em>Scan Hosting</em> to search, or <em>Install WordPress</em> to create one.</p>
+        </div>`;
+        return;
+    }
+
+    cont.innerHTML = sites.map((s, i) => {
+        const statusBadge = s.status === 'active'
+            ? '<span class="badge badge-ok">● Connected</span>'
+            : '<span class="badge badge-error">● DB Error</span>';
+        const pathDisplay = s.path.replace('/home/' + DA_USER + '/', '~/');
+
+        return `<div class="site-card">
+            <div class="site-card-header" onclick="toggleCard(${i})">
+                <div class="wp-icon">W</div>
+                <div class="site-info">
+                    <div class="site-name">${esc(s.blogname)}</div>
+                    <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank">${esc(s.siteurl)}</a></div>
+                </div>
+                <div class="site-badges">
+                    ${statusBadge}
+                    <span class="badge badge-version">WP ${esc(s.version)}</span>
+                </div>
+                <span class="chevron" id="chev-${i}">▶</span>
+            </div>
+            <div class="site-card-body" id="body-${i}">
+                <div class="detail-grid">
+                    <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
+                    <div class="detail-item"><label>Directory</label><div class="val">${esc(s.subdir || '(root)')}</div></div>
+                    <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
+                    <div class="detail-item"><label>Table Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
+                    <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathDisplay)}</div></div>
+                </div>
+                <div class="action-row">
+                    <button class="btn btn-primary btn-sm" onclick="doMagicLogin(${JSON.stringify(s.path)})">⚡ Magic Login</button>
+                    <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${JSON.stringify(s.path)}, ${JSON.stringify(s.db_name)})">🗑 Delete</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ─── Filter ─── */
+function filterSites() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    renderSites(allSites.filter(s =>
+        (s.blogname + s.siteurl + s.path + s.db_name).toLowerCase().includes(q)
+    ));
+}
+
+/* ─── Fetch sites list ─── */
+async function fetchSites(scan = false) {
+    document.getElementById('sites-container').innerHTML =
+        `<div class="empty-state"><div class="icon">⏳</div><strong>${scan ? 'Scanning directories…' : 'Loading…'}</strong></div>`;
+    try {
+        const r = await fetch(apiUrl(scan ? 'scan' : 'list'));
+        const d = await r.json();
+        if (d.success) { allSites = d.sites; renderSites(allSites); }
+        else { toast(d.error || 'Failed to load sites.', 'error'); }
+    } catch(e) {
+        toast('Cannot connect to backend.', 'error');
+        document.getElementById('sites-container').innerHTML =
+            `<div class="empty-state"><div class="icon">⚠️</div><strong>Connection failed</strong></div>`;
+    }
+}
+
+async function triggerScan() {
+    const btn = document.getElementById('btn-scan');
+    btn.disabled = true; btn.textContent = '⏳ Scanning…';
+    await fetchSites(true);
+    btn.disabled = false; btn.textContent = '🔄 Scan Hosting';
+    toast('Scan complete.', 'success');
+}
+
+/* ─── Domain list for install modal ─── */
+async function loadDomains() {
+    const sel = document.getElementById('inst-domain');
+    sel.innerHTML = '<option value="" disabled selected>Loading…</option>';
+    try {
+        const r = await fetch(apiUrl('get_domains'));
+        const d = await r.json();
+        sel.innerHTML = '<option value="" disabled selected>Select domain / subdomain…</option>';
+        if (d.success && d.domains.length) {
+            for (const dom of d.domains) {
+                const o = document.createElement('option');
+                o.value = dom;
+                o.textContent = dom;
+                sel.appendChild(o);
+                // Fetch subdomains
+                const subs = await fetchSubdomains(dom);
+                subs.forEach(sub => {
+                    const s = document.createElement('option');
+                    const full = sub + '.' + dom;
+                    s.value = full; s.textContent = '   └─ ' + full;
+                    sel.appendChild(s);
                 });
-                
-                const result = await response.json();
-                if (result.success) {
-                    showToast("3/3 WordPress installed successfully!", "success");
-                    closeInstallModal();
-                    fetchSites(false);
-                    
-                    // Reset form fields
-                    document.getElementById('form-install').reset();
-                } else {
-                    showToast(result.error || "WordPress setup failed.", "error");
-                }
-            } catch (error) {
-                showToast(error.message || "An error occurred during installation.", "error");
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Install WordPress';
             }
+        } else {
+            sel.innerHTML = '<option value="" disabled>No domains found</option>';
         }
+    } catch(e) { toast('Failed to load domains.', 'error'); }
+}
 
-        // Magic Login Action
-        async function executeMagicLogin(sitePath) {
-            showToast("Generating magic login token...");
-            try {
-                const params = new URLSearchParams();
-                params.append('action', 'magic_login');
-                params.append('path', sitePath);
-                
-                const response = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: params.toString()
-                });
-                const result = await response.json();
-                
-                if (result.success && result.login_url) {
-                    showToast("Redirecting securely...", "success");
-                    window.open(result.login_url, '_blank');
-                } else {
-                    showToast(result.error || "Magic login generation failed.", "error");
-                }
-            } catch (error) {
-                showToast("Connection to server failed.", "error");
-            }
+async function fetchSubdomains(domain) {
+    try {
+        const r = await fetch('/CMD_API_SUBDOMAINS?json=yes&domain=' + encodeURIComponent(domain));
+        const ct = r.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+            const d = await r.json();
+            if (Array.isArray(d)) return d;
+            if (d && d.list) return Array.isArray(d.list) ? d.list : Object.values(d.list);
         }
-
-        // Delete Modal Actions
-        let activeDeletePath = '';
-        let activeDeleteDb = '';
-
-        function openDeleteModal(sitePath, dbName) {
-            activeDeletePath = sitePath;
-            activeDeleteDb = dbName;
-            document.getElementById('del-display-path').textContent = sitePath;
-            document.getElementById('del-display-dbname').textContent = dbName;
-            
-            // If DB name is empty, disable checkbox
-            const checkbox = document.getElementById('del-db-checkbox');
-            if (!dbName) {
-                checkbox.checked = false;
-                checkbox.disabled = true;
-            } else {
-                checkbox.checked = true;
-                checkbox.disabled = false;
-            }
-            
-            document.getElementById('modal-delete').classList.add('active');
+        const text = await r.text();
+        const params = new URLSearchParams(text);
+        const list = [];
+        for (const [k, v] of params.entries()) {
+            if (k === 'list[]' || k.startsWith('list[')) list.push(v);
         }
+        return list;
+    } catch { return []; }
+}
 
-        function closeDeleteModal() {
-            document.getElementById('modal-delete').classList.remove('active');
-            activeDeletePath = '';
-            activeDeleteDb = '';
-        }
+/* ─── Install modal ─── */
+function openInstallModal() {
+    openModal('modal-install');
+    loadDomains();
+    genPass('inst-dbpass');
+    genPass('inst-adminpass');
+}
 
-        async function deleteDatabaseDirectAdmin(dbName) {
-            const params = new URLSearchParams();
-            params.append('action', 'delete');
-            params.append('select0', dbName);
-            
-            const response = await fetch('/CMD_API_DATABASES', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: params.toString()
-            });
-            const text = await response.text();
-            if (text.includes('error=1')) {
-                const match = text.match(/details=(.*?)(&|$)/);
-                const details = match ? decodeURIComponent(match[1]) : "DirectAdmin database error";
-                throw new Error(details);
-            }
-        }
+/* ─── DirectAdmin DB API ─── */
+async function createDB(name, user, pass) {
+    const p = new URLSearchParams({action:'create', name, user, passwd:pass, passwd2:pass});
+    const r = await fetch('/CMD_API_DATABASES', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+    const text = await r.text();
+    const q = new URLSearchParams(text);
+    if (q.get('error') === '1') throw new Error(decodeURIComponent(q.get('details') || 'DB creation failed'));
+    return {
+        db_name: q.get('db') || (DA_USER + '_' + name),
+        db_user: q.get('user') || (DA_USER + '_' + user)
+    };
+}
 
-        async function executeDelete() {
-            const deleteDb = document.getElementById('del-db-checkbox').checked;
-            const submitBtn = document.getElementById('btn-submit-delete');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing Deletion...';
-            
-            try {
-                // 1. Delete DB if checked
-                if (deleteDb && activeDeleteDb) {
-                    showToast(`Deleting database ${activeDeleteDb}...`);
-                    await deleteDatabaseDirectAdmin(activeDeleteDb);
-                }
-                
-                // 2. Delete files on backend
-                showToast("Removing directory files recursively...");
-                const params = new URLSearchParams();
-                params.append('action', 'delete');
-                params.append('path', activeDeletePath);
-                
-                const response = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: params.toString()
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast("WordPress installation removed successfully.", "success");
-                    closeDeleteModal();
-                    fetchSites(false);
-                } else {
-                    showToast(result.error || "File deletion failed.", "error");
-                }
-            } catch (error) {
-                showToast(error.message || "An error occurred during deletion.", "error");
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Confirm Delete';
-            }
-        }
+async function executeInstall(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-install-submit');
+    btn.disabled = true; btn.textContent = 'Creating database…';
+    try {
+        const dbSuffix   = document.getElementById('inst-dbname').value;
+        const userSuffix = document.getElementById('inst-dbuser').value;
+        const dbPass     = document.getElementById('inst-dbpass').value;
 
-        // Admin Update Modal
-        function openUpdateModal() {
-            const terminal = document.getElementById('update-terminal');
-            terminal.innerHTML = '<div class="terminal-line">Initialized updater...</div>';
-            document.getElementById('modal-update').classList.add('active');
-            
-            document.getElementById('btn-close-update').disabled = true;
-            document.getElementById('btn-ok-update').disabled = true;
-            
-            // Start self update
-            executePluginUpdate();
-        }
+        toast('1/3 Creating database via DirectAdmin…');
+        const db = await createDB(dbSuffix, userSuffix, dbPass);
 
-        function closeUpdateModal() {
-            document.getElementById('modal-update').classList.remove('active');
-        }
+        toast('2/3 Downloading & installing WordPress…');
+        btn.textContent = 'Installing…';
 
-        async function executePluginUpdate() {
-            const terminal = document.getElementById('update-terminal');
-            
-            function printLog(text, type = 'info') {
-                const line = document.createElement('div');
-                line.className = 'terminal-line';
-                if (type === 'success') line.classList.add('terminal-success');
-                if (type === 'error') line.classList.add('terminal-error');
-                line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
-                terminal.appendChild(line);
-                terminal.scrollTop = terminal.scrollHeight;
-            }
-            
-            printLog("Connecting to GitHub API to pull master branch...");
-            try {
-                const params = new URLSearchParams();
-                params.append('action', 'update_plugin');
-                
-                const response = await fetch(getApiUrl(), {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: params.toString()
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    printLog("GitHub Zip download complete.", "info");
-                    printLog("Unpacking archive files...", "info");
-                    printLog("Overwriting core plugin assets...", "info");
-                    printLog("Applying recursive file permissions: chmod 644 on resources, chmod 755 on scripts/wrappers...", "info");
-                    printLog(result.message, "success");
-                    printLog("Update completed successfully! Please reload the page.", "success");
-                    showToast("Update successful!", "success");
-                } else {
-                    printLog("Error: " + result.error, "error");
-                    showToast(result.error || "Update failed.", "error");
-                }
-            } catch (error) {
-                printLog("Connection error occurred: " + error.message, "error");
-                showToast("Connection failed.", "error");
-            } finally {
-                document.getElementById('btn-close-update').disabled = false;
-                document.getElementById('btn-ok-update').disabled = false;
-            }
-        }
-
-        // On Load initialization
-        window.addEventListener('DOMContentLoaded', () => {
-            fetchSites(false);
+        const p = new URLSearchParams({
+            action:      'install',
+            domain:      document.getElementById('inst-domain').value,
+            subdir:      document.getElementById('inst-subdir').value,
+            db_name:     db.db_name,
+            db_user:     db.db_user,
+            db_pass:     dbPass,
+            site_title:  document.getElementById('inst-title').value,
+            admin_user:  document.getElementById('inst-adminuser').value,
+            admin_pass:  document.getElementById('inst-adminpass').value,
+            admin_email: document.getElementById('inst-adminemail').value,
+            protocol:    document.getElementById('inst-protocol').value,
         });
-    </script>
+
+        const r = await fetch(apiUrl(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+        const d = await r.json();
+        if (d.success) {
+            toast('3/3 WordPress installed successfully!', 'success');
+            closeModal('modal-install');
+            fetchSites(false);
+        } else {
+            toast(d.error || 'Installation failed.', 'error');
+        }
+    } catch(err) {
+        toast(err.message || 'Error during installation.', 'error');
+    } finally {
+        btn.disabled = false; btn.textContent = 'Install WordPress';
+    }
+}
+
+/* ─── Magic Login ─── */
+async function doMagicLogin(path) {
+    toast('Generating magic login link…');
+    try {
+        const p = new URLSearchParams({action:'magic_login', path});
+        const r = await fetch(apiUrl(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+        const d = await r.json();
+        if (d.success && d.login_url) { window.open(d.login_url, '_blank'); toast('Redirecting…', 'success'); }
+        else toast(d.error || 'Magic login failed.', 'error');
+    } catch { toast('Connection error.', 'error'); }
+}
+
+/* ─── Delete ─── */
+function openDeleteModal(path, db) {
+    deletePath = path; deleteDb = db;
+    document.getElementById('del-path').textContent = path;
+    document.getElementById('del-db-name').textContent = db || '(none)';
+    const chk = document.getElementById('del-db-check');
+    chk.checked = !!db; chk.disabled = !db;
+    openModal('modal-delete');
+}
+
+async function executeDelete() {
+    const btn = document.getElementById('btn-delete-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+        if (document.getElementById('del-db-check').checked && deleteDb) {
+            toast('Removing database…');
+            const p = new URLSearchParams({action:'delete', select0: deleteDb});
+            await fetch('/CMD_API_DATABASES', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+        }
+        const p = new URLSearchParams({action:'delete', path: deletePath});
+        const r = await fetch(apiUrl(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+        const d = await r.json();
+        if (d.success) {
+            toast('Deleted successfully.', 'success');
+            closeModal('modal-delete');
+            fetchSites(false);
+        } else { toast(d.error || 'Deletion failed.', 'error'); }
+    } catch(err) { toast(err.message || 'Error.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Delete'; }
+}
+
+<?php if ($isAdmin): ?>
+/* ─── Plugin update ─── */
+function openUpdateModal() {
+    const term = document.getElementById('update-terminal');
+    term.innerHTML = '';
+    document.getElementById('btn-update-done').disabled = true;
+    openModal('modal-update');
+    runPluginUpdate();
+}
+
+async function runPluginUpdate() {
+    const term = document.getElementById('update-terminal');
+    const log = (msg, cls='') => {
+        const ln = document.createElement('div');
+        if (cls) ln.className = cls;
+        ln.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+        term.appendChild(ln);
+        term.scrollTop = term.scrollHeight;
+    };
+    log('Connecting to GitHub…');
+    try {
+        const p = new URLSearchParams({action:'update_plugin'});
+        const r = await fetch(apiUrl(), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:p.toString()});
+        const d = await r.json();
+        if (d.success) { log(d.message, 'ok'); log('Done. Reload the page.', 'ok'); }
+        else { log('Error: ' + d.error, 'err'); }
+    } catch(e) { log('Connection error: ' + e.message, 'err'); }
+    finally { document.getElementById('btn-update-done').disabled = false; }
+}
+<?php endif; ?>
+
+/* ─── Init ─── */
+window.addEventListener('DOMContentLoaded', () => fetchSites(false));
+</script>
 </body>
 </html>
