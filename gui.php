@@ -1460,8 +1460,8 @@ if ($query_string ~* "author=[0-9]") {
                         <span style="font-weight:bold;">Vui lòng copy và dán các dòng cấu hình sau vào tệp cấu hình Nginx (server block) của website:</span>
                     </div>
                     <div style="position:relative;">
-                        <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:11px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-\${i}">\${esc(nginxConfigRules)}</textarea>
-                        <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(\${i})">📋 Copy</button>
+                        <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:11px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-${i}">${esc(nginxConfigRules)}</textarea>
+                        <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(${i})">📋 Copy</button>
                     </div>
                 </div>
                 `;
