@@ -134,7 +134,38 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
     
     // Fallbacks
     if ($siteurl === '') {
-        $siteurl = 'http://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
+        $is_sub = false;
+        if ($sub_path !== '') {
+            $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+            $home = getenv('HOME') ?: "/home/{$username}";
+            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                $home = 'C:/Users/local_user';
+            }
+            
+            // Check in subdomains.list
+            $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
+            if (file_exists($sub_list_file)) {
+                $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if ($lines !== false) {
+                    foreach ($lines as $line) {
+                        if (trim($line) === $sub_path) {
+                            $is_sub = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            // Check in physical subdomains directory
+            if (is_dir($home . '/domains/' . $domain . '/subdomains/' . $sub_path)) {
+                $is_sub = true;
+            }
+        }
+        
+        if ($is_sub) {
+            $siteurl = 'http://' . $sub_path . '.' . $domain;
+        } else {
+            $siteurl = 'http://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
+        }
     }
     if ($blogname === '') {
         $blogname = $domain . ($sub_path !== '' ? '/' . $sub_path : '');
@@ -170,10 +201,20 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
 }
 
 /**
- * Scan directory recursively up to 2 sub-levels for WP config
+ * Scan directory recursively up to 2 sub-levels for WP config (supports symlinks safely)
  */
-function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth = 0) {
+function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth = 0, &$scanned_paths = null) {
     if ($depth > 2) return;
+    
+    if ($scanned_paths === null) {
+        $scanned_paths = [];
+    }
+    
+    $real = realpath($dir);
+    if ($real === false || isset($scanned_paths[$real])) {
+        return;
+    }
+    $scanned_paths[$real] = true;
     
     $wp_config_path = $dir . '/wp-config.php';
     if (file_exists($wp_config_path)) {
@@ -188,12 +229,12 @@ function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth
     $files = array_diff(scandir($dir), ['.', '..']);
     foreach ($files as $file) {
         $path = $dir . '/' . $file;
-        if (is_dir($path) && !is_link($path)) {
+        if (is_dir($path)) {
             if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
                 continue;
             }
             $next_sub_path = $sub_path === '' ? $file : $sub_path . '/' . $file;
-            scan_directory_for_wp($path, $domain, $next_sub_path, $installations, $depth + 1);
+            scan_directory_for_wp($path, $domain, $next_sub_path, $installations, $depth + 1, $scanned_paths);
         }
     }
 }
