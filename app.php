@@ -1287,6 +1287,120 @@ function update_wordpress_theme($site_path, $theme_folder) {
 }
 
 /**
+ * Reinstall a plugin by fetching from WordPress.org
+ */
+function reinstall_wordpress_plugin($site_path, $plugin_file) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before reinstalling plugins.");
+    }
+    $slug = explode('/', $plugin_file)[0];
+    $url = "https://downloads.wordpress.org/plugin/{$slug}.zip";
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Plugin_Upgrader($skin);
+        $result = $upgrader->install($url, [
+            'overwrite_destination' => true,
+            'clear_destination' => true
+        ]);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+    if (!$result) {
+        throw new Exception("Plugin reinstallation failed.");
+    }
+    return ['success' => true, 'message' => 'Plugin reinstalled successfully.'];
+}
+
+/**
+ * Delete a plugin
+ */
+function delete_wordpress_plugin($site_path, $plugin_file) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before deleting plugins.");
+    }
+    
+    // Deactivate first
+    toggle_plugin_status($site_path, $plugin_file, 'deactivate');
+    
+    $slug = explode('/', $plugin_file)[0];
+    $plugin_dir = $site_path . '/wp-content/plugins/' . $slug;
+    if (is_dir($plugin_dir)) {
+        rmdir_recursive($plugin_dir);
+    } elseif (file_exists($site_path . '/wp-content/plugins/' . $plugin_file)) {
+        @unlink($site_path . '/wp-content/plugins/' . $plugin_file);
+    } else {
+        throw new Exception("Plugin folder or file not found.");
+    }
+    return ['success' => true, 'message' => 'Plugin deleted successfully.'];
+}
+
+/**
+ * Reinstall a theme by fetching from WordPress.org
+ */
+function reinstall_wordpress_theme($site_path, $theme_folder) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before reinstalling themes.");
+    }
+    $url = "https://downloads.wordpress.org/theme/{$theme_folder}.zip";
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Theme_Upgrader($skin);
+        $result = $upgrader->install($url, [
+            'overwrite_destination' => true,
+            'clear_destination' => true
+        ]);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+    if (!$result) {
+        throw new Exception("Theme reinstallation failed.");
+    }
+    return ['success' => true, 'message' => 'Theme reinstalled successfully.'];
+}
+
+/**
+ * Delete a theme
+ */
+function delete_wordpress_theme($site_path, $theme_folder) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before deleting themes.");
+    }
+    
+    $active_theme = get_active_theme($site_path);
+    if ($theme_folder === $active_theme) {
+        throw new Exception("Cannot delete the currently active theme.");
+    }
+    
+    $theme_dir = $site_path . '/wp-content/themes/' . $theme_folder;
+    if (is_dir($theme_dir)) {
+        rmdir_recursive($theme_dir);
+    } else {
+        throw new Exception("Theme directory not found.");
+    }
+    return ['success' => true, 'message' => 'Theme deleted successfully.'];
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -2653,6 +2767,28 @@ function run_api() {
                 echo json_encode($res);
                 break;
                 
+            case 'reinstall_wp_plugin':
+                if (empty($_POST['path']) || empty($_POST['plugin_file'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = reinstall_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                echo json_encode($res);
+                break;
+                
+            case 'delete_wp_plugin':
+                if (empty($_POST['path']) || empty($_POST['plugin_file'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = delete_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                echo json_encode($res);
+                break;
+                
             case 'list_themes':
                 if (empty($_POST['path'])) {
                     throw new Exception("Missing site path parameter.");
@@ -2695,6 +2831,28 @@ function run_api() {
                     throw new Exception("Invalid directory access.");
                 }
                 $res = update_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                echo json_encode($res);
+                break;
+                
+            case 'reinstall_wp_theme':
+                if (empty($_POST['path']) || empty($_POST['theme_folder'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = reinstall_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                echo json_encode($res);
+                break;
+                
+            case 'delete_wp_theme':
+                if (empty($_POST['path']) || empty($_POST['theme_folder'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = delete_wordpress_theme($_POST['path'], $_POST['theme_folder']);
                 echo json_encode($res);
                 break;
                 

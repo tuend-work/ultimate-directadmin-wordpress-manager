@@ -955,8 +955,14 @@ async function loadPlugins(i) {
                         <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
                             ↑ Update
                         </button>
+                        <button class="btn btn-sm btn-secondary" id="btn-plug-reinst-${i}-${idx}" onclick="reinstallPlugin(${i}, ${idx}, '${esc(p.file)}')">
+                            ⟳ Reinstall
+                        </button>
                         <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
                             ${actionText}
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="btn-plug-del-${i}-${idx}" onclick="deletePlugin(${i}, ${idx}, '${esc(p.file)}')">
+                            🗑 Delete
                         </button>
                     </div>
                 </div>`;
@@ -1036,6 +1042,83 @@ async function togglePlugin(siteIdx, plugIdx, file, isActive) {
     }
 }
 
+async function reinstallPlugin(siteIdx, plugIdx, file) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before reinstalling plugins.', 'error');
+        return;
+    }
+    if (!confirm('Bạn có chắc chắn muốn cài đặt lại plugin này không? Thao tác này sẽ tải phiên bản gốc từ WordPress.org và ghi đè lên thư mục plugin hiện tại.')) {
+        return;
+    }
+    
+    const btn = document.getElementById(`btn-plug-reinst-${siteIdx}-${plugIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('plugin_file', file);
+        
+        const r = await fetch(apiUrl('reinstall_wp_plugin'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(d.message || 'Plugin reinstalled successfully!', 'success');
+            loadPlugins(siteIdx);
+        } else {
+            toast(d.error || 'Failed to reinstall plugin.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function deletePlugin(siteIdx, plugIdx, file) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before deleting plugins.', 'error');
+        return;
+    }
+    if (!confirm('Bạn có chắc chắn muốn xóa plugin này không? Hành động này sẽ xóa toàn bộ thư mục plugin khỏi hệ thống.')) {
+        return;
+    }
+    
+    const btn = document.getElementById(`btn-plug-del-${siteIdx}-${plugIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('plugin_file', file);
+        
+        const r = await fetch(apiUrl('delete_wp_plugin'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(d.message || 'Plugin deleted successfully!', 'success');
+            loadPlugins(siteIdx);
+        } else {
+            toast(d.error || 'Failed to delete plugin.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+
 /* ─── Theme Manager ─── */
 async function loadThemes(i) {
     const s = allSites[i];
@@ -1080,8 +1163,14 @@ async function loadThemes(i) {
                         <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ↑ Update
                         </button>
+                        <button class="btn btn-sm btn-secondary" id="btn-theme-reinst-${i}-${idx}" onclick="reinstallTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                            ⟳ Reinstall
+                        </button>
                         <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ${actionText}
+                        </button>
+                        <button class="btn btn-sm btn-danger" ${disabledAttr} id="btn-theme-del-${i}-${idx}" onclick="deleteTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                            🗑 Delete
                         </button>
                     </div>
                 </div>`;
@@ -1158,6 +1247,87 @@ async function activateTheme(siteIdx, themeIdx, folder) {
         btn.textContent = originalText;
     }
 }
+
+async function reinstallTheme(siteIdx, themeIdx, folder) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before reinstalling themes.', 'error');
+        return;
+    }
+    if (!confirm('Bạn có chắc chắn muốn cài đặt lại theme này không? Thao tác này sẽ tải phiên bản gốc từ WordPress.org và ghi đè lên thư mục theme hiện tại.')) {
+        return;
+    }
+    
+    const btn = document.getElementById(`btn-theme-reinst-${siteIdx}-${themeIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('theme_folder', folder);
+        
+        const r = await fetch(apiUrl('reinstall_wp_theme'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(d.message || 'Theme reinstalled successfully!', 'success');
+            loadThemes(siteIdx);
+        } else {
+            toast(d.error || 'Failed to reinstall theme.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function deleteTheme(siteIdx, themeIdx, folder) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before deleting themes.', 'error');
+        return;
+    }
+    if (folder === s.active_theme || (document.getElementById(`btn-theme-${siteIdx}-${themeIdx}`) && document.getElementById(`btn-theme-${siteIdx}-${themeIdx}`).disabled)) {
+        toast('Cannot delete the active theme.', 'error');
+        return;
+    }
+    if (!confirm('Bạn có chắc chắn muốn xóa theme này không? Hành động này sẽ xóa toàn bộ thư mục theme khỏi hệ thống.')) {
+        return;
+    }
+    
+    const btn = document.getElementById(`btn-theme-del-${siteIdx}-${themeIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('theme_folder', folder);
+        
+        const r = await fetch(apiUrl('delete_wp_theme'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(d.message || 'Theme deleted successfully!', 'success');
+            loadThemes(siteIdx);
+        } else {
+            toast(d.error || 'Failed to delete theme.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 
 /* ─── Security Manager ─── */
 async function loadSecurity(i) {
