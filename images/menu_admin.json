@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Extra Features",
+    "icon": "/assets/images/icon_extra.svg",
+    "entries": [
+      {
+        "name": "Ultimate WordPress Manager",
+        "icon": "/IMG_PLUGINS/ultimate-directadmin-wordpress-manager/icon.svg",
+        "href": "/CMD_PLUGINS_ADMIN/ultimate-directadmin-wordpress-manager/index.html",
+        "newTab": false
+      }
+    ]
+  }
+]
