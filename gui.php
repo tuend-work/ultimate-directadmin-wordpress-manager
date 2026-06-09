@@ -871,6 +871,16 @@ function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ─── Copy Nginx Config ─── */
+function copyNginxConfig(i) {
+    const el = document.getElementById('nginx-config-' + i);
+    if (el) {
+        el.select();
+        document.execCommand('copy');
+        toast('Đã copy cấu hình Nginx vào Clipboard!', 'success');
+    }
+}
+
 /* ─── Toggle card ─── */
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
@@ -1365,7 +1375,7 @@ async function loadSecurity(i) {
                 { key: 'block_sensitive_extensions', title: 'Chặn tải file sao lưu (backup files)', desc: 'Thêm luật chặn tải xuống trực tiếp các định dạng tệp sao lưu nguy hiểm (.sql, .bak, .log, .sh, .ini, .dist) từ trình duyệt vào tệp cấu hình .htaccess.', icon: '📦' }
             ];
             
-            container.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px;">` + measures.map((m, idx) => {
+            const mainHtml = `<div style="display:flex; flex-direction:column; gap:8px;">` + measures.map((m, idx) => {
                 const isSecure = !!sec[m.key];
                 const badgeClass = isSecure ? 'badge-green' : 'badge-red';
                 const badgeText = isSecure ? 'Đã bảo vệ' : 'Chưa bảo vệ';
@@ -1397,6 +1407,67 @@ async function loadSecurity(i) {
                 </div>
                 `;
             }).join('') + `</div>`;
+            
+            let nginxHtml = '';
+            if (sec.is_nginx) {
+                const nginxConfigRules = `# ─── Nginx Hardening Configuration for WordPress ───
+
+# 1. Block access to wp-config.php
+location = /wp-config.php {
+    deny all;
+}
+
+# 2. Block access to XML-RPC to prevent DDoS / Brute Force
+location = /xmlrpc.php {
+    deny all;
+}
+
+# 3. Block access to hidden files and .htaccess
+location ~ /\\. {
+    deny all;
+}
+
+# 4. Prevent direct PHP execution in wp-includes
+location ~* ^/wp-includes/.*\\.php$ {
+    deny all;
+}
+
+# 5. Prevent direct PHP execution in uploads
+location ~* ^/wp-content/uploads/.*\\.php$ {
+    deny all;
+}
+
+# 6. Block access to sensitive backup/log extensions
+location ~* \\.(bak|config|sql|fla|psd|ini|log|sh|inc|swp|dist)$ {
+    deny all;
+}
+
+# 7. Block access to sensitive documentation files
+location ~* /(readme\\.html|license\\.txt|wp-config-sample\\.php) {
+    deny all;
+}
+
+# 8. Block user/author scan queries
+if ($query_string ~* "author=[0-9]") {
+    return 403;
+}`;
+
+                nginxHtml = `
+                <div style="margin-top:20px; border-top: 1px dashed var(--border); padding-top: 20px;">
+                    <div class="notice notice-info" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px; line-height:1.4;">
+                        <strong>🌐 Phát hiện website đang sử dụng Nginx</strong>
+                        <span>Hệ thống nhận diện máy chủ web của bạn đang chạy Nginx. Do Nginx không hỗ trợ tệp <code>.htaccess</code>, các luật bảo mật liên quan đến cấu hình web không thể tự động áp dụng.</span>
+                        <span style="font-weight:bold;">Vui lòng copy và dán các dòng cấu hình sau vào tệp cấu hình Nginx (server block) của website:</span>
+                    </div>
+                    <div style="position:relative;">
+                        <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:11px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-\${i}">\${esc(nginxConfigRules)}</textarea>
+                        <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(\${i})">📋 Copy</button>
+                    </div>
+                </div>
+                `;
+            }
+            
+            container.innerHTML = mainHtml + nginxHtml;
         } else {
             container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
         }

@@ -288,6 +288,58 @@ function get_wordpress_security_status($site_path) {
         } catch (Exception $e) {}
     }
     
+    // Detect Nginx using cURL HEAD request
+    $is_nginx = false;
+    $siteurl = '';
+    if ($db) {
+        try {
+            $stmt = $db['pdo']->prepare("SELECT option_value FROM `{$db['prefix']}options` WHERE option_name = 'siteurl'");
+            $stmt->execute();
+            $siteurl = $stmt->fetchColumn();
+        } catch (Exception $e) {}
+    }
+    
+    if (empty($siteurl)) {
+        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+        $home = getenv('HOME') ?: "/home/{$username}";
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $home = 'C:/Users/local_user';
+        }
+        $domain = '';
+        $sub_path = '';
+        $domains_prefix = $home . '/domains/';
+        $site_path_real = realpath($site_path) ?: $site_path;
+        if (strpos($site_path_real, $domains_prefix) === 0) {
+            $relative = substr($site_path_real, strlen($domains_prefix));
+            $parts = explode('/', str_replace('\\', '/', $relative));
+            if (count($parts) > 0) {
+                $domain = $parts[0];
+                $pub_index = array_search('public_html', $parts);
+                if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                    $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+                }
+            }
+        }
+        $siteurl = 'http://' . ($domain ?: 'localhost') . ($sub_path !== '' ? '/' . $sub_path : '');
+    }
+    
+    if (!empty($siteurl)) {
+        $ch = curl_init($siteurl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        $headers = curl_exec($ch);
+        curl_close($ch);
+        if ($headers && preg_match('/Server:\s*nginx/i', $headers)) {
+            $is_nginx = true;
+        }
+    }
+    
+    $status['is_nginx'] = $is_nginx;
+    
     return $status;
 }
 
