@@ -86,6 +86,43 @@ function set_permissions_recursive($dir) {
  */
 function parse_wp_config($wp_config_path, $domain, $sub_path) {
     if (!file_exists($wp_config_path)) return null;
+    
+    // Auto-detect if $sub_path starts with a configured subdomain prefix and remap it
+    if ($sub_path !== '') {
+        $parts = explode('/', $sub_path);
+        $first_part = $parts[0];
+        
+        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+        $home = getenv('HOME') ?: "/home/{$username}";
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $home = 'C:/Users/local_user';
+        }
+        
+        $is_sub = false;
+        // Check in subdomains.list
+        $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
+        if (file_exists($sub_list_file)) {
+            $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if ($lines !== false) {
+                foreach ($lines as $line) {
+                    if (trim($line) === $first_part) {
+                        $is_sub = true;
+                        break;
+                    }
+                }
+            }
+        }
+        // Also check if physical /domains/{domain}/subdomains/{first_part} exists
+        if (is_dir($home . '/domains/' . $domain . '/subdomains/' . $first_part)) {
+            $is_sub = true;
+        }
+        
+        if ($is_sub) {
+            $domain = $first_part . '.' . $domain;
+            $sub_path = implode('/', array_slice($parts, 1));
+        }
+    }
+    
     $content = file_get_contents($wp_config_path);
     
     preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
@@ -134,38 +171,7 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
     
     // Fallbacks
     if ($siteurl === '') {
-        $is_sub = false;
-        if ($sub_path !== '') {
-            $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
-            $home = getenv('HOME') ?: "/home/{$username}";
-            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-                $home = 'C:/Users/local_user';
-            }
-            
-            // Check in subdomains.list
-            $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
-            if (file_exists($sub_list_file)) {
-                $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                if ($lines !== false) {
-                    foreach ($lines as $line) {
-                        if (trim($line) === $sub_path) {
-                            $is_sub = true;
-                            break;
-                        }
-                    }
-                }
-            }
-            // Check in physical subdomains directory
-            if (is_dir($home . '/domains/' . $domain . '/subdomains/' . $sub_path)) {
-                $is_sub = true;
-            }
-        }
-        
-        if ($is_sub) {
-            $siteurl = 'http://' . $sub_path . '.' . $domain;
-        } else {
-            $siteurl = 'http://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
-        }
+        $siteurl = 'http://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
     if ($blogname === '') {
         $blogname = $domain . ($sub_path !== '' ? '/' . $sub_path : '');
