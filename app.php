@@ -743,7 +743,7 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
     $domains_dir = $home . '/domains';
     
     // Check subdomains, conf, and custom HTTPD configurations via wrapper
-    $types = ['subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache'];
+    $types = ['subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache', 'subdomains.docroot.override'];
     $config_contents = [];
     foreach ($types as $type) {
         $content = @shell_exec(escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>/dev/null");
@@ -754,54 +754,78 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
     
     $custom_docroot = '';
     
-    // 1. Search in custom overrides (.cust_*) first
-    foreach (['cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache'] as $type) {
-        if (!empty($config_contents[$type])) {
-            $content = $config_contents[$type];
-            $lines = explode("\n", $content);
-            $in_subdomain_block = false;
-            
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (empty($line)) continue;
-                
-                // If resolving a subdomain, keep track of conditional blocks:
-                // |*if SUB="subdomain"| or |*if SUB='subdomain'|
-                if (!empty($subdomain)) {
-                    if (preg_match('/\|\*if\s+SUB=["\']' . preg_quote($subdomain, '/') . '["\']\|/i', $line)) {
-                        $in_subdomain_block = true;
-                        continue;
-                    }
-                    if (strpos($line, '|*endif|') !== false) {
-                        $in_subdomain_block = false;
-                        continue;
-                    }
+    // 1. Search in subdomains.docroot.override file if resolving a subdomain
+    if (empty($custom_docroot) && !empty($subdomain) && !empty($config_contents['subdomains.docroot.override'])) {
+        $lines = explode("\n", $config_contents['subdomains.docroot.override']);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            $parts_line = explode('=', $line, 2);
+            if (count($parts_line) === 2 && trim($parts_line[0]) === $subdomain) {
+                $val = trim($parts_line[1]);
+                $query_params = [];
+                parse_str($val, $query_params);
+                if (!empty($query_params['public_html'])) {
+                    $custom_docroot = $query_params['public_html'];
+                    break;
+                } elseif (!empty($query_params['private_html'])) {
+                    $custom_docroot = $query_params['private_html'];
+                    break;
                 }
-                
-                // Check if target DOCROOT / SDOCROOT matches the block or main domain context
-                if (empty($subdomain) || $in_subdomain_block) {
-                    if (preg_match('/\|\?(SDOCROOT|DOCROOT)=([^\s\|]+)/i', $line, $matches)) {
-                        $val = trim($matches[2]);
-                        $val = str_replace('`HOME`', $home, $val);
-                        $val = str_replace('`DOMAIN`', $domain, $val);
-                        $val = trim($val, '`\'"');
-                        if (!empty($val)) {
-                            $custom_docroot = $val;
-                            if (!empty($subdomain)) {
-                                break 2; // Found for subdomain
-                            }
-                        }
-                    }
-                }
-            }
-            
-            if (empty($subdomain) && !empty($custom_docroot)) {
-                break;
             }
         }
     }
     
-    // 2. Search in .subdomains file if resolving a subdomain
+    // 2. Search in custom overrides (.cust_*)
+    if (empty($custom_docroot)) {
+        foreach (['cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache'] as $type) {
+            if (!empty($config_contents[$type])) {
+                $content = $config_contents[$type];
+                $lines = explode("\n", $content);
+                $in_subdomain_block = false;
+                
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if (empty($line)) continue;
+                    
+                    // If resolving a subdomain, keep track of conditional blocks:
+                    // |*if SUB="subdomain"| or |*if SUB='subdomain'|
+                    if (!empty($subdomain)) {
+                        if (preg_match('/\|\*if\s+SUB=["\']' . preg_quote($subdomain, '/') . '["\']\|/i', $line)) {
+                            $in_subdomain_block = true;
+                            continue;
+                        }
+                        if (strpos($line, '|*endif|') !== false) {
+                            $in_subdomain_block = false;
+                            continue;
+                        }
+                    }
+                    
+                    // Check if target DOCROOT / SDOCROOT matches the block or main domain context
+                    if (empty($subdomain) || $in_subdomain_block) {
+                        if (preg_match('/\|\?(SDOCROOT|DOCROOT)=([^\s\|]+)/i', $line, $matches)) {
+                            $val = trim($matches[2]);
+                            $val = str_replace('`HOME`', $home, $val);
+                            $val = str_replace('`DOMAIN`', $domain, $val);
+                            $val = trim($val, '`\'"');
+                            if (!empty($val)) {
+                                $custom_docroot = $val;
+                                if (!empty($subdomain)) {
+                                    break 2; // Found for subdomain
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (empty($subdomain) && !empty($custom_docroot)) {
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 3. Search in .subdomains file if resolving a subdomain
     if (empty($custom_docroot) && !empty($subdomain) && !empty($config_contents['subdomains'])) {
         $lines = explode("\n", $config_contents['subdomains']);
         foreach ($lines as $line) {

@@ -64,8 +64,9 @@ int main(int argc, char *argv[]) {
         const char *type = argv[3];
         if (strcmp(type, "subdomains") != 0 && strcmp(type, "conf") != 0 &&
             strcmp(type, "cust_httpd") != 0 && strcmp(type, "cust_nginx") != 0 &&
-            strcmp(type, "cust_openlitespeed") != 0 && strcmp(type, "cust_apache") != 0) {
-            fprintf(stderr, "Error: Invalid config type. Use 'subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', or 'cust_apache'.\n");
+            strcmp(type, "cust_openlitespeed") != 0 && strcmp(type, "cust_apache") != 0 &&
+            strcmp(type, "subdomains.docroot.override") != 0) {
+            fprintf(stderr, "Error: Invalid config type. Use 'subdomains', 'conf', 'cust_httpd', 'cust_nginx', 'cust_openlitespeed', 'cust_apache', or 'subdomains.docroot.override'.\n");
             return 1;
         }
         
