@@ -890,6 +890,44 @@ $isAdmin = is_admin_user();
 
 
 
+        // Fetch subdomains for a domain using DirectAdmin API
+        async function fetchSubdomains(domain) {
+            try {
+                const response = await fetch(`/CMD_API_SUBDOMAINS?json=yes&domain=${encodeURIComponent(domain)}`);
+                const contentType = response.headers.get("content-type") || "";
+                if (contentType.includes("application/json")) {
+                    const data = await response.json();
+                    if (data && Array.isArray(data)) {
+                        return data;
+                    } else if (data && data.list) {
+                        return Array.isArray(data.list) ? data.list : Object.values(data.list);
+                    }
+                }
+                
+                // Fallback to URL-encoded parsing if not JSON
+                const text = await response.text();
+                const params = new URLSearchParams(text);
+                const list = [];
+                for (const [key, value] of params.entries()) {
+                    if (key === 'list[]' || key.startsWith('list[')) {
+                        list.push(value);
+                    }
+                }
+                
+                if (list.length === 0) {
+                    const subList = params.get('list');
+                    if (subList) {
+                        return subList.split(',').map(s => s.trim());
+                    }
+                }
+                
+                return list;
+            } catch (e) {
+                console.error("Failed to fetch subdomains for " + domain, e);
+                return [];
+            }
+        }
+
         // Fetch domains and render
         async function loadDomains() {
             try {
@@ -899,12 +937,27 @@ $isAdmin = is_admin_user();
                 select.innerHTML = '';
                 
                 if (data.success && data.domains.length > 0) {
-                    data.domains.forEach(domain => {
+                    select.innerHTML = '<option value="" disabled selected>Select a Domain / Subdomain...</option>';
+                    
+                    for (const domain of data.domains) {
+                        // 1. Add main domain
                         const opt = document.createElement('option');
                         opt.value = domain;
                         opt.textContent = domain;
                         select.appendChild(opt);
-                    });
+                        
+                        // 2. Fetch and add subdomains
+                        const subdomains = await fetchSubdomains(domain);
+                        if (subdomains && subdomains.length > 0) {
+                            subdomains.forEach(sub => {
+                                const subOpt = document.createElement('option');
+                                const subFullName = sub + '.' + domain;
+                                subOpt.value = subFullName;
+                                subOpt.textContent = '   └─ ' + subFullName;
+                                select.appendChild(subOpt);
+                            });
+                        }
+                    }
                 } else {
                     select.innerHTML = '<option value="" disabled>No domains found on hosting</option>';
                 }

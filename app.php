@@ -739,39 +739,7 @@ function run_api() {
                     $dirs = array_diff(scandir($domains_dir), ['.', '..']);
                     foreach ($dirs as $dir) {
                         if (is_dir($domains_dir . '/' . $dir . '/public_html')) {
-                            // Add main domain
                             $domains[] = $dir;
-                            
-                            // Check for subdomains from DirectAdmin subdomains.list
-                            $sub_list_file = $domains_dir . '/' . $dir . '/subdomains.list';
-                            $found_subs = [];
-                            if (file_exists($sub_list_file)) {
-                                $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                                if ($lines !== false) {
-                                    foreach ($lines as $sub) {
-                                        $sub = trim($sub);
-                                        if ($sub !== '') {
-                                            $found_subs[] = $sub;
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // Check for subdomains physically under /domains/{domain}/subdomains/
-                            $subdomains_dir = $domains_dir . '/' . $dir . '/subdomains';
-                            if (is_dir($subdomains_dir)) {
-                                $subs = array_diff(scandir($subdomains_dir), ['.', '..']);
-                                foreach ($subs as $sub) {
-                                    if (is_dir($subdomains_dir . '/' . $sub)) {
-                                        $found_subs[] = $sub;
-                                    }
-                                }
-                            }
-                            
-                            $found_subs = array_unique($found_subs);
-                            foreach ($found_subs as $sub) {
-                                $domains[] = $sub . '.' . $dir;
-                            }
                         }
                     }
                 }
