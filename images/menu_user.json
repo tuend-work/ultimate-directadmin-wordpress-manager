@@ -7,7 +7,7 @@
         "name": "Ultimate WordPress Manager",
         "icon": "/IMG_PLUGINS/ultimate-directadmin-wordpress-manager/icon.svg",
         "href": "/CMD_PLUGINS/ultimate-directadmin-wordpress-manager/index.html",
-        "newTab": true
+        "newTab": false
       }
     ]
   }
