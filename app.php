@@ -2130,6 +2130,11 @@ function copy_dir_recursive($src, $dst) {
     $dir = opendir($src);
     while (false !== ($file = readdir($dir))) {
         if (($file != '.') && ($file != '..') && ($file != '.locked_mock') && ($file != '.git')) {
+            // Skip wp-content/cache folder to avoid copying heavy caching data
+            if ($file === 'cache' && basename($src) === 'wp-content') {
+                continue;
+            }
+            
             $src_file = $src . '/' . $file;
             $dst_file = $dst . '/' . $file;
             
