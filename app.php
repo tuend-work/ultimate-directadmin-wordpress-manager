@@ -287,7 +287,32 @@ function toggle_wordpress_security_measure($site_path, $measure, $enable, $param
         throw new Exception("wp-config.php not found at site path.");
     }
     
+    // --- WP Lock conflict detection ---
+    // Measures that need to write to wp-config.php
+    $wp_config_write_measures = ['security_keys', 'db_prefix', 'disable_scripts_concat', 'disallow_file_edit'];
+    // Measures that need to write to wp-includes/
+    $wp_includes_write_measures = ['forbid_php_includes'];
+    
+    if (in_array($measure, $wp_config_write_measures) && !is_writable($wp_config_path)) {
+        throw new Exception(
+            "Không thể ghi vào wp-config.php. File đang bị khóa (immutable/chattr). " .
+            "Vui lòng tắt WP Lock trong tab 'Overview Details' trước khi thay đổi tính năng này."
+        );
+    }
+    
+    if (in_array($measure, $wp_includes_write_measures)) {
+        $wp_includes = $site_path . '/wp-includes';
+        if (is_dir($wp_includes) && !is_writable($wp_includes)) {
+            throw new Exception(
+                "Không thể ghi vào thư mục wp-includes/. Thư mục đang bị khóa (immutable/chattr). " .
+                "Vui lòng tắt WP Lock trong tab 'Overview Details' trước khi thay đổi tính năng này."
+            );
+        }
+    }
+    // --- End lock detection ---
+    
     $htaccess_path = $site_path . '/.htaccess';
+
     
     switch ($measure) {
         case 'restrict_files':

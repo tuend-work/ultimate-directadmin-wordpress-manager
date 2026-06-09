@@ -361,7 +361,7 @@ div#iframe-container{
 
 /* ── Toast ── */
 #toast-area {
-    position: fixed; bottom: 20px; right: 20px;
+    position: fixed; top: 20px; right: 20px;
     z-index: 9999; display: flex; flex-direction: column; gap: 6px;
 }
 .toast {
@@ -374,7 +374,7 @@ div#iframe-container{
 }
 .toast.ok  { border-left-color: var(--green); }
 .toast.err { border-left-color: var(--red); }
-@keyframes fadeUp { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none} }
 
 /* ── Terminal ── */
 .terminal {
@@ -1052,8 +1052,18 @@ async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
     const s = allSites[siteIdx];
     const checkbox = document.getElementById(`sec-switch-${siteIdx}-${measureKey}`);
     const nextSecure = !currentSecure;
+
+    // Pre-flight: detect WP Lock conflict before calling API
+    const WP_CONFIG_MEASURES = ['security_keys', 'db_prefix', 'disable_scripts_concat', 'disallow_file_edit'];
+    const WP_INCLUDES_MEASURES = ['forbid_php_includes'];
+    if (s.locked && (WP_CONFIG_MEASURES.includes(measureKey) || WP_INCLUDES_MEASURES.includes(measureKey))) {
+        checkbox.checked = currentSecure;
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trong tab "Overview Details" trước khi thay đổi tính năng này.', 'error');
+        return;
+    }
     
     checkbox.disabled = true;
+
 
     let success = false;
     let errMsg = '';
@@ -1099,6 +1109,12 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
     const checkbox = document.getElementById(`sec-switch-${siteIdx}-${measureKey}`);
     
     checkbox.checked = currentSecure;
+
+    // Pre-flight: db_prefix needs to write to wp-config.php — blocked when locked
+    if (s.locked && measureKey === 'db_prefix') {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trong tab "Overview Details" trước khi đổi tiền tố Database.', 'error');
+        return;
+    }
     
     if (measureKey === 'db_prefix') {
         const randomStr = Math.random().toString(36).substring(2, 6);
