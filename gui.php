@@ -385,12 +385,46 @@ body {
 .terminal .ok  { color: var(--green); }
 .terminal .err { color: var(--red); }
 
-/* ── Expanded layout columns ── */
-.card-expanded-grid {
+/* ── Tabs ── */
+.card-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+    padding: 0 16px;
+    gap: 8px;
+}
+.tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    outline: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.tab-btn:hover {
+    color: var(--text);
+}
+.tab-btn.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+}
+.card-tab-content {
+    display: none;
+}
+.card-tab-content.active {
+    display: block;
+}
+.tab-grid-details {
     display: grid;
-    grid-template-columns: 1.2fr 1fr 1fr;
+    grid-template-columns: 1.2fr 1fr;
     gap: 16px;
-    padding: 16px;
 }
 .card-sec-title {
     font-size: 13px;
