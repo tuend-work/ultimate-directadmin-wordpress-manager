@@ -582,7 +582,7 @@ input:disabled + .slider {
 <div class="topbar">
     <div class="logo">
         <div class="logo-icon">W</div>
-        WordPress Manager
+        Ultimate WordPress Manager
     </div>
     <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
         <span><?php echo htmlspecialchars($server_ip); ?></span> | <span><?php echo htmlspecialchars($hostname); ?></span>
