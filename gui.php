@@ -42,7 +42,11 @@ body {
     color: var(--text);
     line-height: 1.5;
     min-height: 100vh;
-    min-width: 1200px;
+    width: 100%;
+}
+
+.plugin-legacy-host {
+    padding:0px;
 }
 
 /* ── Top bar ── */
