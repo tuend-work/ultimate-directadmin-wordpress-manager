@@ -1841,10 +1841,7 @@ function renderSites(sites) {
                     ${lockBadge}
                 </div>
                 <!-- Quick actions -->
-                <div class="card-actions" onclick="event.stopPropagation()">
-                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Login</button>
-                 
-                </div>
+
                 <span class="chevron" id="cv-${i}">▶</span>
             </div>
 
