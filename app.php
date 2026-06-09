@@ -236,90 +236,47 @@ function parse_wp_config($wp_config_path) {
 }
 
 /**
- * Scan directory recursively for wp-config.php.
- * Tracks visited realpaths to prevent symlink loops,
- * but uses the LOGICAL path (not realpath) when recording the install.
+ * Scans all WordPress installations under $home using the system `find` command.
+ * This approach is symlink-safe, depth-unlimited, and handles all DirectAdmin layouts.
  */
-function scan_directory_for_wp($dir, &$installations, $depth = 0, &$scanned_paths = null) {
-    if ($depth > 3) return;
-    
-    if ($scanned_paths === null) {
-        $scanned_paths = [];
-    }
-    
-    $wp_config_path = $dir . '/wp-config.php';
-    if (file_exists($wp_config_path)) {
-        // Use the realpath of the wp-config to avoid duplicates from multiple symlinks
-        $real_cfg = realpath($wp_config_path);
-        if ($real_cfg !== false) {
-            if (isset($scanned_paths[$real_cfg])) return;
-            $scanned_paths[$real_cfg] = true;
+function scan_wordpress_installations($home, $username) {
+    $installations = [];
+    $seen_realpaths = [];
+
+    // Use find to locate all wp-config.php files under the user's home directory.
+    // Exclude known WP internal directories to avoid false positives.
+    $cmd = sprintf(
+        'find %s -name "wp-config.php" -not -path "*/wp-content/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null',
+        escapeshellarg($home)
+    );
+
+    $output = [];
+    exec($cmd, $output);
+
+    foreach ($output as $wp_config_path) {
+        $wp_config_path = trim($wp_config_path);
+        if ($wp_config_path === '') continue;
+
+        // Deduplicate: two symlinked paths that resolve to the same file should only be listed once
+        $real = realpath($wp_config_path);
+        if ($real !== false) {
+            if (isset($seen_realpaths[$real])) continue;
+            $seen_realpaths[$real] = true;
         }
+
         $info = parse_wp_config($wp_config_path);
         if ($info) {
             $installations[] = $info;
         }
-        return; // Don't descend inside a WP install
     }
-    
-    if (!is_dir($dir)) return;
-    $files = @scandir($dir);
-    if ($files === false) return;
-    
-    foreach (array_diff($files, ['.', '..']) as $file) {
-        $path = $dir . '/' . $file;
-        if (!is_dir($path)) continue;
-        if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
-            continue;
-        }
-        // Prevent looping into circular symlinks at directory level
-        $real_dir = realpath($path);
-        if ($real_dir !== false && isset($scanned_paths[$real_dir])) continue;
-        
-        scan_directory_for_wp($path, $installations, $depth + 1, $scanned_paths);
-    }
-}
 
-/**
- * Scans all domains and saves cache
- */
-function scan_wordpress_installations($home, $username) {
-    $domains_dir = $home . '/domains';
-    $installations = [];
-    $scanned_wp_configs = []; // deduplicate by realpath of wp-config.php
-    
-    if (is_dir($domains_dir)) {
-        $domains = array_diff(scandir($domains_dir), ['.', '..']);
-        foreach ($domains as $domain) {
-            $domain_path = $domains_dir . '/' . $domain;
-            if (!is_dir($domain_path)) continue;
-            
-            // 1. Scan public_html (the logical path - even if it is a symlink)
-            $public_html = $domain_path . '/public_html';
-            if (is_dir($public_html)) {
-                scan_directory_for_wp($public_html, $installations, 0, $scanned_wp_configs);
-            }
-            
-            // 2. Scan dedicated subdomains/sub/public_html directories (when they exist as real dirs)
-            $subdomains_dir = $domain_path . '/subdomains';
-            if (is_dir($subdomains_dir)) {
-                $subs = array_diff(scandir($subdomains_dir), ['.', '..']);
-                foreach ($subs as $sub) {
-                    $sub_pub = $subdomains_dir . '/' . $sub . '/public_html';
-                    if (is_dir($sub_pub)) {
-                        scan_directory_for_wp($sub_pub, $installations, 0, $scanned_wp_configs);
-                    }
-                }
-            }
-        }
-    }
-    
     $cache_file = $home . '/.ultimate_wp_manager.json';
     file_put_contents($cache_file, json_encode($installations, JSON_PRETTY_PRINT));
     @chmod($cache_file, 0600);
-    
+
     return $installations;
 }
+
 
 /**
  * Download WordPress Core and extract it
