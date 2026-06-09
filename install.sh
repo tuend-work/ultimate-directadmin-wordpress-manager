@@ -46,6 +46,9 @@ chown -R diradmin:diradmin "$PLUGIN_DIR"
 find "$PLUGIN_DIR" -type d -exec chmod 755 {} \;
 find "$PLUGIN_DIR" -type f -exec chmod 644 {} \;
 
+# Remove Windows carriage returns (\r) to convert files to Unix format (fixing shebang load errors)
+find "$PLUGIN_DIR" -type f \( -name "*.sh" -o -name "*.html" -o -name "*.raw" -o -name "*.php" -o -name "*.conf" \) -exec sed -i 's/\r$//' {} \;
+
 # Set executable permissions for scripts and panel entry points
 chmod 755 "$PLUGIN_DIR"/scripts/*.sh 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/admin/index.html 2>/dev/null

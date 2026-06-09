@@ -6,7 +6,7 @@
 
 // Enable error reporting
 error_reporting(E_ALL);
-ini_set('display_errors', 0);
+ini_set('display_errors', 1);
 
 // Parse GET and POST variables (DirectAdmin executes plugins via CLI)
 $_GET = [];
