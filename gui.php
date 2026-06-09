@@ -508,6 +508,53 @@ div#iframe-container{
     font-weight: 600;
     font-size: 12px;
 }
+/* Toggle Switch */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+}
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border);
+    transition: .2s;
+    border-radius: 20px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+}
+input:checked + .slider {
+    background-color: var(--green);
+}
+input:focus + .slider {
+    box-shadow: 0 0 1px var(--green);
+}
+input:checked + .slider:before {
+    transform: translateX(18px);
+}
+input:disabled + .slider {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 </style>
 </head>
 <body>
@@ -764,6 +811,11 @@ function switchTab(siteIdx, tabName, event) {
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load themes')) {
             loadThemes(siteIdx);
         }
+    } else if (tabName === 'security') {
+        const list = document.getElementById(`security-list-${siteIdx}`);
+        if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
+            loadSecurity(siteIdx);
+        }
     }
 }
 
@@ -922,6 +974,215 @@ async function activateTheme(siteIdx, themeIdx, folder) {
     }
 }
 
+/* ─── Security Manager ─── */
+async function loadSecurity(i) {
+    const s = allSites[i];
+    const container = document.getElementById('security-list-' + i);
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Đang quét bảo mật website...</div>';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('get_security_status'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            const sec = d.security;
+            
+            const measures = [
+                { key: 'restrict_files', title: 'Hạn chế quyền wp-config.php', desc: 'Chmod tệp wp-config.php về quyền đọc tối thiểu (0400/0600) để ngăn truy cập trái phép.', icon: '🔑' },
+                { key: 'security_keys', title: 'Khóa bảo mật Salt Keys', desc: 'Tạo các chuỗi mã hóa ngẫu nhiên trong wp-config.php để bảo mật cookie và session người dùng.', icon: '🛡️' },
+                { key: 'db_prefix', title: 'Thay đổi tiền tố Database', desc: 'Đổi tiền tố các bảng MySQL từ mặc định "wp_" sang ngẫu nhiên để tránh các cuộc tấn công SQL Injection.', icon: '🗄️', promptInput: true },
+                { key: 'rename_admin_user', title: 'Đổi tên tài khoản "admin"', desc: 'Đổi tên tài khoản quản trị mặc định "admin" sang tên khác để chống tấn công dò mật khẩu (Brute Force).', icon: '👤', promptInput: true },
+                { key: 'block_wp_config', title: 'Khóa truy cập wp-config.php', desc: 'Chặn hoàn toàn việc truy cập trực tiếp tệp cấu hình wp-config.php từ trình duyệt thông qua .htaccess.', icon: '🚫' },
+                { key: 'block_htaccess', title: 'Khóa truy cập .htaccess', desc: 'Chặn trình duyệt web đọc hoặc ghi đè trực tiếp các tệp cấu hình máy chủ .htaccess và .htpasswd.', icon: '🔒' },
+                { key: 'block_xmlrpc', title: 'Chặn truy cập XML-RPC', desc: 'Vô hiệu hóa tệp xmlrpc.php để chống lại các cuộc tấn công DDoS và đoán mật khẩu hàng loạt.', icon: '⚡' },
+                { key: 'forbid_php_includes', title: 'Chặn chạy PHP trong wp-includes', desc: 'Ngăn chặn tin tặc thực thi các tập lệnh PHP độc hại được tải lên thư mục lõi wp-includes/.', icon: '📁' },
+                { key: 'forbid_php_uploads', title: 'Chặn chạy PHP trong wp-content/uploads', desc: 'Ngăn việc tải lên và chạy backdoor/shell PHP trong thư mục tải lên hình ảnh wp-content/uploads/.', icon: '🖼️' },
+                { key: 'disable_php_cache', title: 'Chặn chạy PHP trong wp-content/cache', desc: 'Ngăn chặn tin tặc chèn và thực thi mã độc PHP trong thư mục lưu trữ bộ nhớ đệm (cache).', icon: '💾' },
+                { key: 'disallow_file_edit', title: 'Tắt chỉnh sửa file giao diện/plugin', desc: 'Ẩn trình chỉnh sửa code (Theme/Plugin Editor) trong trang quản trị WordPress để tránh tin tặc sửa file khi chiếm quyền.', icon: '✍️' },
+                { key: 'disable_scripts_concat', title: 'Tắt gộp script admin (CONCATENATE_SCRIPTS)', desc: 'Tắt tính năng gộp các file script trong admin để tránh một số lỗ hổng bảo mật liên quan đến trình duyệt.', icon: '⚙️' },
+                { key: 'turn_off_pingbacks', title: 'Tắt tính năng Pingbacks', desc: 'Tắt cơ chế tự động gửi thông báo liên kết (pingback) để tránh website bị lợi dụng làm bàn đạp tấn công DDoS trang khác.', icon: '📣' },
+                { key: 'bot_protection', title: 'Bảo vệ khỏi Bot xấu & Scrapers', desc: 'Chặn các công cụ tự động quét lỗi, tải nội dung hàng loạt và spam bình luận (như curl, wget, scrapy).', icon: '🤖' },
+                { key: 'block_sensitive_files', title: 'Chặn file tài liệu nhạy cảm', desc: 'Chặn truy cập trực tiếp các file readme.html, license.txt, wp-config-sample.php từ bên ngoài trình duyệt.', icon: '📄' },
+                { key: 'block_author_scans', title: 'Chặn quét tên đăng nhập (Author scan)', desc: 'Chặn các truy vấn dạng "/?author=1" dùng để dò tìm chính xác username của quản trị viên.', icon: '🔍' },
+                { key: 'block_directory_browsing', title: 'Tắt liệt kê thư mục công cộng', desc: 'Ẩn toàn bộ danh sách tệp tin trong các thư mục nếu không có tệp index.html hay index.php.', icon: '📇' },
+                { key: 'block_sensitive_extensions', title: 'Chặn tải file sao lưu (backup files)', desc: 'Ngăn chặn người lạ tải về các tệp tin sao lưu nhạy cảm có đuôi .sql, .bak, .log, .sh, .ini...', icon: '📦' }
+            ];
+            
+            container.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px;">` + measures.map((m, idx) => {
+                const isSecure = !!sec[m.key];
+                const badgeClass = isSecure ? 'badge-green' : 'badge-red';
+                const badgeText = isSecure ? 'Đã bảo vệ' : 'Chưa bảo vệ';
+                const checkedAttr = isSecure ? 'checked' : '';
+                
+                let onchangeHandler = '';
+                if (m.promptInput) {
+                    onchangeHandler = `handleSpecialSecurityMeasure(${i}, '${m.key}', ${isSecure})`;
+                } else {
+                    onchangeHandler = `toggleSecurityMeasure(${i}, '${m.key}', ${isSecure})`;
+                }
+                
+                return `
+                <div class="plugin-item" style="padding: 10px 14px;">
+                    <div style="font-size: 18px; flex-shrink: 0; margin-right: 8px;">${m.icon}</div>
+                    <div class="plugin-info">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="plugin-name" style="font-size:12px; font-weight:600; color:var(--text);">${esc(m.title)}</span>
+                            <span class="badge ${badgeClass}" style="padding: 1px 6px; font-size: 9px; line-height: 1;">${badgeText}</span>
+                        </div>
+                        <div class="plugin-desc" style="font-size:11px; color:var(--text2); margin-top: 2px; white-space: normal; line-height: 1.3;" title="${esc(m.desc)}">${esc(m.desc)}</div>
+                    </div>
+                    <div style="flex-shrink:0; margin-left: 12px; display:flex; align-items:center;">
+                        <label class="switch">
+                            <input type="checkbox" id="sec-switch-${i}-${m.key}" ${checkedAttr} onchange="${onchangeHandler}">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                `;
+            }).join('') + `</div>`;
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Không thể tải trạng thái bảo mật.</div>';
+    }
+}
+
+async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
+    const s = allSites[siteIdx];
+    const checkbox = document.getElementById(`sec-switch-${siteIdx}-${measureKey}`);
+    const nextSecure = !currentSecure;
+    
+    checkbox.disabled = true;
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('measure', measureKey);
+        fd.append('enable', nextSecure ? 'true' : 'false');
+        
+        const r = await fetch(apiUrl('toggle_security'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(`${nextSecure ? 'Kích hoạt' : 'Hủy kích hoạt'} bảo mật thành công!`, 'success');
+        } else {
+            toast(d.error || 'Thao tác thất bại.', 'error');
+        }
+    } catch (err) {
+        toast('Lỗi kết nối đến máy chủ.', 'error');
+    } finally {
+        checkbox.disabled = false;
+        loadSecurity(siteIdx);
+    }
+}
+
+async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) {
+    const s = allSites[siteIdx];
+    const checkbox = document.getElementById(`sec-switch-${siteIdx}-${measureKey}`);
+    
+    checkbox.checked = currentSecure;
+    
+    if (measureKey === 'db_prefix') {
+        const randomStr = Math.random().toString(36).substring(2, 6);
+        const suggestedPrefix = `wp_${randomStr}_`;
+        const newPrefix = prompt(
+            "Nhập tiền tố Database mới (chỉ dùng chữ cái thường, số và dấu gạch dưới):\nLưu ý: Hệ thống sẽ đổi tên toàn bộ các bảng hiện tại và cập nhật tệp wp-config.php.", 
+            suggestedPrefix
+        );
+        
+        if (newPrefix === null) return;
+        
+        const cleanPrefix = newPrefix.trim();
+        if (!cleanPrefix) {
+            alert("Tiền tố Database không được để trống!");
+            return;
+        }
+        
+        if (!/^[a-z0-9_]+$/i.test(cleanPrefix)) {
+            alert("Tiền tố Database không đúng định dạng (chỉ dùng chữ cái, số, gạch dưới)!");
+            return;
+        }
+        
+        checkbox.disabled = true;
+        try {
+            const fd = new FormData();
+            fd.append('path', s.path);
+            fd.append('measure', 'db_prefix');
+            fd.append('enable', 'true');
+            fd.append('new_prefix', cleanPrefix);
+            
+            const r = await fetch(apiUrl('toggle_security'), { method: 'POST', body: fd });
+            const d = await r.json();
+            
+            if (d.success) {
+                toast("Đã thay đổi tiền tố database thành công!", "success");
+                s.db_prefix = cleanPrefix;
+            } else {
+                toast(d.error || "Lỗi khi đổi tiền tố database.", "error");
+            }
+        } catch (err) {
+            toast("Lỗi kết nối máy chủ.", "error");
+        } finally {
+            checkbox.disabled = false;
+            loadSecurity(siteIdx);
+        }
+        
+    } else if (measureKey === 'rename_admin_user') {
+        if (currentSecure) {
+            alert("Tài khoản 'admin' mặc định đã được đổi tên hoặc không tồn tại. Để bảo mật, không thể khôi phục lại tên tài khoản mặc định 'admin'.");
+            return;
+        }
+        
+        const newUsername = prompt(
+            "Nhập tên đăng nhập mới thay thế cho tài khoản 'admin' (chỉ dùng chữ thường, số, dấu chấm, gạch ngang, gạch dưới):",
+            "wp_manager_admin"
+        );
+        
+        if (newUsername === null) return;
+        
+        const cleanUsername = newUsername.trim();
+        if (!cleanUsername) {
+            alert("Tên đăng nhập mới không được để trống!");
+            return;
+        }
+        
+        if (!/^[a-z0-9_\-\.]+$/i.test(cleanUsername)) {
+            alert("Tên đăng nhập mới không đúng định dạng!");
+            return;
+        }
+        
+        if (cleanUsername.toLowerCase() === 'admin') {
+            alert("Tên đăng nhập mới không được là 'admin'!");
+            return;
+        }
+        
+        checkbox.disabled = true;
+        try {
+            const fd = new FormData();
+            fd.append('path', s.path);
+            fd.append('measure', 'rename_admin_user');
+            fd.append('enable', 'true');
+            fd.append('new_admin_username', cleanUsername);
+            
+            const r = await fetch(apiUrl('toggle_security'), { method: 'POST', body: fd });
+            const d = await r.json();
+            
+            if (d.success) {
+                toast("Đã đổi tên tài khoản 'admin' thành công!", "success");
+            } else {
+                toast(d.error || "Lỗi khi đổi tên tài khoản admin.", "error");
+            }
+        } catch (err) {
+            toast("Lỗi kết nối máy chủ.", "error");
+        } finally {
+            checkbox.disabled = false;
+            loadSecurity(siteIdx);
+        }
+    }
+}
+
 /* ─── File Lock Protection ─── */
 async function toggleLock(i) {
     const s = allSites[i];
@@ -1074,39 +1335,35 @@ function renderSites(sites) {
 
                 <!-- Tabs headers -->
                 <div class="card-tabs" onclick="event.stopPropagation()">
-                    <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)">ℹ️ Details & Security</button>
+                    <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)">ℹ️ Overview Details</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'security', event)">🛡️ Security & Protection</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
                 </div>
 
-                <!-- Tab 1: Details & Security -->
+                <!-- Tab 1: Overview Details -->
                 <div class="card-tab-content active" id="tab-content-${i}-details">
-                    <div class="tab-grid-details">
-                        <div>
-                            <div class="card-sec-title">ℹ️ Installation Details</div>
-                            <div class="card-details">
-                                <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
-                                <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
-                                <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
-                                <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
-                                <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
-                                <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
-                                <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="card-sec-title">🛡️ Security & Protection</div>
-                            <div class="plugin-item" style="margin-top: 12px;">
-                                <div class="plugin-info">
-                                    <div class="plugin-name" id="lock-label-${i}">${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}</div>
-                                    <div class="plugin-desc">Protects core files and plugins from modifications or unauthorized writes.</div>
-                                </div>
-                                <div class="plugin-toggle">
-                                    <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                                        ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
-                                    </button>
-                                </div>
-                            </div>
+                    <div class="card-sec-title">ℹ️ Installation Details</div>
+                    <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                        <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
+                        <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
+                        <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
+                        <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
+                        <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
+                        <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
+                        <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
+                    </div>
+                </div>
+
+                <!-- Tab 1.5: Security & Protection -->
+                <div class="card-tab-content" id="tab-content-${i}-security">
+                    <div class="card-sec-title">
+                        <span>🛡️ Security Hardening Status</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})">⟳ Scan & Refresh</button>
+                    </div>
+                    <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px; max-height: 400px;">
+                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                            Clicking Security tab or Scan & Refresh will load status...
                         </div>
                     </div>
                 </div>

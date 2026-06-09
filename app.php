@@ -95,6 +95,445 @@ function wp_exec($cmd) {
 }
 
 /**
+ * Safely add or remove rules in a .htaccess file using markers
+ */
+function wp_manager_htaccess_modify($htaccess_path, $marker, $rules, $enable) {
+    $content = file_exists($htaccess_path) ? file_get_contents($htaccess_path) : '';
+    $start_marker = "# BEGIN WP_MANAGER_{$marker}";
+    $end_marker = "# END WP_MANAGER_{$marker}";
+    
+    // Remove existing marker block if any
+    $pattern = "/# BEGIN WP_MANAGER_" . preg_quote($marker, '/') . ".*# END WP_MANAGER_" . preg_quote($marker, '/') . "/s";
+    $content = preg_replace($pattern, '', $content);
+    $content = trim($content);
+    
+    if ($enable) {
+        $block = "\n\n{$start_marker}\n" . trim($rules) . "\n{$end_marker}\n";
+        $content .= $block;
+    }
+    
+    $dir = dirname($htaccess_path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    
+    @file_put_contents($htaccess_path, trim($content) . "\n");
+    @chmod($htaccess_path, 0644);
+}
+
+/**
+ * Safely add/change or remove constant definitions in wp-config.php
+ */
+function wp_manager_config_define_modify($wp_config_path, $constant, $value, $enable) {
+    if (!file_exists($wp_config_path)) return;
+    $content = file_get_contents($wp_config_path);
+    
+    // Remove existing define if present
+    $pattern = "/\s*define\s*\(\s*['\"]" . preg_quote($constant, '/') . "['\"]\s*,\s*[^;]*\)\s*;/i";
+    $content = preg_replace($pattern, '', $content);
+    
+    if ($enable) {
+        $val_str = is_bool($value) ? ($value ? 'true' : 'false') : "'" . addslashes($value) . "'";
+        $define_str = "\ndefine('{$constant}', {$val_str});\n";
+        
+        $insert_pos = strpos($content, "/* That's all, stop editing!");
+        if ($insert_pos === false) {
+            $insert_pos = strpos($content, "require_once");
+        }
+        
+        if ($insert_pos !== false) {
+            $content = substr_replace($content, $define_str, $insert_pos, 0);
+        } else {
+            $content .= $define_str;
+        }
+    }
+    
+    @file_put_contents($wp_config_path, $content);
+}
+
+/**
+ * Helper to fetch database connection details from wp-config.php
+ */
+function wp_manager_get_db_conn($wp_config_path) {
+    if (!file_exists($wp_config_path)) return null;
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    try {
+        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+        $pdo = new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 2
+        ]);
+        return ['pdo' => $pdo, 'prefix' => $db_prefix];
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
+ * Get security status of 18 measures for a site
+ */
+function get_wordpress_security_status($site_path) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("wp-config.php not found at site path.");
+    }
+    
+    $htaccess_path = $site_path . '/.htaccess';
+    $config_content = file_get_contents($wp_config_path);
+    $htaccess_content = file_exists($htaccess_path) ? file_get_contents($htaccess_path) : '';
+    
+    $status = [];
+    
+    // 1. restrict_files
+    $perms = fileperms($wp_config_path) & 0777;
+    $status['restrict_files'] = ($perms <= 0640 || $perms === 0600 || $perms === 0400 || $perms === 0440);
+    
+    // 2. security_keys
+    preg_match("/define\s*\(\s*['\"]AUTH_KEY['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $config_content, $auth_match);
+    $auth_key = $auth_match[1] ?? '';
+    $status['security_keys'] = (!empty($auth_key) && $auth_key !== 'put your unique phrase here' && strlen($auth_key) > 20);
+    
+    // 3. db_prefix
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $config_content, $prefix_match);
+    $prefix = $prefix_match[1] ?? 'wp_';
+    $status['db_prefix'] = ($prefix !== 'wp_');
+    
+    // 4. block_xmlrpc
+    $status['block_xmlrpc'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_XMLRPC') !== false);
+    
+    // 5. forbid_php_includes
+    $inc_htaccess = $site_path . '/wp-includes/.htaccess';
+    $status['forbid_php_includes'] = file_exists($inc_htaccess) && (strpos(file_get_contents($inc_htaccess), 'WP_MANAGER_FORBID_PHP') !== false);
+    
+    // 6. forbid_php_uploads
+    $up_htaccess = $site_path . '/wp-content/uploads/.htaccess';
+    $status['forbid_php_uploads'] = file_exists($up_htaccess) && (strpos(file_get_contents($up_htaccess), 'WP_MANAGER_FORBID_PHP') !== false);
+    
+    // 7. disable_scripts_concat
+    $status['disable_scripts_concat'] = (preg_match("/define\s*\(\s*['\"]CONCATENATE_SCRIPTS['\"]\s*,\s*false\s*\)/i", $config_content) === 1);
+    
+    // 8. turn_off_pingbacks
+    $status['turn_off_pingbacks'] = false;
+    $db = wp_manager_get_db_conn($wp_config_path);
+    if ($db) {
+        try {
+            $stmt = $db['pdo']->prepare("SELECT option_value FROM `{$db['prefix']}options` WHERE option_name = 'default_pingback_accept'");
+            $stmt->execute();
+            $val = $stmt->fetchColumn();
+            $status['turn_off_pingbacks'] = ($val === '0');
+        } catch (Exception $e) {}
+    }
+    
+    // 9. disallow_file_edit
+    $status['disallow_file_edit'] = (preg_match("/define\s*\(\s*['\"]DISALLOW_FILE_EDIT['\"]\s*,\s*true\s*\)/i", $config_content) === 1);
+    
+    // 10. bot_protection
+    $status['bot_protection'] = (strpos($htaccess_content, 'WP_MANAGER_BOT_PROTECTION') !== false);
+    
+    // 11. block_sensitive_files
+    $status['block_sensitive_files'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_SENSITIVE') !== false);
+    
+    // 12. block_htaccess
+    $status['block_htaccess'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_HTACCESS') !== false);
+    
+    // 13. block_author_scans
+    $status['block_author_scans'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_AUTHOR_SCANS') !== false);
+    
+    // 14. block_directory_browsing
+    $status['block_directory_browsing'] = (strpos($htaccess_content, 'Options -Indexes') !== false || strpos($htaccess_content, 'WP_MANAGER_BLOCK_DIRECTORY_BROWSING') !== false);
+    
+    // 15. block_wp_config
+    $status['block_wp_config'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_WP_CONFIG') !== false);
+    
+    // 16. disable_php_cache
+    $cache_htaccess = $site_path . '/wp-content/cache/.htaccess';
+    $status['disable_php_cache'] = file_exists($cache_htaccess) && (strpos(file_get_contents($cache_htaccess), 'WP_MANAGER_FORBID_PHP') !== false);
+    
+    // 17. block_sensitive_extensions
+    $status['block_sensitive_extensions'] = (strpos($htaccess_content, 'WP_MANAGER_BLOCK_EXTENSIONS') !== false);
+    
+    // 18. rename_admin_user
+    $status['rename_admin_user'] = true;
+    if ($db) {
+        try {
+            $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$db['prefix']}users` WHERE user_login = 'admin'");
+            $stmt->execute();
+            $count = $stmt->fetchColumn();
+            $status['rename_admin_user'] = ($count == 0);
+        } catch (Exception $e) {}
+    }
+    
+    return $status;
+}
+
+/**
+ * Toggle security measure on/off for a site
+ */
+function toggle_wordpress_security_measure($site_path, $measure, $enable, $params = []) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("wp-config.php not found at site path.");
+    }
+    
+    $htaccess_path = $site_path . '/.htaccess';
+    
+    switch ($measure) {
+        case 'restrict_files':
+            if ($enable) {
+                @chmod($wp_config_path, 0400);
+            } else {
+                @chmod($wp_config_path, 0644);
+            }
+            break;
+            
+        case 'security_keys':
+            if ($enable) {
+                $salts = '';
+                $ch = curl_init('https://api.wordpress.org/secret-key/1.1/salt/');
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                $salts = curl_exec($ch);
+                curl_close($ch);
+                
+                if (!$salts || strpos($salts, 'define') === false) {
+                    $salts = '';
+                    $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
+                    foreach ($keys as $key) {
+                        $random_salt = bin2hex(random_bytes(32));
+                        $salts .= "define('{$key}', '{$random_salt}');\n";
+                    }
+                }
+                
+                $content = file_get_contents($wp_config_path);
+                $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
+                foreach ($keys as $key) {
+                    $content = preg_replace("/\s*define\s*\(\s*['\"]" . preg_quote($key, '/') . "['\"]\s*,\s*[^;]*\)\s*;/i", '', $content);
+                }
+                
+                $insert_pos = strpos($content, "/* That's all, stop editing!");
+                if ($insert_pos === false) {
+                    $insert_pos = strpos($content, "require_once");
+                }
+                
+                if ($insert_pos !== false) {
+                    $content = substr_replace($content, "\n" . $salts . "\n", $insert_pos, 0);
+                } else {
+                    $content .= "\n" . $salts . "\n";
+                }
+                
+                file_put_contents($wp_config_path, $content);
+            }
+            break;
+            
+        case 'db_prefix':
+            if ($enable) {
+                $new_prefix = $params['new_prefix'] ?? '';
+                if (!preg_match('/^[a-z0-9_]+$/i', $new_prefix)) {
+                    throw new Exception("Invalid database prefix format. Use alphanumeric characters and underscores.");
+                }
+                
+                $db = wp_manager_get_db_conn($wp_config_path);
+                if (!$db) {
+                    throw new Exception("Unable to establish database connection to modify prefix.");
+                }
+                
+                $pdo = $db['pdo'];
+                $old_prefix = $db['prefix'];
+                if ($old_prefix === $new_prefix) {
+                    break;
+                }
+                
+                $stmt = $pdo->prepare("SHOW TABLES LIKE " . $pdo->quote($old_prefix . "%"));
+                $stmt->execute();
+                $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                
+                if (empty($tables)) {
+                    throw new Exception("No database tables found matching old prefix: {$old_prefix}");
+                }
+                
+                foreach ($tables as $table) {
+                    $new_table_name = $new_prefix . substr($table, strlen($old_prefix));
+                    $pdo->exec("RENAME TABLE `{$table}` TO `{$new_table_name}`");
+                }
+                
+                $pdo->exec("UPDATE `{$new_prefix}options` SET option_name = REPLACE(option_name, '{$old_prefix}', '{$new_prefix}') WHERE option_name LIKE '{$old_prefix}%'");
+                $pdo->exec("UPDATE `{$new_prefix}usermeta` SET meta_key = REPLACE(meta_key, '{$old_prefix}', '{$new_prefix}') WHERE meta_key LIKE '{$old_prefix}%'");
+                
+                $content = file_get_contents($wp_config_path);
+                $content = preg_replace("/\\\$table_prefix\s*=\s*['\"].*?['\"]\s*;/", "\$table_prefix = '" . addslashes($new_prefix) . "';", $content);
+                file_put_contents($wp_config_path, $content);
+            }
+            break;
+            
+        case 'block_xmlrpc':
+            $rules = "<Files xmlrpc.php>\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_XMLRPC', $rules, $enable);
+            break;
+            
+        case 'forbid_php_includes':
+            $inc_htaccess = $site_path . '/wp-includes/.htaccess';
+            $rules = "<Files *.php>\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>\n" .
+                     "<Files wp-tinymce.php>\n" .
+                     "Order Allow,Deny\n" .
+                     "Allow from all\n" .
+                     "</Files>\n" .
+                     "<Files ms-files.php>\n" .
+                     "Order Allow,Deny\n" .
+                     "Allow from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($inc_htaccess, 'FORBID_PHP', $rules, $enable);
+            if (!$enable && file_exists($inc_htaccess) && filesize($inc_htaccess) === 0) {
+                @unlink($inc_htaccess);
+            }
+            break;
+            
+        case 'forbid_php_uploads':
+            $up_htaccess = $site_path . '/wp-content/uploads/.htaccess';
+            $rules = "<Files *.php>\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($up_htaccess, 'FORBID_PHP', $rules, $enable);
+            if (!$enable && file_exists($up_htaccess) && filesize($up_htaccess) === 0) {
+                @unlink($up_htaccess);
+            }
+            break;
+            
+        case 'disable_scripts_concat':
+            wp_manager_config_define_modify($wp_config_path, 'CONCATENATE_SCRIPTS', false, $enable);
+            break;
+            
+        case 'turn_off_pingbacks':
+            $db = wp_manager_get_db_conn($wp_config_path);
+            if (!$db) {
+                throw new Exception("Unable to connect to database.");
+            }
+            $val = $enable ? '0' : '1';
+            $stmt = $db['pdo']->prepare("UPDATE `{$db['prefix']}options` SET option_value = ? WHERE option_name = 'default_pingback_accept'");
+            $stmt->execute([$val]);
+            break;
+            
+        case 'disallow_file_edit':
+            wp_manager_config_define_modify($wp_config_path, 'DISALLOW_FILE_EDIT', true, $enable);
+            break;
+            
+        case 'bot_protection':
+            $rules = "<IfModule mod_rewrite.c>\n" .
+                     "RewriteEngine On\n" .
+                     "RewriteCond %{HTTP_USER_AGENT} (custombot|curl|wget|python|libwww|scrapy) [NC]\n" .
+                     "RewriteRule .* - [F,L]\n" .
+                     "</IfModule>";
+            wp_manager_htaccess_modify($htaccess_path, 'BOT_PROTECTION', $rules, $enable);
+            break;
+            
+        case 'block_sensitive_files':
+            $rules = "<FilesMatch \"^(readme\\.html|license\\.txt|wp-config-sample\\.php)$\">\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</FilesMatch>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_SENSITIVE', $rules, $enable);
+            break;
+            
+        case 'block_htaccess':
+            $rules = "<Files ~ \"^.*\\.([Hh][Tt][AaPp])\">\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_HTACCESS', $rules, $enable);
+            break;
+            
+        case 'block_author_scans':
+            $rules = "<IfModule mod_rewrite.c>\n" .
+                     "RewriteEngine On\n" .
+                     "RewriteCond %{QUERY_STRING} author=\\d [NC]\n" .
+                     "RewriteRule .* - [F,L]\n" .
+                     "</IfModule>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_AUTHOR_SCANS', $rules, $enable);
+            break;
+            
+        case 'block_directory_browsing':
+            $rules = "Options -Indexes";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_DIRECTORY_BROWSING', $rules, $enable);
+            break;
+            
+        case 'block_wp_config':
+            $rules = "<Files wp-config.php>\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_WP_CONFIG', $rules, $enable);
+            break;
+            
+        case 'disable_php_cache':
+            $cache_htaccess = $site_path . '/wp-content/cache/.htaccess';
+            $rules = "<Files *.php>\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</Files>";
+            wp_manager_htaccess_modify($cache_htaccess, 'FORBID_PHP', $rules, $enable);
+            if (!$enable && file_exists($cache_htaccess) && filesize($cache_htaccess) === 0) {
+                @unlink($cache_htaccess);
+            }
+            break;
+            
+        case 'block_sensitive_extensions':
+            $rules = "<FilesMatch \"\\.(bak|config|sql|fla|psd|ini|log|sh|inc|swp|dist)$\">\n" .
+                     "Order Deny,Allow\n" .
+                     "Deny from all\n" .
+                     "</FilesMatch>";
+            wp_manager_htaccess_modify($htaccess_path, 'BLOCK_EXTENSIONS', $rules, $enable);
+            break;
+            
+        case 'rename_admin_user':
+            if ($enable) {
+                $new_admin_username = $params['new_admin_username'] ?? '';
+                if (empty($new_admin_username) || !preg_match('/^[a-z0-9_\-\.]+$/i', $new_admin_username)) {
+                    throw new Exception("Invalid username format.");
+                }
+                
+                $db = wp_manager_get_db_conn($wp_config_path);
+                if (!$db) {
+                    throw new Exception("Unable to connect to database.");
+                }
+                
+                $pdo = $db['pdo'];
+                $prefix = $db['prefix'];
+                
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM `{$prefix}users` WHERE user_login = ?");
+                $stmt->execute([$new_admin_username]);
+                if ($stmt->fetchColumn() > 0) {
+                    throw new Exception("Username '{$new_admin_username}' already exists in database.");
+                }
+                
+                $stmt = $pdo->prepare("UPDATE `{$prefix}users` SET user_login = ? WHERE user_login = 'admin'");
+                $stmt->execute([$new_admin_username]);
+            }
+            break;
+    }
+    
+    return true;
+}
+
+/**
+
  * Check if WordPress files are locked (immutable)
  */
 function is_wordpress_locked($site_path) {
@@ -1580,6 +2019,29 @@ function run_api() {
                 }
                 activate_theme($_POST['path'], $_POST['theme_folder']);
                 echo json_encode(['success' => true, 'message' => 'Theme activated successfully.']);
+                break;
+                
+            case 'get_security_status':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $status = get_wordpress_security_status($_POST['path']);
+                echo json_encode(['success' => true, 'security' => $status]);
+                break;
+
+            case 'toggle_security':
+                if (empty($_POST['path']) || empty($_POST['measure'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                toggle_wordpress_security_measure($_POST['path'], $_POST['measure'], $enable, $_POST);
+                echo json_encode(['success' => true, 'message' => 'Security setting updated successfully.']);
                 break;
                 
             case 'update_plugin':
