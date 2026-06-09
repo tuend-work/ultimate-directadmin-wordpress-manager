@@ -1097,7 +1097,7 @@ function update_wordpress_core($site_path, $home) {
         throw new Exception("Safety block: wp-config.php not found.");
     }
     if (is_wordpress_locked($site_path)) {
-        throw new Exception("Website is locked. Please unlock WP Lock before updating WordPress core.");
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating WordPress core.");
     }
 
     $cache_dir = $home . '/.wp-cache';
@@ -1204,7 +1204,7 @@ function update_wordpress_plugin($site_path, $plugin_file) {
         throw new Exception("Plugin file not found.");
     }
     if (is_wordpress_locked($site_path)) {
-        throw new Exception("Website is locked. Please unlock WP Lock before updating plugins.");
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.");
     }
 
     $buffer_level = ob_get_level();
@@ -1250,7 +1250,7 @@ function update_wordpress_theme($site_path, $theme_folder) {
         throw new Exception("Theme folder not found.");
     }
     if (is_wordpress_locked($site_path)) {
-        throw new Exception("Website is locked. Please unlock WP Lock before updating themes.");
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating themes.");
     }
 
     $buffer_level = ob_get_level();
@@ -2334,7 +2334,7 @@ function toggle_site_cronjob($site_path, $enable) {
  */
 function toggle_wordpress_cron($site_path, $enable) {
     if (is_wordpress_locked($site_path)) {
-        throw new Exception("Website is locked. Please unlock WP Lock before modifying WP Cron status.");
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before modifying WP Cron status.");
     }
     
     $wp_config_path = $site_path . '/wp-config.php';

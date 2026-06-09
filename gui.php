@@ -972,7 +972,7 @@ async function loadPlugins(i) {
 async function updatePlugin(siteIdx, plugIdx, file) {
     const s = allSites[siteIdx];
     if (s.locked) {
-        toast('Website is locked. Unlock WP Lock before updating plugins.', 'error');
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.', 'error');
         return;
     }
 
@@ -1097,7 +1097,7 @@ async function loadThemes(i) {
 async function updateTheme(siteIdx, themeIdx, folder) {
     const s = allSites[siteIdx];
     if (s.locked) {
-        toast('Website is locked. Unlock WP Lock before updating themes.', 'error');
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before updating themes.', 'error');
         return;
     }
 
@@ -1430,16 +1430,16 @@ async function toggleLock(i) {
             
             if (s.locked) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '🔓 Unlock';
-                label.textContent = '🔒 Source code is locked (Immutable)';
+                btn.textContent = '🔓 Tắt Lockdown';
+                label.textContent = '🔒 WordPress Lockdown (Khoá thư mục và tập tin): Đang Bật';
                 if (hBadge) {
                     hBadge.className = 'badge badge-yellow';
-                    hBadge.textContent = '🔒 Locked';
+                    hBadge.textContent = '🔒 Lockdown';
                 }
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '🔒 Lock Source';
-                label.textContent = '🔓 Source code is unlocked (Writable)';
+                btn.textContent = '🔒 Bật Lockdown';
+                label.textContent = '🔓 WordPress Lockdown (Khoá thư mục và tập tin): Đang Tắt';
                 if (hBadge) {
                     hBadge.className = 'badge badge-gray';
                     hBadge.textContent = '🔓 Unlocked';
@@ -1461,7 +1461,7 @@ async function toggleLock(i) {
 async function toggleCron(i) {
     const s = allSites[i];
     if (s.locked) {
-        toast('Website is locked. Please unlock WP Lock before modifying WP Cron status.', 'error');
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before modifying WP Cron status.', 'error');
         return;
     }
     const isCronDisabled = s.disable_wp_cron;
@@ -1510,7 +1510,7 @@ async function toggleCron(i) {
 async function updateCore(i) {
     const s = allSites[i];
     if (s.locked) {
-        toast('Website is locked. Unlock WP Lock before updating WordPress core.', 'error');
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before updating WordPress core.', 'error');
         return;
     }
 
@@ -1593,7 +1593,7 @@ function renderSites(sites) {
             ? '<span class="badge badge-green">● Connected</span>'
             : '<span class="badge badge-red">● DB Error</span>';
         const lockBadge = s.locked
-            ? `<span class="badge badge-yellow" id="hb-lock-${i}">🔒 Locked</span>`
+            ? `<span class="badge badge-yellow" id="hb-lock-${i}">🔒 Lockdown</span>`
             : `<span class="badge badge-gray" id="hb-lock-${i}">🔓 Unlocked</span>`;
         const pathShort = s.path.replace('/home/'+DA_USER+'/', '~/');
         const shotSrc   = thumbUrl(s.siteurl);
@@ -1664,10 +1664,10 @@ function renderSites(sites) {
                     </div>
                     <div class="lock-section" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
-                            ${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}
+                            ${s.locked ? '🔒 WordPress Lockdown (Khoá thư mục và tập tin): Đang Bật' : '🔓 WordPress Lockdown (Khoá thư mục và tập tin): Đang Tắt'}
                         </div>
                         <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                            ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
+                            ${s.locked ? '🔓 Tắt Lockdown' : '🔒 Bật Lockdown'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
