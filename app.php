@@ -623,7 +623,18 @@ function delete_wordpress_instance($site_path, $home) {
         throw new Exception("Safety block: Could not locate wp-config.php. Deletion canceled.");
     }
     
-    rmdir_recursive($site_path);
+    // Delete only the files and folders inside the site path, keeping the root directory itself
+    if (is_dir($site_path)) {
+        $files = array_diff(scandir($site_path), ['.', '..']);
+        foreach ($files as $file) {
+            $path = $site_path . '/' . $file;
+            if (is_dir($path) && !is_link($path)) {
+                rmdir_recursive($path);
+            } else {
+                @unlink($path);
+            }
+        }
+    }
     
     // Force cache refresh
     $cache_file = $home . '/.ultimate_wp_manager.json';
