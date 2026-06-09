@@ -989,6 +989,68 @@ function wp_manager_bootstrap_wordpress($site_path) {
 }
 
 /**
+ * Fetch available plugin updates from WordPress update transients.
+ */
+function get_wordpress_plugin_update_info($site_path) {
+    $updates = [];
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $transient = get_site_transient('update_plugins');
+        foreach (['response' => true, 'no_update' => false] as $bucket => $has_update) {
+            if (!empty($transient->$bucket) && is_array($transient->$bucket)) {
+                foreach ($transient->$bucket as $file => $item) {
+                    $updates[$file] = [
+                        'latest_version' => $item->new_version ?? '',
+                        'update_available' => $has_update,
+                        'update_package_available' => $has_update && !empty($item->package)
+                    ];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        wp_manager_log("Unable to fetch plugin update info: " . $e->getMessage());
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+    return $updates;
+}
+
+/**
+ * Fetch available theme updates from WordPress update transients.
+ */
+function get_wordpress_theme_update_info($site_path) {
+    $updates = [];
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $transient = get_site_transient('update_themes');
+        foreach (['response' => true, 'no_update' => false] as $bucket => $has_update) {
+            if (!empty($transient->$bucket) && is_array($transient->$bucket)) {
+                foreach ($transient->$bucket as $folder => $item) {
+                    $updates[$folder] = [
+                        'latest_version' => $item['new_version'] ?? ($item->new_version ?? ''),
+                        'update_available' => $has_update,
+                        'update_package_available' => $has_update && !empty($item['package'] ?? ($item->package ?? ''))
+                    ];
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        wp_manager_log("Unable to fetch theme update info: " . $e->getMessage());
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+    return $updates;
+}
+
+/**
  * Copy WordPress core files from an extracted wordpress.org package.
  */
 function wp_manager_copy_core_files($src_dir, $target_dir) {
@@ -1050,6 +1112,17 @@ function update_wordpress_core($site_path, $home) {
 
     $extract_dir = $cache_dir . '/core_update_' . time();
     $maintenance = $site_path . '/.maintenance';
+    $legacy_maintenance = $site_path . '/.maintainance';
+    @unlink($maintenance);
+    @unlink($legacy_maintenance);
+    register_shutdown_function(function() use ($maintenance, $legacy_maintenance) {
+        if (file_exists($maintenance)) {
+            @unlink($maintenance);
+        }
+        if (file_exists($legacy_maintenance)) {
+            @unlink($legacy_maintenance);
+        }
+    });
 
     try {
         $zip = new ZipArchive;
@@ -1095,6 +1168,9 @@ function update_wordpress_core($site_path, $home) {
         if (file_exists($maintenance)) {
             @unlink($maintenance);
         }
+        if (file_exists($legacy_maintenance)) {
+            @unlink($legacy_maintenance);
+        }
         if (is_dir($extract_dir)) {
             rmdir_recursive($extract_dir);
         }
@@ -1126,6 +1202,15 @@ function update_wordpress_plugin($site_path, $plugin_file) {
     ob_start();
     try {
         wp_manager_bootstrap_wordpress($site_path);
+        $updates = get_site_transient('update_plugins');
+        $update = $updates->response[$plugin_file] ?? null;
+        if (!$update) {
+            throw new Exception("Plugin is already up to date or WordPress.org has no update metadata for this plugin.");
+        }
+        if (empty($update->package)) {
+            throw new Exception("A newer plugin version is listed, but no update package is available. This usually happens with premium/private plugins.");
+        }
+
         $skin = new Automatic_Upgrader_Skin();
         $upgrader = new Plugin_Upgrader($skin);
         $result = $upgrader->upgrade($plugin_file);
@@ -1163,6 +1248,16 @@ function update_wordpress_theme($site_path, $theme_folder) {
     ob_start();
     try {
         wp_manager_bootstrap_wordpress($site_path);
+        $updates = get_site_transient('update_themes');
+        $update = $updates->response[$theme_folder] ?? null;
+        if (!$update) {
+            throw new Exception("Theme is already up to date or WordPress.org has no update metadata for this theme.");
+        }
+        $package = is_array($update) ? ($update['package'] ?? '') : ($update->package ?? '');
+        if (empty($package)) {
+            throw new Exception("A newer theme version is listed, but no update package is available. This usually happens with premium/private themes.");
+        }
+
         $skin = new Automatic_Upgrader_Skin();
         $upgrader = new Theme_Upgrader($skin);
         $result = $upgrader->upgrade($theme_folder);
@@ -2410,11 +2505,16 @@ function run_api() {
                 }
                 $plugins = list_plugins($_POST['path']);
                 $active = get_active_plugins($_POST['path']);
+                $updates = get_wordpress_plugin_update_info($_POST['path']);
                 
                 $response_plugins = [];
                 foreach ($plugins as $file => $details) {
+                    $update_info = $updates[$file] ?? [];
                     $details['file'] = $file;
                     $details['active'] = in_array($file, $active);
+                    $details['latest_version'] = $update_info['latest_version'] ?? $details['version'];
+                    $details['update_available'] = $update_info['update_available'] ?? false;
+                    $details['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_plugins[] = $details;
                 }
                 echo json_encode(['success' => true, 'plugins' => $response_plugins]);
@@ -2451,10 +2551,15 @@ function run_api() {
                 }
                 $themes = list_themes($_POST['path']);
                 $active = get_active_theme($_POST['path']);
+                $updates = get_wordpress_theme_update_info($_POST['path']);
                 
                 $response_themes = [];
                 foreach ($themes as $theme) {
+                    $update_info = $updates[$theme['folder']] ?? [];
                     $theme['active'] = ($theme['folder'] === $active);
+                    $theme['latest_version'] = $update_info['latest_version'] ?? $theme['version'];
+                    $theme['update_available'] = $update_info['update_available'] ?? false;
+                    $theme['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_themes[] = $theme;
                 }
                 echo json_encode(['success' => true, 'themes' => $response_themes]);
