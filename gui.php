@@ -45,8 +45,8 @@ body {
     width: 100%;
 }
 
-.plugin-legacy-host {
-    padding:0px;
+div.plugin-legacy-host {
+    padding:0px !important;
 }
 div#iframe-container{
     width: 100%;
