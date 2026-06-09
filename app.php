@@ -98,9 +98,6 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
     $db_user = $db_user_match[1] ?? '';
     $db_pass = $db_pass_match[1] ?? '';
     $db_host = $db_host_match[1] ?? 'localhost';
-    if ($db_host === 'localhost') {
-        $db_host = '127.0.0.1';
-    }
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     // Extract WP Version
@@ -467,8 +464,23 @@ PHP;
     file_put_contents($mu_plugin_file, $mu_code);
     @chmod($mu_plugin_file, 0644);
     
-    // Parse site URL for redirection
-    $info = parse_wp_config($wp_config_path, '', '');
+    // Parse site URL for redirection (extract domain and subpath for fallback)
+    $domain = '';
+    $sub_path = '';
+    $domains_prefix = $home . '/domains/';
+    if (strpos($site_path, $domains_prefix) === 0) {
+        $relative = substr($site_path, strlen($domains_prefix));
+        $parts = explode('/', $relative);
+        if (count($parts) > 0) {
+            $domain = $parts[0];
+            $pub_index = array_search('public_html', $parts);
+            if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+            }
+        }
+    }
+    
+    $info = parse_wp_config($wp_config_path, $domain, $sub_path);
     $siteurl = $info['siteurl'] ?? '';
     
     return [
