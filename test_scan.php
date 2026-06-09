@@ -7,7 +7,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-$username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+$username = 'testplugin';
 $home = getenv('HOME') ?: "/home/{$username}";
 
 echo "Detected User : {$username}\n";
