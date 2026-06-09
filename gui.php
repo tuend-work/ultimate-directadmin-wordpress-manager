@@ -992,6 +992,12 @@ function visitSite(i, suffix) {
     window.open(s.siteurl + suffix, '_blank');
 }
 
+/* ─── Open File Manager ─── */
+function openFileManager(i) {
+    const s = allSites[i];
+    window.open('/CMD_FILE_MANAGER?path=' + encodeURIComponent(s.path), '_blank');
+}
+
 /* ─── Render ─── */
 function renderSites(sites) {
     const cnt = document.getElementById('sites-container');
@@ -1131,6 +1137,7 @@ function renderSites(sites) {
                     <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
                     <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete</button>
                 </div>
             </div>
