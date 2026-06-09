@@ -995,7 +995,12 @@ function visitSite(i, suffix) {
 /* ─── Open File Manager ─── */
 function openFileManager(i) {
     const s = allSites[i];
-    window.open('/CMD_FILE_MANAGER?path=' + encodeURIComponent(s.path), '_blank');
+    let path = s.path;
+    const prefix = '/home/' + DA_USER;
+    if (path.startsWith(prefix)) {
+        path = path.substring(prefix.length);
+    }
+    window.open('/CMD_FILE_MANAGER?path=' + encodeURIComponent(path), '_blank');
 }
 
 /* ─── Render ─── */
