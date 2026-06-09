@@ -609,6 +609,7 @@ input:disabled + .slider {
     <div class="toolbar-sep"></div>
     <input type="text" id="search-input" class="toolbar-search" placeholder="🔍  Search by name, URL, path…" oninput="filterSites()">
     <span class="count-label" id="count-label">Loading…</span>
+    <button class="btn btn-secondary btn-sm" onclick="openLogsModal()" style="margin-left: 8px;">📋 Show Logs</button>
 </div>
 
 <!-- Content -->
@@ -835,6 +836,23 @@ input:disabled + .slider {
     <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-delete')">Cancel</button>
         <button class="btn btn-danger" id="btn-delete-confirm" onclick="executeDelete()">Delete Permanently</button>
+    </div>
+</div>
+</div>
+
+<!-- ═══ MODAL: Show Logs ═══ -->
+<div class="modal-overlay" id="modal-logs">
+<div class="modal" style="max-width:700px;">
+    <div class="modal-head">
+        <h3>📋 Nhật ký hoạt động (System Logs)</h3>
+        <button class="modal-close" onclick="closeModal('modal-logs')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:15px;">
+        <textarea id="logs-textarea" readonly style="width:100%; height:400px; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:11px; padding:12px; resize:vertical; outline:none; line-height:1.4;"></textarea>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="refreshLogs()">⟳ Làm mới</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-logs')">Đóng</button>
     </div>
 </div>
 </div>
@@ -2518,6 +2536,30 @@ async function runPluginUpdate() {
     finally{document.getElementById('btn-update-done').disabled=false;}
 }
 <?php endif; ?>
+
+/* ─── Show Logs Handlers ─── */
+function openLogsModal() {
+    openModal('modal-logs');
+    refreshLogs();
+}
+
+async function refreshLogs() {
+    const txt = document.getElementById('logs-textarea');
+    txt.value = 'Đang tải nhật ký...';
+    try {
+        const r = await fetch(apiUrl('get_logs'));
+        const d = await r.json();
+        if (d.success) {
+            txt.value = d.logs || '(Không có dữ liệu nhật ký hoặc file nhật ký trống)';
+        } else {
+            txt.value = 'Lỗi: ' + (d.error || 'Không thể tải nhật ký.');
+        }
+    } catch (err) {
+        txt.value = 'Lỗi kết nối: ' + err.message;
+    }
+    // Auto scroll to bottom
+    txt.scrollTop = txt.scrollHeight;
+}
 
 /* ─── Init ─── */
 window.addEventListener('DOMContentLoaded', () => {

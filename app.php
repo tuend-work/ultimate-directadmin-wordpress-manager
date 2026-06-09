@@ -3113,7 +3113,13 @@ function run_api() {
                         }
                     }
                 }
+                wp_manager_log("Bắt đầu cài đặt WordPress cho tên miền: " . $_POST['domain'] . " (Database: " . $db['db_name'] . ")");
                 $res = install_wordpress_instance($_POST, $home);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cài đặt WordPress thành công cho tên miền: " . $_POST['domain']);
+                } else {
+                    wp_manager_log("Cài đặt WordPress thất bại cho tên miền: " . $_POST['domain']);
+                }
                 echo json_encode($res);
                 break;
             case 'clone':
@@ -3126,7 +3132,13 @@ function run_api() {
                 if (strpos(realpath($_POST['src_path']) ?: $_POST['src_path'], $home) !== 0) {
                     throw new Exception("Invalid source directory access.");
                 }
+                wp_manager_log("Bắt đầu clone WordPress từ " . $_POST['src_path'] . " sang tên miền: " . $_POST['domain']);
                 $res = clone_wordpress_instance($_POST, $home);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Clone WordPress thành công từ " . $_POST['src_path'] . " sang tên miền: " . $_POST['domain']);
+                } else {
+                    wp_manager_log("Clone WordPress thất bại từ " . $_POST['src_path'] . " sang tên miền: " . $_POST['domain']);
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3147,7 +3159,13 @@ function run_api() {
                 if (empty($_POST['path'])) {
                     throw new Exception("Missing site path parameter.");
                 }
+                wp_manager_log("Xóa cài đặt WordPress tại đường dẫn: " . $_POST['path']);
                 $res = delete_wordpress_instance($_POST['path'], $home);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Xóa WordPress thành công tại: " . $_POST['path']);
+                } else {
+                    wp_manager_log("Xóa WordPress thất bại tại: " . $_POST['path']);
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3158,7 +3176,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Khóa bảo vệ WordPress (Lockdown) tại: " . $_POST['path']);
                 $res = lock_wordpress_instance($_POST['path']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Khóa bảo vệ thành công tại: " . $_POST['path']);
+                } else {
+                    wp_manager_log("Khóa bảo vệ thất bại tại: " . $_POST['path']);
+                }
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {
                     @unlink($cache_file);
@@ -3173,7 +3197,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Mở khóa bảo vệ WordPress tại: " . $_POST['path']);
                 $res = unlock_wordpress_instance($_POST['path']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Mở khóa bảo vệ thành công tại: " . $_POST['path']);
+                } else {
+                    wp_manager_log("Mở khóa bảo vệ thất bại tại: " . $_POST['path']);
+                }
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {
                     @unlink($cache_file);
@@ -3335,6 +3365,7 @@ function run_api() {
                     throw new Exception("Invalid directory access.");
                 }
                 $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                wp_manager_log("Thay đổi cấu hình bảo mật '" . $_POST['measure'] . "' cho website: " . $_POST['path'] . " | Trạng thái: " . ($enable ? 'Bật' : 'Tắt'));
                 toggle_wordpress_security_measure($_POST['path'], $_POST['measure'], $enable, $_POST);
                 echo json_encode(['success' => true, 'message' => 'Security setting updated successfully.']);
                 break;
@@ -3363,6 +3394,7 @@ function run_api() {
                     throw new Exception("Invalid directory access.");
                 }
                 $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                wp_manager_log("Thay đổi trạng thái WP Cron cho website: " . $_POST['path'] . " | Trạng thái: " . ($enable ? 'Tắt Cron mặc định (Bật)' : 'Sử dụng Cron mặc định (Tắt)'));
                 toggle_wordpress_cron($_POST['path'], $enable);
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {
@@ -3379,6 +3411,7 @@ function run_api() {
                     throw new Exception("Invalid directory access.");
                 }
                 $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                wp_manager_log("Thay đổi trạng thái Tự động cập nhật cho website: " . $_POST['path'] . " | Trạng thái: " . ($enable ? 'Cho phép cập nhật (Tắt chặn)' : 'Không cho phép cập nhật (Bật chặn)'));
                 toggle_wordpress_auto_update($_POST['path'], $enable);
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {
@@ -3395,6 +3428,7 @@ function run_api() {
                     throw new Exception("Invalid directory access.");
                 }
                 $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                wp_manager_log("Thay đổi trạng thái WP Debug cho website: " . $_POST['path'] . " | Trạng thái: " . ($enable ? 'Bật' : 'Tắt'));
                 toggle_wordpress_debug($_POST['path'], $enable);
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {
@@ -3403,6 +3437,11 @@ function run_api() {
                 echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái WP Debug thành công.']);
                 break;
 
+            case 'get_logs':
+                $log_file = $home . '/.ultimate_wp_manager_debug.log';
+                $log_content = file_exists($log_file) ? file_get_contents($log_file) : 'Chưa có nhật ký hoạt động nào.';
+                echo json_encode(['success' => true, 'logs' => $log_content]);
+                break;
             default:
                 throw new Exception("Unknown action parameter: " . $action);
         }
