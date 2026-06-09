@@ -880,7 +880,15 @@ async function runPluginUpdate() {
 <?php endif; ?>
 
 /* ─── Init ─── */
-window.addEventListener('DOMContentLoaded', () => fetchSites(false));
+window.addEventListener('DOMContentLoaded', () => {
+    fetchSites(false);
+    // Hide DirectAdmin's injected plugin header bar (same-origin iframe)
+    try {
+        const hdr = window.parent.document.getElementById('plugin-host-header');
+        if (hdr) hdr.style.display = 'none';
+    } catch(e) { /* cross-origin or not in iframe — ignore */ }
+});
+
 </script>
 </body>
 </html>
