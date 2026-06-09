@@ -614,11 +614,20 @@ function toggleCard(i) {
 }
 
 /* ─── Refresh screenshot ─── */
-function refreshShot(i, url) {
+function refreshShot(i) {
+    const s   = allSites[i];
     const img = document.getElementById('shot-big-'+i);
-    const ts  = Date.now();
-    img.src = thumbUrl(url) + '&_=' + ts;
+    const th  = document.querySelector('#cb-'+i+' .site-thumb img');
+    const url = thumbUrl(s.siteurl) + '&_=' + Date.now();
+    img.src = url;
+    if (th) th.src = url;
     toast('Refreshing screenshot…');
+}
+
+/* ─── Visit site / WP Admin ─── */
+function visitSite(i, suffix) {
+    const s = allSites[i];
+    window.open(s.siteurl + suffix, '_blank');
 }
 
 /* ─── Render ─── */
@@ -666,8 +675,8 @@ function renderSites(sites) {
                 </div>
                 <!-- Quick actions -->
                 <div class="card-actions" onclick="event.stopPropagation()">
-                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${JSON.stringify(s.path)})">⚡ Login</button>
-                    <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${JSON.stringify(s.path)},${JSON.stringify(s.db_name)})">🗑</button>
+                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Login</button>
+                    <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${i})">🗑</button>
                 </div>
                 <span class="chevron" id="cv-${i}">▶</span>
             </div>
@@ -682,7 +691,7 @@ function renderSites(sites) {
                     <div class="shot-overlay"></div>
                     <span class="shot-label">📷 Live screenshot via thum.io</span>
                     <div class="shot-refresh">
-                        <button class="btn btn-secondary btn-sm" onclick="refreshShot(${i}, ${JSON.stringify(s.siteurl)})">⟳ Refresh</button>
+                        <button class="btn btn-secondary btn-sm" onclick="refreshShot(${i})">⟳ Refresh</button>
                     </div>
                 </div>
 
@@ -699,10 +708,10 @@ function renderSites(sites) {
 
                 <!-- Action row -->
                 <div class="card-action-row">
-                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${JSON.stringify(s.path)})">⚡ Magic Login</button>
-                    <button class="btn btn-secondary btn-sm" onclick="window.open(${JSON.stringify(s.siteurl+'/wp-admin/')}, '_blank')">⊞ WP Admin</button>
-                    <button class="btn btn-secondary btn-sm" onclick="window.open(${JSON.stringify(s.siteurl)}, '_blank')">🌐 Visit Site</button>
-                    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${JSON.stringify(s.path)},${JSON.stringify(s.db_name)})">🗑 Delete</button>
+                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
+                    <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
+                    <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
+                    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete</button>
                 </div>
             </div>
         </div>`;
@@ -834,10 +843,11 @@ async function executeInstall(e) {
 }
 
 /* ─── Magic Login ─── */
-async function doMagicLogin(path) {
+async function doMagicLogin(i) {
+    const s = allSites[i];
     toast('Generating magic login…');
     try {
-        const p = new URLSearchParams({action:'magic_login',path});
+        const p = new URLSearchParams({action:'magic_login', path: s.path});
         const r = await fetch(apiUrl(),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
         const d = await r.json();
         if (d.success&&d.login_url) { window.open(d.login_url,'_blank'); toast('Opening WP Admin…','success'); }
@@ -846,12 +856,13 @@ async function doMagicLogin(path) {
 }
 
 /* ─── Delete ─── */
-function openDeleteModal(path, db) {
-    deletePath=path; deleteDb=db;
-    document.getElementById('del-path').textContent=path;
-    document.getElementById('del-db-name').textContent=db||'(none)';
-    const chk=document.getElementById('del-db-check');
-    chk.checked=!!db; chk.disabled=!db;
+function openDeleteModal(i) {
+    const s = allSites[i];
+    deletePath = s.path; deleteDb = s.db_name;
+    document.getElementById('del-path').textContent = s.path;
+    document.getElementById('del-db-name').textContent = s.db_name || '(none)';
+    const chk = document.getElementById('del-db-check');
+    chk.checked = !!s.db_name; chk.disabled = !s.db_name;
     openModal('modal-delete');
 }
 
