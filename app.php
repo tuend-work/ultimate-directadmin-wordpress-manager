@@ -3113,12 +3113,12 @@ function run_api() {
                         }
                     }
                 }
-                wp_manager_log("Bắt đầu cài đặt WordPress cho tên miền: " . $_POST['domain'] . " (Database: " . $db['db_name'] . ")");
+                wp_manager_log("Bắt đầu cài đặt WordPress cho tên miền: " . $_POST['domain'] . " (Database: " . $_POST['db_name'] . ")");
                 $res = install_wordpress_instance($_POST, $home);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Cài đặt WordPress thành công cho tên miền: " . $_POST['domain']);
                 } else {
-                    wp_manager_log("Cài đặt WordPress thất bại cho tên miền: " . $_POST['domain']);
+                    wp_manager_log("Cài đặt WordPress thất bại cho tên miền: " . $_POST['domain'] . " | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
                 echo json_encode($res);
                 break;
@@ -3151,7 +3151,13 @@ function run_api() {
                 if (empty($_POST['path'])) {
                     throw new Exception("Missing site path parameter.");
                 }
+                wp_manager_log("Tạo Magic Login cho website tại: " . $_POST['path']);
                 $res = generate_magic_login($_POST['path'], $home);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Tạo Magic Login thành công cho website tại: " . $_POST['path']);
+                } else {
+                    wp_manager_log("Tạo Magic Login thất bại cho website tại: " . $_POST['path'] . " | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3242,7 +3248,9 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Thay đổi trạng thái plugin '" . $_POST['plugin_file'] . "' cho website " . $_POST['path'] . " -> " . $_POST['status']);
                 toggle_plugin_status($_POST['path'], $_POST['plugin_file'], $_POST['status']);
+                wp_manager_log("Thay đổi trạng thái plugin thành công.");
                 echo json_encode(['success' => true, 'message' => 'Plugin status updated successfully.']);
                 break;
 
@@ -3253,7 +3261,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Cập nhật plugin '" . $_POST['plugin_file'] . "' cho website: " . $_POST['path']);
                 $res = update_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật plugin thành công.");
+                } else {
+                    wp_manager_log("Cập nhật plugin thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3264,7 +3278,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Cài đặt lại plugin '" . $_POST['plugin_file'] . "' cho website: " . $_POST['path']);
                 $res = reinstall_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cài đặt lại plugin thành công.");
+                } else {
+                    wp_manager_log("Cài đặt lại plugin thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3275,7 +3295,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Xóa plugin '" . $_POST['plugin_file'] . "' khỏi website: " . $_POST['path']);
                 $res = delete_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Xóa plugin thành công.");
+                } else {
+                    wp_manager_log("Xóa plugin thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3309,7 +3335,9 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Kích hoạt theme '" . $_POST['theme_folder'] . "' cho website: " . $_POST['path']);
                 activate_theme($_POST['path'], $_POST['theme_folder']);
+                wp_manager_log("Kích hoạt theme thành công.");
                 echo json_encode(['success' => true, 'message' => 'Theme activated successfully.']);
                 break;
 
@@ -3320,7 +3348,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Cập nhật theme '" . $_POST['theme_folder'] . "' cho website: " . $_POST['path']);
                 $res = update_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật theme thành công.");
+                } else {
+                    wp_manager_log("Cập nhật theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3331,7 +3365,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Cài đặt lại theme '" . $_POST['theme_folder'] . "' cho website: " . $_POST['path']);
                 $res = reinstall_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cài đặt lại theme thành công.");
+                } else {
+                    wp_manager_log("Cài đặt lại theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3342,7 +3382,13 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Xóa theme '" . $_POST['theme_folder'] . "' khỏi website: " . $_POST['path']);
                 $res = delete_wordpress_theme($_POST['path'], $_POST['theme_folder']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Xóa theme thành công.");
+                } else {
+                    wp_manager_log("Xóa theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3377,12 +3423,24 @@ function run_api() {
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
                     throw new Exception("Invalid directory access.");
                 }
+                wp_manager_log("Cập nhật WordPress Core cho website: " . $_POST['path']);
                 $res = update_wordpress_core($_POST['path'], $home);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật WordPress Core thành công.");
+                } else {
+                    wp_manager_log("Cập nhật WordPress Core thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
             case 'update_plugin':
+                wp_manager_log("Bắt đầu cập nhật plugin WordPress Manager từ GitHub.");
                 $res = update_plugin_from_github();
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật plugin WordPress Manager thành công.");
+                } else {
+                    wp_manager_log("Cập nhật plugin WordPress Manager thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
                 echo json_encode($res);
                 break;
                 
@@ -3446,6 +3504,7 @@ function run_api() {
                 throw new Exception("Unknown action parameter: " . $action);
         }
     } catch (Exception $e) {
+        wp_manager_log("Thao tác thất bại. Action: {$action} | Lỗi: " . $e->getMessage());
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;
