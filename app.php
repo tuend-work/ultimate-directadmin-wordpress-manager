@@ -2086,10 +2086,23 @@ function run_api() {
                 break;
                 
             case 'install':
-                $required = ['domain', 'db_name', 'db_user', 'db_pass', 'site_title', 'admin_user', 'admin_pass', 'admin_email'];
-                foreach ($required as $field) {
-                    if (empty($_POST[$field])) {
-                        throw new Exception("Required parameter missing: {$field}");
+                $mode = $_POST['mode'] ?? 'fresh';
+                if ($mode === 'zip') {
+                    $required = ['domain', 'db_name', 'db_user', 'db_pass'];
+                    foreach ($required as $field) {
+                        if (empty($_POST[$field])) {
+                            throw new Exception("Required parameter missing: {$field}");
+                        }
+                    }
+                    if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
+                        throw new Exception("Vui lòng tải lên tệp ZIP source code hợp lệ!");
+                    }
+                } else {
+                    $required = ['domain', 'db_name', 'db_user', 'db_pass', 'site_title', 'admin_user', 'admin_pass', 'admin_email'];
+                    foreach ($required as $field) {
+                        if (empty($_POST[$field])) {
+                            throw new Exception("Required parameter missing: {$field}");
+                        }
                     }
                 }
                 $res = install_wordpress_instance($_POST, $home);
