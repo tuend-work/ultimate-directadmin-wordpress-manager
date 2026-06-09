@@ -716,27 +716,14 @@ $isAdmin = is_admin_user();
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Domain</label>
+                            <label>Domain / Subdomain</label>
                             <select id="inst-domain" class="form-control" required>
                                 <option value="" disabled selected>Loading Domains...</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Installation Type</label>
-                        <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem;">
-                            <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); cursor: pointer; text-transform: none;">
-                                <input type="radio" name="inst_type" value="directory" checked onchange="toggleInstallType()" style="width: 16px; height: 16px;">
-                                <span>Directory (subfolder)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); cursor: pointer; text-transform: none;">
-                                <input type="radio" name="inst_type" value="subdomain" onchange="toggleInstallType()" style="width: 16px; height: 16px;">
-                                <span>Subdomain</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label id="inst-subdir-label">Subdirectory (optional)</label>
+                        <label>Subdirectory (optional)</label>
                         <input type="text" id="inst-subdir" class="form-control" placeholder="e.g. blog (leave empty for root)">
                     </div>
 
@@ -901,21 +888,6 @@ $isAdmin = is_admin_user();
             document.getElementById(inputId).value = password;
         }
 
-        // Toggle subdirectory vs subdomain labels and settings
-        function toggleInstallType() {
-            const instType = document.querySelector('input[name="inst_type"]:checked').value;
-            const label = document.getElementById('inst-subdir-label');
-            const input = document.getElementById('inst-subdir');
-            if (instType === 'subdomain') {
-                label.textContent = "Subdomain Prefix (required)";
-                input.placeholder = "e.g. blog (for blog.domain.com)";
-                input.required = true;
-            } else {
-                label.textContent = "Subdirectory (optional)";
-                input.placeholder = "e.g. blog (leave empty for root)";
-                input.required = false;
-            }
-        }
 
 
         // Fetch domains and render
@@ -1063,7 +1035,6 @@ $isAdmin = is_admin_user();
             loadDomains();
             generatePassword('inst-dbpass');
             generatePassword('inst-adminpass');
-            toggleInstallType();
         }
 
         function closeInstallModal() {
@@ -1123,9 +1094,6 @@ $isAdmin = is_admin_user();
                 installParams.append('action', 'install');
                 installParams.append('domain', document.getElementById('inst-domain').value);
                 installParams.append('subdir', document.getElementById('inst-subdir').value);
-                
-                const isSubdomain = document.querySelector('input[name="inst_type"]:checked').value === 'subdomain';
-                installParams.append('is_subdomain', isSubdomain ? 'true' : 'false');
                 
                 installParams.append('db_name', dbInfo.db_name);
                 installParams.append('db_user', dbInfo.db_user);

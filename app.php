@@ -308,6 +308,56 @@ function download_and_extract_wordpress($target_dir, $home) {
 }
 
 /**
+ * Resolves a selected domain string into parent domain, subdomain prefix (if any), and its document root directory.
+ */
+function resolve_domain_path($domain_str, $home) {
+    $domains_dir = $home . '/domains';
+    
+    // First, check if the domain_str exists directly as a main domain folder
+    if (is_dir($domains_dir . '/' . $domain_str)) {
+        return [
+            'is_subdomain' => false,
+            'parent_domain' => $domain_str,
+            'subdomain_prefix' => '',
+            'doc_root' => $domains_dir . '/' . $domain_str . '/public_html'
+        ];
+    }
+    
+    // If not, it could be a subdomain. Let's find if a parent domain matches the suffix.
+    $parts = explode('.', $domain_str);
+    for ($i = 1; $i < count($parts) - 1; $i++) {
+        $parent = implode('.', array_slice($parts, $i));
+        if (is_dir($domains_dir . '/' . $parent)) {
+            $subdomain = implode('.', array_slice($parts, 0, $i));
+            
+            // Now check standard subdomain directories
+            $subdomain_dir = $domains_dir . '/' . $parent . '/subdomains/' . $subdomain . '/public_html';
+            if (is_dir($domains_dir . '/' . $parent . '/subdomains/' . $subdomain)) {
+                $doc_root = $subdomain_dir;
+            } else {
+                // Fallback to public_html/subdomain
+                $doc_root = $domains_dir . '/' . $parent . '/public_html/' . $subdomain;
+            }
+            
+            return [
+                'is_subdomain' => true,
+                'parent_domain' => $parent,
+                'subdomain_prefix' => $subdomain,
+                'doc_root' => $doc_root
+            ];
+        }
+    }
+    
+    // Fallback: treat it as a main domain, even if folder doesn't exist yet
+    return [
+        'is_subdomain' => false,
+        'parent_domain' => $domain_str,
+        'subdomain_prefix' => '',
+        'doc_root' => $domains_dir . '/' . $domain_str . '/public_html'
+    ];
+}
+
+/**
  * Core WordPress programmatic Installer
  */
 function install_wordpress_instance($params, $home) {
@@ -327,26 +377,15 @@ function install_wordpress_instance($params, $home) {
     $subdir_clean = str_replace(['..', '\\'], '', $subdir);
     $subdir_clean = trim($subdir_clean, '/');
     
-    $is_subdomain = !empty($params['is_subdomain']) && ($params['is_subdomain'] === 'true' || $params['is_subdomain'] === '1' || $params['is_subdomain'] === true);
-    
-    if ($is_subdomain) {
-        $subdomain_host = $subdir_clean . '.' . $domain_clean;
-        $subdomain_dir = $home . '/domains/' . $domain_clean . '/subdomains/' . $subdir_clean . '/public_html';
-        if (is_dir($home . '/domains/' . $domain_clean . '/subdomains/' . $subdir_clean)) {
-            $target_dir = $subdomain_dir;
-        } else {
-            $target_dir = $home . '/domains/' . $domain_clean . '/public_html/' . $subdir_clean;
-        }
-        $site_host = $subdomain_host;
-        $request_uri = '/';
-    } else {
-        $target_dir = $home . '/domains/' . $domain_clean . '/public_html';
-        if ($subdir_clean !== '') {
-            $target_dir .= '/' . $subdir_clean;
-        }
-        $site_host = $domain_clean;
-        $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
+    // Resolve the directory root and subdomain mapping
+    $domain_info = resolve_domain_path($domain_clean, $home);
+    $target_dir = $domain_info['doc_root'];
+    if ($subdir_clean !== '') {
+        $target_dir .= '/' . $subdir_clean;
     }
+    
+    $site_host = $domain_clean;
+    $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
     
     // Security check: must reside inside home directory
     $check_path = realpath($target_dir) ?: $target_dir;
@@ -432,7 +471,7 @@ function install_wordpress_instance($params, $home) {
     
     return [
         'success' => true,
-        'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($is_subdomain ? '' : ''),
+        'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
         'details' => $install_result
     ];
 }
@@ -700,7 +739,39 @@ function run_api() {
                     $dirs = array_diff(scandir($domains_dir), ['.', '..']);
                     foreach ($dirs as $dir) {
                         if (is_dir($domains_dir . '/' . $dir . '/public_html')) {
+                            // Add main domain
                             $domains[] = $dir;
+                            
+                            // Check for subdomains from DirectAdmin subdomains.list
+                            $sub_list_file = $domains_dir . '/' . $dir . '/subdomains.list';
+                            $found_subs = [];
+                            if (file_exists($sub_list_file)) {
+                                $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                                if ($lines !== false) {
+                                    foreach ($lines as $sub) {
+                                        $sub = trim($sub);
+                                        if ($sub !== '') {
+                                            $found_subs[] = $sub;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Check for subdomains physically under /domains/{domain}/subdomains/
+                            $subdomains_dir = $domains_dir . '/' . $dir . '/subdomains';
+                            if (is_dir($subdomains_dir)) {
+                                $subs = array_diff(scandir($subdomains_dir), ['.', '..']);
+                                foreach ($subs as $sub) {
+                                    if (is_dir($subdomains_dir . '/' . $sub)) {
+                                        $found_subs[] = $sub;
+                                    }
+                                }
+                            }
+                            
+                            $found_subs = array_unique($found_subs);
+                            foreach ($found_subs as $sub) {
+                                $domains[] = $sub . '.' . $dir;
+                            }
                         }
                     }
                 }
