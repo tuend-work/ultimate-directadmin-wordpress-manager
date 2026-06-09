@@ -1387,7 +1387,7 @@ function renderSites(sites) {
                         <span>🛡️ Security Hardening Status</span>
                         <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})">⟳ Scan & Refresh</button>
                     </div>
-                    <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px; max-height: 400px;">
+                    <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
                             Clicking Security tab or Scan & Refresh will load status...
                         </div>
