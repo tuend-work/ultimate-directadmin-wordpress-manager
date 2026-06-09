@@ -52,7 +52,7 @@ reseller=yes
 user=yes
 installed=yes
 name=Ultimate WordPress Manager
-version=1.0.5
+version=1.0.6
 author=tuend-work
 update_url=https://raw.githubusercontent.com/tuend-work/ultimate-directadmin-wordpress-manager/main/plugin.conf
 ```

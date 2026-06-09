@@ -447,7 +447,7 @@ Version: 1.0
 Author: DirectAdmin WP Manager
 */
 add_action('init', function() {
-    if (isset($_GET['magic_login']) && $_GET['magic_login'] === '{$token}') {
+    if (isset(\$_GET['magic_login']) && \$_GET['magic_login'] === '{$token}') {
         require_once ABSPATH . 'wp-includes/pluggable.php';
         // Auto-detect and fetch the first administrative user
         \$users = get_users(['role' => 'administrator', 'number' => 1]);
