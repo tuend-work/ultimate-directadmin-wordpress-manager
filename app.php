@@ -82,6 +82,19 @@ function set_permissions_recursive($dir) {
 }
 
 /**
+ * Command execution helper to bypass disabled shell_exec
+ */
+function wp_exec($cmd) {
+    $output = [];
+    $retval = null;
+    @exec($cmd, $output, $retval);
+    if ($retval !== 0 && empty($output)) {
+        return null;
+    }
+    return implode("\n", $output);
+}
+
+/**
  * Check if WordPress files are locked (immutable)
  */
 function is_wordpress_locked($site_path) {
@@ -91,8 +104,8 @@ function is_wordpress_locked($site_path) {
     $wp_config = $site_path . '/wp-config.php';
     if (!file_exists($wp_config)) return false;
     
-    $lsattr_path = trim(@shell_exec('which lsattr 2>/dev/null') ?: '/usr/bin/lsattr');
-    $output = @shell_exec("{$lsattr_path} " . escapeshellarg($wp_config) . " 2>/dev/null");
+    $lsattr_path = trim(wp_exec('which lsattr 2>/dev/null') ?: '/usr/bin/lsattr');
+    $output = wp_exec("{$lsattr_path} " . escapeshellarg($wp_config) . " 2>/dev/null");
     if ($output) {
         $parts = preg_split('/\s+/', trim($output));
         if (!empty($parts[0]) && strpos($parts[0], 'i') !== false) {
@@ -128,7 +141,7 @@ function lock_wordpress_instance($site_path) {
     
     $esc_path = escapeshellarg($site_path);
     $esc_wrapper = escapeshellarg($wrapper);
-    $output = @shell_exec("{$esc_wrapper} lock {$esc_path} 2>&1");
+    $output = wp_exec("{$esc_wrapper} lock {$esc_path} 2>&1");
     
     if (!is_wordpress_locked($site_path)) {
         $err_msg = $output ? trim($output) : "lsattr did not detect the lock. SUID permissions might be missing.";
@@ -167,7 +180,7 @@ function unlock_wordpress_instance($site_path) {
     
     $esc_path = escapeshellarg($site_path);
     $esc_wrapper = escapeshellarg($wrapper);
-    $output = @shell_exec("{$esc_wrapper} unlock {$esc_path} 2>&1");
+    $output = wp_exec("{$esc_wrapper} unlock {$esc_path} 2>&1");
     
     if (is_wordpress_locked($site_path)) {
         $err_msg = $output ? trim($output) : "lsattr still detects the lock. SUID permissions might be missing.";
@@ -759,7 +772,7 @@ function get_custom_docroot_from_configs($domain, $subdomain, $home, $wrapper) {
     $config_contents = [];
     foreach ($types as $type) {
         $cmd = escapeshellarg($wrapper) . " get_domain_config " . escapeshellarg($domain) . " " . escapeshellarg($type) . " 2>&1";
-        $content = @shell_exec($cmd);
+        $content = wp_exec($cmd);
         wp_manager_log("  wrapper query '{$type}': status=" . ($content !== null ? "success" : "failed") . ", length=" . strlen((string)$content));
         if ($content && strpos($content, 'Error:') === false) {
             $config_contents[$type] = $content;
