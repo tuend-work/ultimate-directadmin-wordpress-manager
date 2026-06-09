@@ -2114,6 +2114,183 @@ function resolve_domain_path($domain_str, $home) {
 
 
 /**
+ * Helper to recursively copy directories
+ */
+function copy_dir_recursive($src, $dst) {
+    if (!is_dir($dst)) {
+        mkdir($dst, 0755, true);
+    }
+    $dir = opendir($src);
+    while (false !== ($file = readdir($dir))) {
+        if (($file != '.') && ($file != '..') && ($file != '.locked_mock') && ($file != '.git')) {
+            if (is_dir($src . '/' . $file)) {
+                copy_dir_recursive($src . '/' . $file, $dst . '/' . $file);
+            } else {
+                copy($src . '/' . $file, $dst . '/' . $file);
+            }
+        }
+    }
+    closedir($dir);
+}
+
+/**
+ * Programmatic WordPress Cloner
+ */
+function clone_wordpress_instance($params, $home) {
+    $src_dir = $params['src_path'] ?? '';
+    $domain = $params['domain'] ?? '';
+    $subdir = $params['subdir'] ?? '';
+    $db_name = $params['db_name'] ?? '';
+    $db_user = $params['db_user'] ?? '';
+    $db_pass = $params['db_pass'] ?? '';
+    $protocol = $params['protocol'] ?? 'http';
+    
+    if (empty($src_dir) || !file_exists($src_dir . '/wp-config.php')) {
+        throw new Exception("Thư mục nguồn không hợp lệ hoặc không chứa wp-config.php.");
+    }
+    
+    // Sanitize path inputs
+    $domain_clean = str_replace(['..', '/', '\\'], '', $domain);
+    $subdir_clean = str_replace(['..', '\\'], '', $subdir);
+    $subdir_clean = trim($subdir_clean, '/');
+    
+    // Resolve target path
+    $domain_info = resolve_domain_path($domain_clean, $home);
+    $target_dir = $domain_info['doc_root'];
+    if ($subdir_clean !== '') {
+        $target_dir .= '/' . $subdir_clean;
+    }
+    
+    // Security check: must reside inside home directory
+    $check_path = realpath($target_dir) ?: $target_dir;
+    if (strpos($check_path, $home) !== 0) {
+        throw new Exception("Error: Thư mục đích phải nằm trong thư mục home của bạn.");
+    }
+    
+    if (file_exists($target_dir . '/wp-config.php')) {
+        throw new Exception("Thư mục đích đã chứa một cài đặt WordPress (wp-config.php đã tồn tại).");
+    }
+    
+    // 1. Copy files
+    copy_dir_recursive($src_dir, $target_dir);
+    set_permissions_recursive($target_dir);
+    
+    // 2. Export source DB
+    $src_config = $src_dir . '/wp-config.php';
+    $src_content = file_get_contents($src_config);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $src_content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $src_content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $src_content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $src_content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $src_content, $prefix_match);
+    
+    $src_db_name = $db_name_match[1] ?? '';
+    $src_db_user = $db_user_match[1] ?? '';
+    $src_db_pass = $db_pass_match[1] ?? '';
+    $src_db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    $src_db = wp_manager_get_db_conn($src_config);
+    $src_siteurl = '';
+    if ($src_db) {
+        try {
+            $stmt = $src_db['pdo']->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'siteurl'");
+            $stmt->execute();
+            $src_siteurl = rtrim($stmt->fetchColumn(), '/');
+        } catch (Exception $e) {}
+    }
+    
+    $dump_file = sys_get_temp_dir() . '/clone_dump_' . time() . '.sql';
+    $cmd_dump = sprintf(
+        'mysqldump -h %s -u %s -p%s %s > %s 2>&1',
+        escapeshellarg($src_db_host),
+        escapeshellarg($src_db_user),
+        escapeshellarg($src_db_pass),
+        escapeshellarg($src_db_name),
+        escapeshellarg($dump_file)
+    );
+    
+    $output = [];
+    $retval = null;
+    exec($cmd_dump, $output, $retval);
+    if ($retval !== 0) {
+        rmdir_recursive($target_dir);
+        throw new Exception("Lỗi khi xuất database nguồn: " . implode("\n", $output));
+    }
+    
+    // 3. Import target DB
+    $cmd_import = sprintf(
+        'mysql -h localhost -u %s -p%s %s < %s 2>&1',
+        escapeshellarg($db_user),
+        escapeshellarg($db_pass),
+        escapeshellarg($db_name),
+        escapeshellarg($dump_file)
+    );
+    $output_import = [];
+    $retval_import = null;
+    exec($cmd_import, $output_import, $retval_import);
+    @unlink($dump_file);
+    
+    if ($retval_import !== 0) {
+        rmdir_recursive($target_dir);
+        throw new Exception("Lỗi khi nhập database đích: " . implode("\n", $output_import));
+    }
+    
+    // 4. Update wp-config.php in target
+    $tgt_config = $target_dir . '/wp-config.php';
+    if (file_exists($tgt_config)) {
+        $content = file_get_contents($tgt_config);
+        $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
+        $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
+        $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
+        $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
+        file_put_contents($tgt_config, $content);
+    }
+    
+    // 5. Database search and replace
+    $new_siteurl = ($protocol === 'https' ? 'https://' : 'http://') . $domain_clean . ($subdir_clean !== '' ? '/' . $subdir_clean : '');
+    $tgt_siteurl = rtrim($new_siteurl, '/');
+    
+    try {
+        $dsn = "mysql:host=localhost;dbname={$db_name};charset=utf8mb4";
+        $pdo = new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 5
+        ]);
+        
+        // Update siteurl and home
+        $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name IN ('siteurl', 'home')");
+        $stmt->execute([$tgt_siteurl]);
+        
+        if (!empty($src_siteurl) && $src_siteurl !== $tgt_siteurl) {
+            // Update posts content, excerpt, and guid
+            $stmt = $pdo->prepare("UPDATE `{$db_prefix}posts` SET 
+                post_content = REPLACE(post_content, ?, ?),
+                post_excerpt = REPLACE(post_excerpt, ?, ?),
+                guid = REPLACE(guid, ?, ?)
+            ");
+            $stmt->execute([$src_siteurl, $tgt_siteurl, $src_siteurl, $tgt_siteurl, $src_siteurl, $tgt_siteurl]);
+            
+            // Update postmeta
+            $stmt = $pdo->prepare("UPDATE `{$db_prefix}postmeta` SET meta_value = REPLACE(meta_value, ?, ?) WHERE meta_value LIKE ?");
+            $stmt->execute([$src_siteurl, $tgt_siteurl, '%' . $src_siteurl . '%']);
+            
+            // Update options
+            $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = REPLACE(option_value, ?, ?) WHERE option_name NOT IN ('siteurl', 'home') AND option_value LIKE ?");
+            $stmt->execute([$src_siteurl, $tgt_siteurl, '%' . $src_siteurl . '%']);
+        }
+    } catch (Exception $e) {
+        wp_manager_log("Search and replace failed: " . $e->getMessage());
+    }
+    
+    return [
+        'success' => true,
+        'siteurl' => $new_siteurl,
+        'message' => 'Clone website WordPress thành công.'
+    ];
+}
+
+/**
  * Core WordPress programmatic Installer
  */
 function install_wordpress_instance($params, $home) {
@@ -2916,6 +3093,19 @@ function run_api() {
                     }
                 }
                 $res = install_wordpress_instance($_POST, $home);
+                echo json_encode($res);
+                break;
+            case 'clone':
+                $required = ['src_path', 'domain', 'db_name', 'db_user', 'db_pass'];
+                foreach ($required as $field) {
+                    if (empty($_POST[$field])) {
+                        throw new Exception("Required parameter missing: {$field}");
+                    }
+                }
+                if (strpos(realpath($_POST['src_path']) ?: $_POST['src_path'], $home) !== 0) {
+                    throw new Exception("Invalid source directory access.");
+                }
+                $res = clone_wordpress_instance($_POST, $home);
                 echo json_encode($res);
                 break;
                 

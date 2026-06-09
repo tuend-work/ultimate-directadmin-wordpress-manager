@@ -737,6 +737,83 @@ input:disabled + .slider {
 </div>
 </div>
 
+<!-- ═══ MODAL: Clone Website ═══ -->
+<div class="modal-overlay" id="modal-clone">
+<div class="modal">
+    <div class="modal-head">
+        <h3>👯 Clone WordPress Website</h3>
+        <button class="modal-close" onclick="closeModal('modal-clone')">✕</button>
+    </div>
+    <form onsubmit="executeClone(event)">
+    <input type="hidden" id="clone-src-path">
+    <div class="modal-body">
+
+        <div class="form-section">
+            <div class="form-section-title">Source Website Path</div>
+            <div class="form-group">
+                <code id="clone-src-display" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;word-break:break-all;color:var(--text2);"></code>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title">Target Website Location</div>
+            <div style="display: grid; grid-template-columns: 1.2fr 3fr 2fr; gap: 12px;">
+                <div class="form-group">
+                    <label>Protocol</label>
+                    <select id="clone-protocol" class="form-control">
+                        <option value="https">https://</option>
+                        <option value="http">http://</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Domain / Subdomain</label>
+                    <select id="clone-domain" class="form-control" required>
+                        <option value="" disabled selected>Loading…</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Directory <span style="font-weight:400;color:var(--text3)">(optional)</span></label>
+                    <input type="text" id="clone-subdir" class="form-control" placeholder="e.g. clone-site">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title">Target Database</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 12px;">
+                <div class="form-group">
+                    <label>DB Name</label>
+                    <div class="input-group">
+                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <input type="text" id="clone-dbname" class="form-control" placeholder="wpclone" required maxlength="16">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>DB User</label>
+                    <div class="input-group">
+                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <input type="text" id="clone-dbuser" class="form-control" placeholder="wpcloneuser" required maxlength="16">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>DB Password</label>
+                    <div class="input-group-btn">
+                        <input type="text" id="clone-dbpass" class="form-control" required placeholder="Password">
+                        <button type="button" class="btn btn-secondary" onclick="genPass('clone-dbpass')">Gen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-clone')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-clone-submit">Clone Website</button>
+    </div>
+    </form>
+</div>
+</div>
+
 <!-- ═══ MODAL: Delete ═══ -->
 <div class="modal-overlay" id="modal-delete">
 <div class="modal" style="max-width:460px;">
@@ -2087,6 +2164,7 @@ function renderSites(sites) {
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
                     <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
                     <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
             </div>
@@ -2287,6 +2365,88 @@ async function executeInstall(e) {
     } finally { 
         btn.disabled=false; 
         btn.textContent='Install WordPress'; 
+    }
+}
+
+/* ─── Clone Website Handlers ─── */
+async function loadCloneDomains() {
+    const sel = document.getElementById('clone-domain');
+    sel.innerHTML = '<option value="" disabled selected>Loading…</option>';
+    try {
+        const r = await fetch(apiUrl('get_domains'));
+        const d = await r.json();
+        sel.innerHTML = '<option value="" disabled selected>Select domain…</option>';
+        if (d.success && d.domains.length) {
+            for (const dom of d.domains) {
+                const o = document.createElement('option'); o.value=dom; o.textContent=dom;
+                sel.appendChild(o);
+                const subs = await fetchSubdomains(dom);
+                subs.forEach(sub => {
+                    const s = document.createElement('option');
+                    const full = sub+'.'+dom;
+                    s.value=full; s.textContent='  └─ '+full;
+                    sel.appendChild(s);
+                });
+            }
+        }
+    } catch { toast('Failed to load domains.', 'error'); }
+}
+
+function openCloneModal(i) {
+    const s = allSites[i];
+    document.getElementById('clone-src-path').value = s.path;
+    document.getElementById('clone-src-display').textContent = s.path;
+    openModal('modal-clone');
+    loadCloneDomains();
+    genPass('clone-dbpass');
+    
+    // Suggest target database details
+    const randomStr = Math.random().toString(36).substring(2, 6);
+    document.getElementById('clone-dbname').value = 'cln' + randomStr;
+    document.getElementById('clone-dbuser').value = 'u' + randomStr;
+}
+
+async function executeClone(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-clone-submit');
+    btn.disabled = true; btn.textContent = 'Creating database…';
+    try {
+        const db = await createDB(
+            document.getElementById('clone-dbname').value,
+            document.getElementById('clone-dbuser').value,
+            document.getElementById('clone-dbpass').value
+        );
+        toast('1/2 Target Database created.', 'success');
+        
+        btn.textContent = 'Cloning files & database…';
+        
+        const fd = new FormData();
+        fd.append('action', 'clone');
+        fd.append('src_path', document.getElementById('clone-src-path').value);
+        fd.append('domain', document.getElementById('clone-domain').value);
+        fd.append('subdir', document.getElementById('clone-subdir').value);
+        fd.append('db_name', db.db_name);
+        fd.append('db_user', db.db_user);
+        fd.append('db_pass', document.getElementById('clone-dbpass').value);
+        fd.append('protocol', document.getElementById('clone-protocol').value);
+        
+        const r = await fetch(apiUrl(), {
+            method: 'POST',
+            body: fd
+        });
+        const d = await r.json();
+        if (d.success) {
+            toast(d.message || 'Clone website thành công!', 'success');
+            closeModal('modal-clone');
+            fetchSites(false);
+        } else {
+            toast(d.error || 'Clone failed.', 'error');
+        }
+    } catch (err) {
+        toast(err.message || 'Error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Clone Website';
     }
 }
 
