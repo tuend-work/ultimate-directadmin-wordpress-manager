@@ -1600,16 +1600,16 @@ async function toggleLock(i) {
             
             if (s.locked) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '🔓 Tắt Lockdown';
-                label.textContent = '🔒 WordPress Lockdown (Khoá thư mục và tập tin): Đang Bật';
+                btn.textContent = '🔓 Tắt';
+                label.innerHTML = '🔒 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
                 if (hBadge) {
                     hBadge.className = 'badge badge-yellow';
                     hBadge.textContent = '🔒 Lockdown';
                 }
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '🔒 Bật Lockdown';
-                label.textContent = '🔓 WordPress Lockdown (Khoá thư mục và tập tin): Đang Tắt';
+                btn.textContent = '🔒 Bật';
+                label.innerHTML = '🔓 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
                 if (hBadge) {
                     hBadge.className = 'badge badge-gray';
                     hBadge.textContent = '🔓 Unlocked';
@@ -1657,12 +1657,12 @@ async function toggleCron(i) {
             
             if (s.disable_wp_cron) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '⚙️ Enable WP Cron';
-                label.textContent = '⚡ WP Cron is disabled (System cron active)';
+                btn.textContent = '⚙️ Tắt';
+                label.innerHTML = '⚡ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '⚡ Disable WP Cron';
-                label.textContent = '⚙️ WP Cron is enabled (WP default)';
+                btn.textContent = '⚡ Bật';
+                label.innerHTML = '⚙️ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
             }
         } else {
             toast(d.error || 'Failed to update WP Cron status.', 'error');
@@ -1706,12 +1706,12 @@ async function toggleAutoUpdate(i) {
             
             if (s.disable_auto_update) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '⚙️ Enable Auto Update';
-                label.textContent = '⚡ Auto Check Update is Disabled (Optimized)';
+                btn.textContent = '⚙️ Tắt';
+                label.innerHTML = '⚡ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '⚡ Disable Auto Update';
-                label.textContent = '⚙️ Auto Check Update is Enabled (WordPress default)';
+                btn.textContent = '⚡ Bật';
+                label.innerHTML = '⚙️ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
             }
         } else {
             toast(d.error || 'Failed to update Auto Update status.', 'error');
@@ -1884,26 +1884,32 @@ function renderSites(sites) {
                     </div>
                     <div class="lock-section" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
-                            ${s.locked ? '🔒 WordPress Lockdown (Khoá thư mục và tập tin): Đang Bật' : '🔓 WordPress Lockdown (Khoá thư mục và tập tin): Đang Tắt'}
+                            ${s.locked 
+                                ? '🔒 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '🔓 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                            ${s.locked ? '🔓 Tắt Lockdown' : '🔒 Bật Lockdown'}
+                            ${s.locked ? '🔓 Tắt' : '🔒 Bật'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="cron-label-${i}">
-                            ${s.disable_wp_cron ? '⚡ WP Cron is disabled (System cron active)' : '⚙️ WP Cron is enabled (WP default)'}
+                            ${s.disable_wp_cron 
+                                ? '⚡ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '⚙️ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.disable_wp_cron ? 'btn-secondary' : 'btn-primary'}" id="btn-cron-${i}" onclick="toggleCron(${i})">
-                            ${s.disable_wp_cron ? '⚙️ Enable WP Cron' : '⚡ Disable WP Cron'}
+                            ${s.disable_wp_cron ? '⚙️ Tắt' : '⚡ Bật'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="autoupdate-label-${i}">
-                            ${s.disable_auto_update ? '⚡ Auto Check Update is Disabled (Optimized)' : '⚙️ Auto Check Update is Enabled (WordPress default)'}
+                            ${s.disable_auto_update 
+                                ? '⚡ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '⚙️ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.disable_auto_update ? 'btn-secondary' : 'btn-primary'}" id="btn-autoupdate-${i}" onclick="toggleAutoUpdate(${i})">
-                            ${s.disable_auto_update ? '⚙️ Enable Auto Update' : '⚡ Disable Auto Update'}
+                            ${s.disable_auto_update ? '⚙️ Tắt' : '⚡ Bật'}
                         </button>
                     </div>
                 </div>
