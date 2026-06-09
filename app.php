@@ -2676,7 +2676,7 @@ function toggle_wordpress_debug($site_path, $enable) {
     // Modify debug constants
     wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG', (bool)$enable, true);
     wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG_LOG', (bool)$enable, true);
-    wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG_DISPLAY', false, true);
+    wp_manager_config_define_modify($wp_config_path, 'WP_DEBUG_DISPLAY', (bool)$enable, true);
     
     return true;
 }
