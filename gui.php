@@ -42,6 +42,7 @@ body {
     color: var(--text);
     line-height: 1.5;
     min-height: 100vh;
+    min-width: 1200px;
 }
 
 /* ── Top bar ── */
@@ -201,6 +202,7 @@ body {
 .badge-red    { background: #1f0d0d; color: var(--red);   border-color: #421a1a; }
 .badge-blue   { background: #0d1b2f; color: var(--blue);  border-color: #1a3352; }
 .badge-yellow { background: #1f1a0d; color: var(--yellow);border-color: #42380a; }
+.badge-gray   { background: #1c2128; color: var(--text2); border-color: var(--border); }
 
 /* Card actions column */
 .card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
@@ -382,6 +384,86 @@ body {
 }
 .terminal .ok  { color: var(--green); }
 .terminal .err { color: var(--red); }
+
+/* ── Expanded layout columns ── */
+.card-expanded-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 16px;
+    padding: 16px;
+}
+.card-sec-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.plugin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.plugin-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.plugin-info {
+    min-width: 0;
+    flex: 1;
+}
+.plugin-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plugin-desc {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plugin-meta {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+}
+.plugin-toggle {
+    flex-shrink: 0;
+}
+.lock-section {
+    margin-top: 16px;
+    border-top: 1px dashed var(--border);
+    padding-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.lock-status-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 12px;
+}
 </style>
 </head>
 <body>
@@ -609,8 +691,142 @@ function esc(s) {
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
     const chev = document.getElementById('cv-'+i);
-    body.classList.toggle('open');
+    const isOpen = body.classList.toggle('open');
     chev.classList.toggle('open');
+    if (isOpen) {
+        loadPlugins(i);
+    }
+}
+
+/* ─── Plugin Manager ─── */
+async function loadPlugins(i) {
+    const s = allSites[i];
+    const container = document.getElementById('plugin-list-' + i);
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Loading plugins...</div>';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('list_plugins'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            if (!d.plugins.length) {
+                container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">No plugins installed.</div>';
+                return;
+            }
+            container.innerHTML = d.plugins.map((p, idx) => {
+                const actionText = p.active ? 'Deactivate' : 'Activate';
+                const actionBtnClass = p.active ? 'btn-danger' : 'btn-primary';
+                const statusBadge = p.active 
+                    ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
+                    : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
+                
+                return `
+                <div class="plugin-item">
+                    <div class="plugin-info">
+                        <div class="plugin-name" title="${esc(p.name)}">${esc(p.name)}</div>
+                        <div class="plugin-desc" title="${esc(p.description)}">${esc(p.description)}</div>
+                        <div class="plugin-meta">v${esc(p.version)} | By ${esc(p.author)} | ${statusBadge}</div>
+                    </div>
+                    <div class="plugin-toggle">
+                        <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
+                            ${actionText}
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load plugins.</div>';
+    }
+}
+
+async function togglePlugin(siteIdx, plugIdx, file, isActive) {
+    const s = allSites[siteIdx];
+    const btn = document.getElementById(`btn-plug-${siteIdx}-${plugIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const nextStatus = isActive ? 'deactivate' : 'activate';
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('plugin_file', file);
+        fd.append('status', nextStatus);
+        
+        const r = await fetch(apiUrl('toggle_plugin'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(`Plugin ${isActive ? 'deactivated' : 'activated'} successfully!`, 'success');
+            loadPlugins(siteIdx);
+        } else {
+            toast(d.error || 'Failed to toggle plugin.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+/* ─── File Lock Protection ─── */
+async function toggleLock(i) {
+    const s = allSites[i];
+    const isLocked = s.locked;
+    const btn = document.getElementById('btn-lock-' + i);
+    const label = document.getElementById('lock-label-' + i);
+    const hBadge = document.getElementById('hb-lock-' + i);
+    
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const action = isLocked ? 'unlock' : 'lock';
+        const fd = new FormData();
+        fd.append('path', s.path);
+        
+        const r = await fetch(apiUrl(action), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            s.locked = !isLocked;
+            toast(d.message || 'Updated protection status.', 'success');
+            
+            if (s.locked) {
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.textContent = '🔓 Unlock';
+                label.textContent = '🔒 Source code is locked (Immutable)';
+                if (hBadge) {
+                    hBadge.className = 'badge badge-yellow';
+                    hBadge.textContent = '🔒 Locked';
+                }
+            } else {
+                btn.className = 'btn btn-sm btn-primary';
+                btn.textContent = '🔒 Lock Source';
+                label.textContent = '🔓 Source code is unlocked (Writable)';
+                if (hBadge) {
+                    hBadge.className = 'badge badge-gray';
+                    hBadge.textContent = '🔓 Unlocked';
+                }
+            }
+        } else {
+            toast(d.error || 'Failed to update file protection.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
 }
 
 /* ─── Refresh screenshot ─── */
@@ -649,6 +865,9 @@ function renderSites(sites) {
         const statusBadge = s.status === 'active'
             ? '<span class="badge badge-green">● Connected</span>'
             : '<span class="badge badge-red">● DB Error</span>';
+        const lockBadge = s.locked
+            ? `<span class="badge badge-yellow" id="hb-lock-${i}">🔒 Locked</span>`
+            : `<span class="badge badge-gray" id="hb-lock-${i}">🔓 Unlocked</span>`;
         const pathShort = s.path.replace('/home/'+DA_USER+'/', '~/');
         const shotSrc   = thumbUrl(s.siteurl);
 
@@ -659,9 +878,9 @@ function renderSites(sites) {
                 <div class="site-thumb">
                     <div class="thumb-loader" id="tl-${i}">🌐</div>
                     <img src="${esc(shotSrc)}"
-                         alt="screenshot"
-                         onload="document.getElementById('tl-${i}').classList.add('hidden')"
-                         onerror="this.style.opacity='.2'; document.getElementById('tl-${i}').classList.add('hidden')">
+                          alt="screenshot"
+                          onload="document.getElementById('tl-${i}').classList.add('hidden')"
+                          onerror="this.style.opacity='.2'; document.getElementById('tl-${i}').classList.add('hidden')">
                 </div>
                 <!-- Info -->
                 <div class="site-info">
@@ -672,6 +891,7 @@ function renderSites(sites) {
                 <div class="badges">
                     ${statusBadge}
                     <span class="badge badge-blue">WP ${esc(s.version)}</span>
+                    ${lockBadge}
                 </div>
                 <!-- Quick actions -->
                 <div class="card-actions" onclick="event.stopPropagation()">
@@ -686,8 +906,8 @@ function renderSites(sites) {
                 <!-- Big screenshot strip -->
                 <div class="card-screenshot-bar">
                     <img id="shot-big-${i}" src="${esc(shotSrc)}"
-                         alt="Website screenshot"
-                         onerror="this.style.opacity='.1'">
+                          alt="Website screenshot"
+                          onerror="this.style.opacity='.1'">
                     <div class="shot-overlay"></div>
                     <span class="shot-label">📷 Live screenshot via thum.io</span>
                     <div class="shot-refresh">
@@ -695,15 +915,46 @@ function renderSites(sites) {
                     </div>
                 </div>
 
-                <!-- Details grid -->
-                <div class="card-details">
-                    <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
-                    <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
-                    <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
-                    <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
-                    <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
-                    <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
-                    <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
+                <div class="card-expanded-grid">
+                    <!-- Left Column: Details & Security -->
+                    <div>
+                        <div class="card-sec-title">ℹ️ Installation Details</div>
+                        <div class="card-details" style="margin-bottom: 16px;">
+                            <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
+                            <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
+                            <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
+                            <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
+                            <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
+                            <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
+                            <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
+                        </div>
+
+                        <div class="card-sec-title">🛡️ Security & Protection</div>
+                        <div class="plugin-item">
+                            <div class="plugin-info">
+                                <div class="plugin-name" id="lock-label-${i}">${s.locked ? '🔒 Source code is locked (Immutable)' : '🔓 Source code is unlocked (Writable)'}</div>
+                                <div class="plugin-desc">Protects core files and plugins from modifications or unauthorized writes.</div>
+                            </div>
+                            <div class="plugin-toggle">
+                                <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
+                                    ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Plugin Manager -->
+                    <div>
+                        <div class="card-sec-title">
+                            <span>🔌 Installed Plugins</span>
+                            <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
+                        </div>
+                        <div class="plugin-list" id="plugin-list-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                                Expanding card will load plugins...
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action row -->

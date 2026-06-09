@@ -82,6 +82,234 @@ function set_permissions_recursive($dir) {
 }
 
 /**
+ * Check if WordPress files are locked (immutable)
+ */
+function is_wordpress_locked($site_path) {
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        return file_exists($site_path . '/.locked_mock');
+    }
+    $wp_config = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config)) return false;
+    $output = shell_exec("lsattr " . escapeshellarg($wp_config) . " 2>/dev/null");
+    if ($output) {
+        $parts = preg_split('/\s+/', trim($output));
+        if (!empty($parts[0]) && strpos($parts[0], 'i') !== false) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Lock WordPress files (make them immutable)
+ */
+function lock_wordpress_instance($site_path) {
+    if (!file_exists($site_path . '/wp-config.php')) {
+        throw new Exception("Safety block: Could not locate wp-config.php.");
+    }
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        file_put_contents($site_path . '/.locked_mock', '1');
+        return [
+            'success' => true,
+            'message' => 'WordPress files successfully locked (Mock on Windows).'
+        ];
+    }
+    $esc_path = escapeshellarg($site_path);
+    shell_exec("sudo chattr +i {$esc_path}/wp-config.php 2>/dev/null");
+    shell_exec("sudo chattr -R +i {$esc_path}/wp-includes 2>/dev/null");
+    shell_exec("sudo chattr -R +i {$esc_path}/wp-admin 2>/dev/null");
+    shell_exec("sudo chattr -R +i {$esc_path}/wp-content/plugins 2>/dev/null");
+    shell_exec("sudo chattr -R +i {$esc_path}/wp-content/themes 2>/dev/null");
+    return [
+        'success' => true,
+        'message' => 'WordPress files successfully locked (Immutable).'
+    ];
+}
+
+/**
+ * Unlock WordPress files (make them writable)
+ */
+function unlock_wordpress_instance($site_path) {
+    if (!file_exists($site_path . '/wp-config.php')) {
+        throw new Exception("Safety block: Could not locate wp-config.php.");
+    }
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        @unlink($site_path . '/.locked_mock');
+        return [
+            'success' => true,
+            'message' => 'WordPress files successfully unlocked (Mock on Windows).'
+        ];
+    }
+    $esc_path = escapeshellarg($site_path);
+    shell_exec("sudo chattr -i {$esc_path}/wp-config.php 2>/dev/null");
+    shell_exec("sudo chattr -R -i {$esc_path}/wp-includes 2>/dev/null");
+    shell_exec("sudo chattr -R -i {$esc_path}/wp-admin 2>/dev/null");
+    shell_exec("sudo chattr -R -i {$esc_path}/wp-content/plugins 2>/dev/null");
+    shell_exec("sudo chattr -R -i {$esc_path}/wp-content/themes 2>/dev/null");
+    return [
+        'success' => true,
+        'message' => 'WordPress files successfully unlocked (Writable).'
+    ];
+}
+
+/**
+ * Extract WordPress plugin details from its header comments
+ */
+function get_plugin_details($file_path) {
+    if (!file_exists($file_path)) return null;
+    $content = file_get_contents($file_path, false, null, 0, 8192);
+    if (!preg_match('/Plugin Name\s*:\s*(.*)/i', $content, $name_match)) {
+        return null;
+    }
+    
+    preg_match('/Version\s*:\s*(.*)/i', $content, $version_match);
+    preg_match('/Description\s*:\s*(.*)/i', $content, $desc_match);
+    preg_match('/Author\s*:\s*(.*)/i', $content, $author_match);
+    
+    return [
+        'name' => trim(strip_tags($name_match[1])),
+        'version' => isset($version_match[1]) ? trim(strip_tags($version_match[1])) : 'Unknown',
+        'description' => isset($desc_match[1]) ? trim(strip_tags($desc_match[1])) : '',
+        'author' => isset($author_match[1]) ? trim(strip_tags($author_match[1])) : ''
+    ];
+}
+
+/**
+ * List all installed plugins
+ */
+function list_plugins($site_path) {
+    $plugins_dir = $site_path . '/wp-content/plugins';
+    if (!is_dir($plugins_dir)) {
+        return [];
+    }
+    
+    $plugins = [];
+    $entries = array_diff(scandir($plugins_dir), ['.', '..']);
+    
+    foreach ($entries as $entry) {
+        $entry_path = $plugins_dir . '/' . $entry;
+        if (is_dir($entry_path)) {
+            $sub_files = glob($entry_path . '/*.php');
+            if ($sub_files) {
+                foreach ($sub_files as $sub_file) {
+                    $details = get_plugin_details($sub_file);
+                    if ($details) {
+                        $plugin_file = $entry . '/' . basename($sub_file);
+                        $plugins[$plugin_file] = $details;
+                        break;
+                    }
+                }
+            }
+        } elseif (is_file($entry_path) && pathinfo($entry_path, PATHINFO_EXTENSION) === 'php') {
+            $details = get_plugin_details($entry_path);
+            if ($details) {
+                $plugins[$entry] = $details;
+            }
+        }
+    }
+    return $plugins;
+}
+
+/**
+ * Fetch active plugins from database
+ */
+function get_active_plugins($site_path) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) return [];
+    
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    try {
+        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+        $pdo = new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 2
+        ]);
+        
+        $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'active_plugins'");
+        $stmt->execute();
+        $val = $stmt->fetchColumn();
+        if ($val) {
+            $unserialized = unserialize($val);
+            if (is_array($unserialized)) {
+                return $unserialized;
+            }
+        }
+    } catch (Exception $e) {
+        // fail silently
+    }
+    return [];
+}
+
+/**
+ * Toggle plugin status (activate/deactivate) directly in the database
+ */
+function toggle_plugin_status($site_path, $plugin_file, $status) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("wp-config.php not found.");
+    }
+    
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+    $pdo = new PDO($dsn, $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_TIMEOUT => 2
+    ]);
+    
+    $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'active_plugins'");
+    $stmt->execute();
+    $val = $stmt->fetchColumn();
+    
+    $active_plugins = [];
+    if ($val) {
+        $unserialized = @unserialize($val);
+        if (is_array($unserialized)) {
+            $active_plugins = $unserialized;
+        }
+    }
+    
+    if ($status === 'activate') {
+        if (!in_array($plugin_file, $active_plugins)) {
+            $active_plugins[] = $plugin_file;
+            $active_plugins = array_values(array_unique($active_plugins));
+        }
+    } else {
+        $active_plugins = array_values(array_diff($active_plugins, [$plugin_file]));
+    }
+    
+    $serialized = serialize($active_plugins);
+    
+    $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name = 'active_plugins'");
+    $stmt->execute([$serialized]);
+    
+    return true;
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -231,7 +459,8 @@ function parse_wp_config($wp_config_path) {
         'db_user' => $db_user,
         'db_host' => $db_host,
         'db_prefix' => $db_prefix,
-        'status' => $status
+        'status' => $status,
+        'locked' => is_wordpress_locked(dirname($wp_config_path))
     ];
 }
 
@@ -837,6 +1066,66 @@ function run_api() {
                 }
                 $res = delete_wordpress_instance($_POST['path'], $home);
                 echo json_encode($res);
+                break;
+                
+            case 'lock':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = lock_wordpress_instance($_POST['path']);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode($res);
+                break;
+                
+            case 'unlock':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $res = unlock_wordpress_instance($_POST['path']);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode($res);
+                break;
+
+            case 'list_plugins':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $plugins = list_plugins($_POST['path']);
+                $active = get_active_plugins($_POST['path']);
+                
+                $response_plugins = [];
+                foreach ($plugins as $file => $details) {
+                    $details['file'] = $file;
+                    $details['active'] = in_array($file, $active);
+                    $response_plugins[] = $details;
+                }
+                echo json_encode(['success' => true, 'plugins' => $response_plugins]);
+                break;
+
+            case 'toggle_plugin':
+                if (empty($_POST['path']) || empty($_POST['plugin_file']) || empty($_POST['status'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                toggle_plugin_status($_POST['path'], $_POST['plugin_file'], $_POST['status']);
+                echo json_encode(['success' => true, 'message' => 'Plugin status updated successfully.']);
                 break;
                 
             case 'update_plugin':
