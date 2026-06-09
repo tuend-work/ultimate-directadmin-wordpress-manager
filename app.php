@@ -950,6 +950,8 @@ function activate_theme($site_path, $theme_folder) {
  * Prepare a WordPress installation so internal upgrade APIs can run from DirectAdmin CGI.
  */
 function wp_manager_bootstrap_wordpress($site_path) {
+    static $bootstrapped_path = null;
+
     $wp_load = rtrim($site_path, '/') . '/wp-load.php';
     if (!file_exists($wp_load)) {
         throw new Exception("wp-load.php not found. This does not look like a complete WordPress installation.");
@@ -970,7 +972,14 @@ function wp_manager_bootstrap_wordpress($site_path) {
     $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
     chdir($site_path);
-    require_once $wp_load;
+    $real_site_path = realpath($site_path) ?: $site_path;
+    if ($bootstrapped_path !== null && $bootstrapped_path !== $real_site_path) {
+        throw new Exception("Cannot bootstrap multiple WordPress installations in the same request.");
+    }
+    if ($bootstrapped_path === null) {
+        require_once $wp_load;
+        $bootstrapped_path = $real_site_path;
+    }
     require_once ABSPATH . 'wp-admin/includes/file.php';
     require_once ABSPATH . 'wp-admin/includes/plugin.php';
     require_once ABSPATH . 'wp-admin/includes/theme.php';

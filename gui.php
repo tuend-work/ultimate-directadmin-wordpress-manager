@@ -912,16 +912,24 @@ async function loadPlugins(i) {
                 const statusBadge = p.active 
                     ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
                     : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
+                const latestVersion = p.latest_version || p.version || 'Unknown';
+                const updateBadge = p.update_available
+                    ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
+                    : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
+                const updateDisabled = p.update_package_available ? '' : 'disabled';
+                const updateTitle = p.update_package_available
+                    ? 'Update this plugin'
+                    : (p.update_available ? 'No update package available for this plugin' : 'Plugin is already up to date');
                 
                 return `
                 <div class="plugin-item">
                     <div class="plugin-info">
                         <div class="plugin-name" title="${esc(p.name)}">${esc(p.name)}</div>
                         <div class="plugin-desc" title="${esc(p.description)}">${esc(p.description)}</div>
-                        <div class="plugin-meta">v${esc(p.version)} | By ${esc(p.author)} | ${statusBadge}</div>
+                        <div class="plugin-meta">Current: v${esc(p.version)} | Latest: v${esc(latestVersion)} | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
+                        <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
                             ↑ Update
                         </button>
                         <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
@@ -1029,16 +1037,24 @@ async function loadThemes(i) {
                     ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
                     : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
                 const disabledAttr = t.active ? 'disabled' : '';
+                const latestVersion = t.latest_version || t.version || 'Unknown';
+                const updateBadge = t.update_available
+                    ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
+                    : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
+                const updateDisabled = t.update_package_available ? '' : 'disabled';
+                const updateTitle = t.update_package_available
+                    ? 'Update this theme'
+                    : (t.update_available ? 'No update package available for this theme' : 'Theme is already up to date');
                 
                 return `
                 <div class="plugin-item">
                     <div class="plugin-info">
                         <div class="plugin-name" title="${esc(t.name)}">${esc(t.name)}</div>
                         <div class="plugin-desc" title="${esc(t.description)}">${esc(t.description)}</div>
-                        <div class="plugin-meta">v${esc(t.version)} | By ${esc(t.author)} | ${statusBadge}</div>
+                        <div class="plugin-meta">Current: v${esc(t.version)} | Latest: v${esc(latestVersion)} | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                        <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ↑ Update
                         </button>
                         <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
