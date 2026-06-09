@@ -1561,6 +1561,13 @@ function parse_wp_config($wp_config_path) {
         $disable_wp_cron = true;
     }
     
+    // Check if auto check update is disabled
+    $disable_auto_update = false;
+    $mu_plugin_file = dirname($wp_config_path) . '/wp-content/mu-plugins/wp_disable_check_update.php';
+    if (file_exists($mu_plugin_file)) {
+        $disable_auto_update = true;
+    }
+    
     return [
         'path' => dirname($wp_config_path),
         'domain' => $domain,
@@ -1574,7 +1581,8 @@ function parse_wp_config($wp_config_path) {
         'db_prefix' => $db_prefix,
         'status' => $status,
         'locked' => is_wordpress_locked(dirname($wp_config_path)),
-        'disable_wp_cron' => $disable_wp_cron
+        'disable_wp_cron' => $disable_wp_cron,
+        'disable_auto_update' => $disable_auto_update
     ];
 }
 
@@ -2485,6 +2493,111 @@ function toggle_wordpress_cron($site_path, $enable) {
 }
 
 /**
+ * Toggle WP Auto Check Update status
+ */
+function toggle_wordpress_auto_update($site_path, $enable) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before modifying Auto Update status.");
+    }
+    
+    $mu_dir = $site_path . '/wp-content/mu-plugins';
+    $mu_plugin_file = $mu_dir . '/wp_disable_check_update.php';
+    
+    if ($enable) {
+        // We want to ENABLE auto check update, which means REMOVING the disable file.
+        if (file_exists($mu_plugin_file)) {
+            @unlink($mu_plugin_file);
+        }
+    } else {
+        // We want to DISABLE auto check update, which means CREATING/WRITING the disable file.
+        if (!is_dir($mu_dir)) {
+            mkdir($mu_dir, 0755, true);
+        }
+        
+        $code = <<<'PHP'
+<?php
+/**
+ * Plugin Name: Disable Automatic Update Checks
+ * Plugin URI: https://github.com/tuend-work/ultimate-directadmin-wordpress-manager
+ * Description: Optimizes server performance by disabling default automatic update checks for WordPress core, plugins, and themes, scheduling them to run monthly instead. Managed by Ultimate WordPress Manager.
+ * Version: 1.0.0
+ * Author: Ultimate WordPress Manager
+ * Author URI: https://github.com/tuend-work/ultimate-directadmin-wordpress-manager
+ * License: GPLv2 or later
+ */
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Filter transient update checks to return empty updates.
+ */
+function uwm_disable_update_checks($value) {
+    global $wp_version;
+    return (object) array(
+        'last_checked'    => time(),
+        'version_checked' => $wp_version,
+        'updates'         => array()
+    );
+}
+add_filter('pre_site_transient_update_core', 'uwm_disable_update_checks');
+add_filter('pre_site_transient_update_plugins', 'uwm_disable_update_checks');
+add_filter('pre_site_transient_update_themes', 'uwm_disable_update_checks');
+
+// Disable automatic updater background checks and updates
+if (!defined('AUTOMATIC_UPDATER_DISABLED')) {
+    define('AUTOMATIC_UPDATER_DISABLED', true);
+}
+
+/**
+ * Schedule manual update checks monthly instead of default frequencies.
+ */
+add_action('init', function() {
+    if (!wp_next_scheduled('wp_custom_check_updates')) {
+        wp_schedule_event(time(), 'monthly', 'wp_custom_check_updates');
+    }
+});
+
+add_action('wp_custom_check_updates', function() {
+    wp_update_plugins();
+    wp_update_themes();
+    wp_version_check();
+});
+
+/**
+ * Disable automatic check update hooks in WordPress admin panel.
+ */
+add_action('admin_init', function() {
+    // Disable maybe update checks
+    remove_action('admin_init', '_maybe_update_core');
+    remove_action('admin_init', '_maybe_update_plugins_and_themes');
+
+    // Disable default background update cron actions
+    remove_action('wp_version_check', 'wp_version_check');
+    remove_action('wp_update_plugins', 'wp_update_plugins');
+    remove_action('wp_update_themes', 'wp_update_themes');
+
+    // Remove automatic check actions on core update screen
+    remove_action('load-update-core.php', 'wp_update_plugins');
+    remove_action('load-update-core.php', 'wp_update_themes');
+    remove_action('load-update-core.php', 'wp_version_check');
+    remove_action('init', 'wp_schedule_update_checks');
+    
+    // Remove automatic checks on plugins and themes lists
+    remove_action('load-plugins.php', 'wp_update_plugins');
+    remove_action('load-themes.php', 'wp_update_themes');
+});
+PHP;
+        file_put_contents($mu_plugin_file, $code);
+        @chmod($mu_plugin_file, 0644);
+    }
+    
+    return true;
+}
+
+/**
  * Self Update Admin functionality
  */
 function update_plugin_from_github() {
@@ -2909,6 +3022,22 @@ function run_api() {
                     @unlink($cache_file);
                 }
                 echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái WP Cron thành công.']);
+                break;
+                
+            case 'toggle_auto_update':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                toggle_wordpress_auto_update($_POST['path'], $enable);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái tự động kiểm tra cập nhật thành công.']);
                 break;
 
             default:

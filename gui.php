@@ -1676,6 +1676,56 @@ async function toggleCron(i) {
     }
 }
 
+/* ─── Auto Check Update Management ─── */
+async function toggleAutoUpdate(i) {
+    const s = allSites[i];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before modifying Auto Update status.', 'error');
+        return;
+    }
+    const isAutoUpdateDisabled = s.disable_auto_update;
+    const btn = document.getElementById('btn-autoupdate-' + i);
+    const label = document.getElementById('autoupdate-label-' + i);
+    
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const nextStatus = !isAutoUpdateDisabled; // true to Enable (remove file), false to Disable (create file)
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('enable', nextStatus ? 'true' : 'false');
+        
+        const r = await fetch(apiUrl('toggle_auto_update'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            s.disable_auto_update = !nextStatus;
+            toast(d.message || 'Updated Auto Update status.', 'success');
+            
+            if (s.disable_auto_update) {
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.textContent = '⚙️ Enable Auto Update';
+                label.textContent = '⚡ Auto Check Update is Disabled (Optimized)';
+            } else {
+                btn.className = 'btn btn-sm btn-primary';
+                btn.textContent = '⚡ Disable Auto Update';
+                label.textContent = '⚙️ Auto Check Update is Enabled (WordPress default)';
+            }
+        } else {
+            toast(d.error || 'Failed to update Auto Update status.', 'error');
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 /* ─── WordPress Core Update ─── */
 async function updateCore(i) {
     const s = allSites[i];
@@ -1846,6 +1896,14 @@ function renderSites(sites) {
                         </div>
                         <button class="btn btn-sm ${s.disable_wp_cron ? 'btn-secondary' : 'btn-primary'}" id="btn-cron-${i}" onclick="toggleCron(${i})">
                             ${s.disable_wp_cron ? '⚙️ Enable WP Cron' : '⚡ Disable WP Cron'}
+                        </button>
+                    </div>
+                    <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
+                        <div class="lock-status-label" id="autoupdate-label-${i}">
+                            ${s.disable_auto_update ? '⚡ Auto Check Update is Disabled (Optimized)' : '⚙️ Auto Check Update is Enabled (WordPress default)'}
+                        </div>
+                        <button class="btn btn-sm ${s.disable_auto_update ? 'btn-secondary' : 'btn-primary'}" id="btn-autoupdate-${i}" onclick="toggleAutoUpdate(${i})">
+                            ${s.disable_auto_update ? '⚙️ Enable Auto Update' : '⚡ Disable Auto Update'}
                         </button>
                     </div>
                 </div>
