@@ -236,7 +236,9 @@ function parse_wp_config($wp_config_path) {
 }
 
 /**
- * Scan directory recursively up to 3 sub-levels for WP config (supports symlinks safely)
+ * Scan directory recursively for wp-config.php.
+ * Tracks visited realpaths to prevent symlink loops,
+ * but uses the LOGICAL path (not realpath) when recording the install.
  */
 function scan_directory_for_wp($dir, &$installations, $depth = 0, &$scanned_paths = null) {
     if ($depth > 3) return;
@@ -245,34 +247,36 @@ function scan_directory_for_wp($dir, &$installations, $depth = 0, &$scanned_path
         $scanned_paths = [];
     }
     
-    $real = realpath($dir);
-    if ($real === false || isset($scanned_paths[$real])) {
-        return;
-    }
-    $scanned_paths[$real] = true;
-    
     $wp_config_path = $dir . '/wp-config.php';
     if (file_exists($wp_config_path)) {
+        // Use the realpath of the wp-config to avoid duplicates from multiple symlinks
+        $real_cfg = realpath($wp_config_path);
+        if ($real_cfg !== false) {
+            if (isset($scanned_paths[$real_cfg])) return;
+            $scanned_paths[$real_cfg] = true;
+        }
         $info = parse_wp_config($wp_config_path);
         if ($info) {
             $installations[] = $info;
         }
-        return; // Skip checking subdirectories inside this WordPress root
+        return; // Don't descend inside a WP install
     }
     
     if (!is_dir($dir)) return;
     $files = @scandir($dir);
     if ($files === false) return;
     
-    $files = array_diff($files, ['.', '..']);
-    foreach ($files as $file) {
+    foreach (array_diff($files, ['.', '..']) as $file) {
         $path = $dir . '/' . $file;
-        if (is_dir($path)) {
-            if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
-                continue;
-            }
-            scan_directory_for_wp($path, $installations, $depth + 1, $scanned_paths);
+        if (!is_dir($path)) continue;
+        if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
+            continue;
         }
+        // Prevent looping into circular symlinks at directory level
+        $real_dir = realpath($path);
+        if ($real_dir !== false && isset($scanned_paths[$real_dir])) continue;
+        
+        scan_directory_for_wp($path, $installations, $depth + 1, $scanned_paths);
     }
 }
 
@@ -282,6 +286,7 @@ function scan_directory_for_wp($dir, &$installations, $depth = 0, &$scanned_path
 function scan_wordpress_installations($home, $username) {
     $domains_dir = $home . '/domains';
     $installations = [];
+    $scanned_wp_configs = []; // deduplicate by realpath of wp-config.php
     
     if (is_dir($domains_dir)) {
         $domains = array_diff(scandir($domains_dir), ['.', '..']);
@@ -289,8 +294,23 @@ function scan_wordpress_installations($home, $username) {
             $domain_path = $domains_dir . '/' . $domain;
             if (!is_dir($domain_path)) continue;
             
-            // Scan everything inside the domain folder recursively!
-            scan_directory_for_wp($domain_path, $installations);
+            // 1. Scan public_html (the logical path - even if it is a symlink)
+            $public_html = $domain_path . '/public_html';
+            if (is_dir($public_html)) {
+                scan_directory_for_wp($public_html, $installations, 0, $scanned_wp_configs);
+            }
+            
+            // 2. Scan dedicated subdomains/sub/public_html directories (when they exist as real dirs)
+            $subdomains_dir = $domain_path . '/subdomains';
+            if (is_dir($subdomains_dir)) {
+                $subs = array_diff(scandir($subdomains_dir), ['.', '..']);
+                foreach ($subs as $sub) {
+                    $sub_pub = $subdomains_dir . '/' . $sub . '/public_html';
+                    if (is_dir($sub_pub)) {
+                        scan_directory_for_wp($sub_pub, $installations, 0, $scanned_wp_configs);
+                    }
+                }
+            }
         }
     }
     
