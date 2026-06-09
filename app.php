@@ -1441,6 +1441,12 @@ function parse_wp_config($wp_config_path) {
         }
     }
     
+    // Extract WP Cron disable status
+    $disable_wp_cron = false;
+    if (preg_match("/define\s*\(\s*['\"]DISABLE_WP_CRON['\"]\s*,\s*true\s*\)/i", $content)) {
+        $disable_wp_cron = true;
+    }
+    
     return [
         'path' => dirname($wp_config_path),
         'domain' => $domain,
@@ -1453,7 +1459,8 @@ function parse_wp_config($wp_config_path) {
         'db_host' => $db_host,
         'db_prefix' => $db_prefix,
         'status' => $status,
-        'locked' => is_wordpress_locked(dirname($wp_config_path))
+        'locked' => is_wordpress_locked(dirname($wp_config_path)),
+        'disable_wp_cron' => $disable_wp_cron
     ];
 }
 
@@ -2269,6 +2276,101 @@ function delete_wordpress_instance($site_path, $home) {
 }
 
 /**
+ * Manage user crontab
+ */
+function get_user_cronjobs() {
+    $output = [];
+    $retval = null;
+    @exec('crontab -l 2>/dev/null', $output, $retval);
+    return $output;
+}
+
+function save_user_cronjobs($cronjobs) {
+    // Write cronjobs to a temporary file and load them via crontab command
+    $tmp_file = tempnam(sys_get_temp_dir(), 'cron');
+    file_put_contents($tmp_file, implode("\n", $cronjobs) . "\n");
+    
+    $output = [];
+    $retval = null;
+    @exec('crontab ' . escapeshellarg($tmp_file) . ' 2>&1', $output, $retval);
+    @unlink($tmp_file);
+    
+    if ($retval !== 0) {
+        throw new Exception("Lỗi khi lưu cronjob: " . implode("\n", $output));
+    }
+    return true;
+}
+
+function toggle_site_cronjob($site_path, $enable) {
+    $cron_file = rtrim($site_path, '/') . '/wp-cron.php';
+    $cron_line_pattern = $cron_file;
+    
+    $cronjobs = get_user_cronjobs();
+    $new_cronjobs = [];
+    $found = false;
+    
+    foreach ($cronjobs as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+        if (strpos($line, $cron_line_pattern) !== false) {
+            $found = true;
+            if ($enable) {
+                $new_cronjobs[] = "*/10 * * * * /usr/local/bin/php " . escapeshellarg($cron_file) . " >/dev/null 2>&1";
+            }
+        } else {
+            $new_cronjobs[] = $line;
+        }
+    }
+    
+    if ($enable && !$found) {
+        $new_cronjobs[] = "*/10 * * * * /usr/local/bin/php " . escapeshellarg($cron_file) . " >/dev/null 2>&1";
+    }
+    
+    save_user_cronjobs($new_cronjobs);
+}
+
+/**
+ * Toggle WP Cron disable status (config + cronjob)
+ */
+function toggle_wordpress_cron($site_path, $enable) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is locked. Please unlock WP Lock before modifying WP Cron status.");
+    }
+    
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("Safety block: wp-config.php not found.");
+    }
+    
+    $content = file_get_contents($wp_config_path);
+    
+    // Remove any existing definition of DISABLE_WP_CRON
+    $pattern = "/\s*define\s*\(\s*['\"]DISABLE_WP_CRON['\"]\s*,\s*[^;]*\)\s*;/i";
+    $content = preg_replace($pattern, '', $content);
+    
+    if ($enable) {
+        $define_str = "\ndefine('DISABLE_WP_CRON', true);\n";
+        $insert_pos = strpos($content, "/* That's all, stop editing!");
+        if ($insert_pos === false) {
+            $insert_pos = strpos($content, "require_once");
+        }
+        
+        if ($insert_pos !== false) {
+            $content = substr_replace($content, $define_str, $insert_pos, 0);
+        } else {
+            $content .= $define_str;
+        }
+    }
+    
+    file_put_contents($wp_config_path, $content);
+    
+    // Manage crontab
+    toggle_site_cronjob($site_path, $enable);
+    
+    return true;
+}
+
+/**
  * Self Update Admin functionality
  */
 function update_plugin_from_github() {
@@ -2635,6 +2737,22 @@ function run_api() {
                 echo json_encode($res);
                 break;
                 
+            case 'toggle_cron':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                toggle_wordpress_cron($_POST['path'], $enable);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái WP Cron thành công.']);
+                break;
+
             default:
                 throw new Exception("Unknown action parameter: " . $action);
         }

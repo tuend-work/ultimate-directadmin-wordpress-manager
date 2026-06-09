@@ -1457,6 +1457,55 @@ async function toggleLock(i) {
     }
 }
 
+/* ─── WP Cron Management ─── */
+async function toggleCron(i) {
+    const s = allSites[i];
+    if (s.locked) {
+        toast('Website is locked. Please unlock WP Lock before modifying WP Cron status.', 'error');
+        return;
+    }
+    const isCronDisabled = s.disable_wp_cron;
+    const btn = document.getElementById('btn-cron-' + i);
+    const label = document.getElementById('cron-label-' + i);
+    
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const nextStatus = !isCronDisabled;
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('enable', nextStatus ? 'true' : 'false');
+        
+        const r = await fetch(apiUrl('toggle_cron'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            s.disable_wp_cron = nextStatus;
+            toast(d.message || 'Updated WP Cron status.', 'success');
+            
+            if (s.disable_wp_cron) {
+                btn.className = 'btn btn-sm btn-secondary';
+                btn.textContent = '⚙️ Enable WP Cron';
+                label.textContent = '⚡ WP Cron is disabled (System cron active)';
+            } else {
+                btn.className = 'btn btn-sm btn-primary';
+                btn.textContent = '⚡ Disable WP Cron';
+                label.textContent = '⚙️ WP Cron is enabled (WP default)';
+            }
+        } else {
+            toast(d.error || 'Failed to update WP Cron status.', 'error');
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.textContent = originalText;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 /* ─── WordPress Core Update ─── */
 async function updateCore(i) {
     const s = allSites[i];
@@ -1619,6 +1668,14 @@ function renderSites(sites) {
                         </div>
                         <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
                             ${s.locked ? '🔓 Unlock' : '🔒 Lock Source'}
+                        </button>
+                    </div>
+                    <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
+                        <div class="lock-status-label" id="cron-label-${i}">
+                            ${s.disable_wp_cron ? '⚡ WP Cron is disabled (System cron active)' : '⚙️ WP Cron is enabled (WP default)'}
+                        </div>
+                        <button class="btn btn-sm ${s.disable_wp_cron ? 'btn-secondary' : 'btn-primary'}" id="btn-cron-${i}" onclick="toggleCron(${i})">
+                            ${s.disable_wp_cron ? '⚙️ Enable WP Cron' : '⚡ Disable WP Cron'}
                         </button>
                     </div>
                 </div>
