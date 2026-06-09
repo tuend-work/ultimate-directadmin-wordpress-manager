@@ -780,7 +780,51 @@ function toast(msg, type='info') {
     const el = document.createElement('div');
     el.className = 'toast' + (type==='success'?' ok':type==='error'?' err':'');
     el.textContent = msg;
-    document.getElementById('toast-area').appendChild(el);
+    
+    let targetDoc = document;
+    let targetArea = document.getElementById('toast-area');
+    
+    try {
+        if (window.parent && window.parent.document) {
+            let parentToastArea = window.parent.document.getElementById('plugin-toast-area');
+            if (!parentToastArea) {
+                parentToastArea = window.parent.document.createElement('div');
+                parentToastArea.id = 'plugin-toast-area';
+                parentToastArea.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 6px; pointer-events: none;';
+                window.parent.document.body.appendChild(parentToastArea);
+            }
+            targetDoc = window.parent.document;
+            targetArea = parentToastArea;
+        }
+    } catch (e) {
+        targetArea = document.getElementById('toast-area');
+    }
+    
+    try {
+        if (targetDoc !== document && !targetDoc.getElementById('plugin-toast-styles')) {
+            const style = targetDoc.createElement('style');
+            style.id = 'plugin-toast-styles';
+            style.textContent = `
+                #plugin-toast-area .toast {
+                    background: #161b22; border: 1px solid #30363d;
+                    color: #e6edf3; padding: 10px 16px;
+                    border-radius: 6px; font-size: 12px;
+                    box-shadow: 0 4px 16px rgba(0,0,0,.4);
+                    animation: fadeUpParent .2s ease; max-width: 340px;
+                    border-left: 3px solid #6e7681;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+                    pointer-events: auto;
+                    margin-bottom: 6px;
+                }
+                #plugin-toast-area .toast.ok { border-left-color: #3fb950; }
+                #plugin-toast-area .toast.err { border-left-color: #f85149; }
+                @keyframes fadeUpParent { from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none} }
+            `;
+            targetDoc.head.appendChild(style);
+        }
+    } catch (e) {}
+
+    targetArea.appendChild(el);
     setTimeout(() => el.remove(), 4000);
 }
 
