@@ -438,6 +438,9 @@ Author: DirectAdmin WP Manager
 */
 add_action('init', function() {
     if (isset($_GET['magic_login']) && $_GET['magic_login'] === '{{TOKEN}}') {
+        // Delete the mu-plugin immediately on execution to prevent leftover files if wp_login hook redirects/exits
+        @unlink(__FILE__);
+        
         require_once ABSPATH . 'wp-includes/pluggable.php';
         // Auto-detect and fetch the first administrative user
         $users = get_users(['role' => 'administrator', 'number' => 1]);
@@ -447,9 +450,6 @@ add_action('init', function() {
             wp_set_current_user($user->ID, $user->user_login);
             wp_set_auth_cookie($user->ID, true);
             do_action('wp_login', $user->user_login, $user);
-            
-            // Delete the mu-plugin immediately on execution
-            @unlink(__FILE__);
             
             // Redirect to dashboard
             wp_safe_redirect(admin_url());
