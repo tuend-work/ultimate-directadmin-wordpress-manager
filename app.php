@@ -1038,13 +1038,29 @@ function parse_wp_config($wp_config_path) {
         $status = 'db_error';
     }
     
-    // Fallbacks
+    // Fallback siteurl/blogname if DB unreachable
     if ($siteurl === '') {
         $siteurl = 'http://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
     if ($blogname === '') {
         $blogname = $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
+
+    // --- AUTHORITATIVE: derive domain and sub_path from siteurl (from DB) ---
+    // This is the single source of truth. The folder name under ~/domains/ can
+    // differ from the actual hostname (e.g. custom doc root for a subdomain).
+    $parsed = parse_url($siteurl);
+    if (!empty($parsed['host'])) {
+        $domain = $parsed['host'];
+        // Strip default port from host if present
+        if (strpos($domain, ':') !== false) {
+            $domain = explode(':', $domain)[0];
+        }
+        // sub_path = URL path without leading/trailing slashes
+        $sub_path = isset($parsed['path']) ? trim($parsed['path'], '/') : '';
+    }
+    // If DB was unreachable, $domain and $sub_path remain as path-derived fallback
+
     
     // Auto Cleanup expired Magic Logins (older than 1 hour)
     $mu_dir = dirname($wp_config_path) . '/wp-content/mu-plugins';

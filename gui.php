@@ -450,8 +450,6 @@ div#iframe-container{
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 250px;
-    overflow-y: auto;
     padding-right: 4px;
     margin-top: 12px;
 }
@@ -1079,17 +1077,21 @@ async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
     }
 
     if (success) {
+        // ✅ Cập nhật badge trực tiếp trên DOM — không reload lại list
+        const badge = checkbox.closest('.plugin-item')?.querySelector('.badge');
+        if (badge) {
+            badge.className = `badge ${nextSecure ? 'badge-green' : 'badge-red'}`;
+            badge.textContent = nextSecure ? 'Đã bảo vệ' : 'Chưa bảo vệ';
+        }
+        // Cập nhật lại onchange với giá trị currentSecure mới
+        checkbox.setAttribute('onchange', `toggleSecurityMeasure(${siteIdx}, '${measureKey}', ${nextSecure})`);
+        checkbox.disabled = false;
         toast(`${nextSecure ? '✅ Đã bật' : '⛔ Đã tắt'} tính năng bảo mật thành công!`, 'success');
     } else {
-        toast('❌ ' + errMsg, 'error');
         checkbox.checked = currentSecure; // revert toggle state on error
         checkbox.disabled = false;
-        return;
+        toast('❌ ' + errMsg, 'error');
     }
-
-    // Reload security tab after a short delay so user can read the toast
-    checkbox.disabled = false;
-    setTimeout(() => loadSecurity(siteIdx), 800);
 }
 
 async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) {
