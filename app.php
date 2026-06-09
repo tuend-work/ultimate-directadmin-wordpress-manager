@@ -41,18 +41,20 @@ function is_admin_user() {
 /**
  * Recursively remove directories and files
  */
-function rmdir_recursive($dir) {
+function rmdir_recursive($dir, $keep_root = false) {
     if (!is_dir($dir)) return;
     $files = array_diff(scandir($dir), ['.', '..']);
     foreach ($files as $file) {
         $path = $dir . '/' . $file;
         if (is_dir($path) && !is_link($path)) {
-            rmdir_recursive($path);
+            rmdir_recursive($path, false);
         } else {
             @unlink($path);
         }
     }
-    @rmdir($dir);
+    if (!$keep_root) {
+        @rmdir($dir);
+    }
 }
 
 /**
@@ -2241,7 +2243,7 @@ function clone_wordpress_instance($params, $home) {
         $err_msg = file_exists($dump_error_file) ? file_get_contents($dump_error_file) : '';
         @unlink($dump_error_file);
         @unlink($dump_file);
-        rmdir_recursive($target_dir);
+        rmdir_recursive($target_dir, true);
         throw new Exception("Lỗi khi xuất database nguồn: " . $err_msg);
     }
     @unlink($dump_error_file);
@@ -2264,7 +2266,7 @@ function clone_wordpress_instance($params, $home) {
     if ($retval_import !== 0) {
         $err_msg = file_exists($import_error_file) ? file_get_contents($import_error_file) : '';
         @unlink($import_error_file);
-        rmdir_recursive($target_dir);
+        rmdir_recursive($target_dir, true);
         throw new Exception("Lỗi khi nhập database đích: " . $err_msg);
     }
     @unlink($import_error_file);
@@ -2277,6 +2279,24 @@ function clone_wordpress_instance($params, $home) {
         $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
         $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
         $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
+        
+        // Remove existing WP_SITEURL and WP_HOME if present
+        $content = preg_replace("/\s*define\s*\(\s*['\"]WP_SITEURL['\"]\s*,\s*[^;]*\)\s*;/i", "", $content);
+        $content = preg_replace("/\s*define\s*\(\s*['\"]WP_HOME['\"]\s*,\s*[^;]*\)\s*;/i", "", $content);
+        
+        $dynamic_url = "'https://' . \$_SERVER['HTTP_HOST']" . ($subdir_clean !== '' ? " . '/" . addslashes($subdir_clean) . "'" : "");
+        $extra_defines = "\ndefine('WP_SITEURL', {$dynamic_url});\ndefine('WP_HOME', {$dynamic_url});\n";
+        
+        $insert_pos = strpos($content, "/* That's all, stop editing!");
+        if ($insert_pos === false) {
+            $insert_pos = strpos($content, "require_once");
+        }
+        if ($insert_pos !== false) {
+            $content = substr_replace($content, $extra_defines, $insert_pos, 0);
+        } else {
+            $content .= $extra_defines;
+        }
+        
         file_put_contents($tgt_config, $content);
     }
     
@@ -2449,30 +2469,47 @@ function install_wordpress_instance($params, $home) {
             // Delete the database file immediately for security
             @unlink($db_file_path);
             
+            // Update wp-config.php with new database details
+            $wp_config_path = $target_dir . '/wp-config.php';
+            if (file_exists($wp_config_path)) {
+                $content = file_get_contents($wp_config_path);
+                
+                // Extract db table prefix
+                if (preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match)) {
+                    $db_prefix = $prefix_match[1];
+                }
+                
+                $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
+                
+                // Remove existing WP_SITEURL and WP_HOME if present
+                $content = preg_replace("/\s*define\s*\(\s*['\"]WP_SITEURL['\"]\s*,\s*[^;]*\)\s*;/i", "", $content);
+                $content = preg_replace("/\s*define\s*\(\s*['\"]WP_HOME['\"]\s*,\s*[^;]*\)\s*;/i", "", $content);
+                
+                $dynamic_url = "'https://' . \$_SERVER['HTTP_HOST']" . ($subdir_clean !== '' ? " . '/" . addslashes($subdir_clean) . "'" : "");
+                $extra_defines = "\ndefine('WP_SITEURL', {$dynamic_url});\ndefine('WP_HOME', {$dynamic_url});\n";
+                
+                $insert_pos = strpos($content, "/* That's all, stop editing!");
+                if ($insert_pos === false) {
+                    $insert_pos = strpos($content, "require_once");
+                }
+                if ($insert_pos !== false) {
+                    $content = substr_replace($content, $extra_defines, $insert_pos, 0);
+                } else {
+                    $content .= $extra_defines;
+                }
+                
+                file_put_contents($wp_config_path, $content);
+                @chmod($wp_config_path, 0600);
+            }
+            
             if ($retval !== 0) {
                 $err_detail = implode("\n", $output);
                 throw new Exception("Lỗi khi nhập database backup: " . $err_detail);
             }
             $db_imported = true;
-        }
-        
-        // Update wp-config.php with new database details
-        $wp_config_path = $target_dir . '/wp-config.php';
-        if (file_exists($wp_config_path)) {
-            $content = file_get_contents($wp_config_path);
-            
-            // Extract db table prefix
-            if (preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match)) {
-                $db_prefix = $prefix_match[1];
-            }
-            
-            $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
-            $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
-            $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
-            $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
-            
-            file_put_contents($wp_config_path, $content);
-            @chmod($wp_config_path, 0600);
         }
         
         // Update siteurl and home in database
