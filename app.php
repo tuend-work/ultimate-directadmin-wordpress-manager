@@ -2120,13 +2120,34 @@ function copy_dir_recursive($src, $dst) {
     if (!is_dir($dst)) {
         mkdir($dst, 0755, true);
     }
+    
+    // Resolve real paths to prevent infinite recursion
+    $real_src = realpath($src);
+    $real_dst = realpath($dst);
+    
     $dir = opendir($src);
     while (false !== ($file = readdir($dir))) {
         if (($file != '.') && ($file != '..') && ($file != '.locked_mock') && ($file != '.git')) {
-            if (is_dir($src . '/' . $file)) {
-                copy_dir_recursive($src . '/' . $file, $dst . '/' . $file);
+            $src_file = $src . '/' . $file;
+            $dst_file = $dst . '/' . $file;
+            
+            // Resolve real path of current item
+            $real_item = realpath($src_file);
+            if ($real_item !== false && $real_dst !== false) {
+                // Skip if this item is the target directory
+                if ($real_item === $real_dst) {
+                    continue;
+                }
+                // Skip if target directory is inside this subdirectory
+                if (strpos($real_dst . '/', $real_item . '/') === 0) {
+                    continue;
+                }
+            }
+            
+            if (is_dir($src_file)) {
+                copy_dir_recursive($src_file, $dst_file);
             } else {
-                copy($src . '/' . $file, $dst . '/' . $file);
+                copy($src_file, $dst_file);
             }
         }
     }
