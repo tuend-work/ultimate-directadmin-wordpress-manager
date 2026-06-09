@@ -1296,29 +1296,48 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
     $slug = explode('/', $plugin_file)[0];
     $url = "https://downloads.wordpress.org/plugin/{$slug}.zip";
 
-    $buffer_level = ob_get_level();
-    ob_start();
-    try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $skin = new Automatic_Upgrader_Skin();
-        $upgrader = new Plugin_Upgrader($skin);
-        $result = $upgrader->install($url, [
-            'overwrite_destination' => true,
-            'clear_destination' => true
-        ]);
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+    // Download the ZIP file
+    $temp_zip = sys_get_temp_dir() . '/reinstall_plugin_' . time() . '.zip';
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'WordPress-Plugin-Reinstaller');
+    $data = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200 || !$data) {
+        throw new Exception("Không thể tải plugin từ WordPress.org (HTTP Code: {$http_code}). Vui lòng kiểm tra lại slug của plugin.");
+    }
+    
+    file_put_contents($temp_zip, $data);
+    
+    // Extract ZIP
+    $zip = new ZipArchive;
+    if ($zip->open($temp_zip) === TRUE) {
+        $plugins_dir = $site_path . '/wp-content/plugins';
+        $target_dir = $plugins_dir . '/' . $slug;
+        
+        // Remove old plugin folder
+        if (is_dir($target_dir)) {
+            rmdir_recursive($target_dir);
         }
+        
+        // Extract
+        $zip->extractTo($plugins_dir);
+        $zip->close();
+        @unlink($temp_zip);
+        
+        // Reset permissions
+        set_permissions_recursive($target_dir);
+        
+        return ['success' => true, 'message' => 'Plugin reinstalled successfully.'];
+    } else {
+        @unlink($temp_zip);
+        throw new Exception("Không thể giải nén tệp ZIP của plugin.");
     }
-
-    if (is_wp_error($result)) {
-        throw new Exception($result->get_error_message());
-    }
-    if (!$result) {
-        throw new Exception("Plugin reinstallation failed.");
-    }
-    return ['success' => true, 'message' => 'Plugin reinstalled successfully.'];
 }
 
 /**
@@ -1353,29 +1372,48 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
     }
     $url = "https://downloads.wordpress.org/theme/{$theme_folder}.zip";
 
-    $buffer_level = ob_get_level();
-    ob_start();
-    try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $skin = new Automatic_Upgrader_Skin();
-        $upgrader = new Theme_Upgrader($skin);
-        $result = $upgrader->install($url, [
-            'overwrite_destination' => true,
-            'clear_destination' => true
-        ]);
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+    // Download the ZIP file
+    $temp_zip = sys_get_temp_dir() . '/reinstall_theme_' . time() . '.zip';
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_USERAGENT, 'WordPress-Theme-Reinstaller');
+    $data = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200 || !$data) {
+        throw new Exception("Không thể tải theme từ WordPress.org (HTTP Code: {$http_code}). Vui lòng kiểm tra lại slug của theme.");
+    }
+    
+    file_put_contents($temp_zip, $data);
+    
+    // Extract ZIP
+    $zip = new ZipArchive;
+    if ($zip->open($temp_zip) === TRUE) {
+        $themes_dir = $site_path . '/wp-content/themes';
+        $target_dir = $themes_dir . '/' . $theme_folder;
+        
+        // Remove old theme folder
+        if (is_dir($target_dir)) {
+            rmdir_recursive($target_dir);
         }
+        
+        // Extract
+        $zip->extractTo($themes_dir);
+        $zip->close();
+        @unlink($temp_zip);
+        
+        // Reset permissions
+        set_permissions_recursive($target_dir);
+        
+        return ['success' => true, 'message' => 'Theme reinstalled successfully.'];
+    } else {
+        @unlink($temp_zip);
+        throw new Exception("Không thể giải nén tệp ZIP của theme.");
     }
-
-    if (is_wp_error($result)) {
-        throw new Exception($result->get_error_message());
-    }
-    if (!$result) {
-        throw new Exception("Theme reinstallation failed.");
-    }
-    return ['success' => true, 'message' => 'Theme reinstalled successfully.'];
 }
 
 /**
