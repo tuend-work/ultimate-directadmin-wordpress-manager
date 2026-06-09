@@ -8,6 +8,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Start output buffering to capture any accidental warnings/notices and protect CGI headers
+ob_start();
+
 // Parse GET and POST variables (DirectAdmin executes plugins via CLI)
 $_GET = [];
 $QUERY_STRING = getenv('QUERY_STRING');
@@ -441,7 +444,7 @@ function generate_magic_login($site_path, $home) {
     
     $token = bin2hex(random_bytes(16));
     
-    $mu_code = <<<PHP
+    $mu_code = <<<'PHP'
 <?php
 /*
 Plugin Name: Magic Login Temporary Plugin
@@ -450,16 +453,16 @@ Version: 1.0
 Author: DirectAdmin WP Manager
 */
 add_action('init', function() {
-    if (isset(\$_GET['magic_login']) && \$_GET['magic_login'] === '{$token}') {
+    if (isset($_GET['magic_login']) && $_GET['magic_login'] === '{{TOKEN}}') {
         require_once ABSPATH . 'wp-includes/pluggable.php';
         // Auto-detect and fetch the first administrative user
-        \$users = get_users(['role' => 'administrator', 'number' => 1]);
-        if (!empty(\$users)) {
-            \$user = \$users[0];
+        $users = get_users(['role' => 'administrator', 'number' => 1]);
+        if (!empty($users)) {
+            $user = $users[0];
             wp_clear_auth_cookie();
-            wp_set_current_user(\$user->ID, \$user->user_login);
-            wp_set_auth_cookie(\$user->ID, true);
-            do_action('wp_login', \$user->user_login, \$user);
+            wp_set_current_user($user->ID, $user->user_login);
+            wp_set_auth_cookie($user->ID, true);
+            do_action('wp_login', $user->user_login, $user);
             
             // Delete the mu-plugin immediately on execution
             @unlink(__FILE__);
@@ -472,6 +475,7 @@ add_action('init', function() {
 });
 PHP;
 
+    $mu_code = str_replace('{{TOKEN}}', $token, $mu_code);
     $mu_plugin_file = $mu_dir . '/magic-login-' . $token . '.php';
     file_put_contents($mu_plugin_file, $mu_code);
     @chmod($mu_plugin_file, 0644);
@@ -605,11 +609,34 @@ function update_plugin_from_github() {
 }
 
 /**
+ * Handle GUI rendering
+ */
+function run_gui() {
+    // Clear any warnings/notices captured in output buffer before rendering GUI
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    
+    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+    // LOCAL DEVELOPMENT / WIN FALLBACK
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
+    }
+    
+    require_once $plugin_dir . '/gui.php';
+}
+
+/**
  * Handle API Endpoint actions
  */
 function run_api() {
-    // Standard CGI headers for DirectAdmin raw mode
-    echo "Status: 200 OK\r\n";
+    // Clear any warnings/notices captured in output buffer to keep CGI headers clean
+    if (ob_get_length()) {
+        ob_clean();
+    }
+    
+    // Standard CGI headers for DirectAdmin raw mode (HTTP/1.1 is standard)
+    echo "HTTP/1.1 200 OK\r\n";
     echo "Content-Type: application/json; charset=utf-8\r\n";
     echo "Access-Control-Allow-Origin: *\r\n";
     echo "\r\n";
