@@ -338,6 +338,138 @@ function toggle_plugin_status($site_path, $plugin_file, $status) {
 }
 
 /**
+ * Extract WordPress theme details from style.css
+ */
+function get_theme_details($style_css_path) {
+    if (!file_exists($style_css_path)) return null;
+    $content = file_get_contents($style_css_path, false, null, 0, 8192);
+    if (!preg_match('/Theme Name\s*:\s*(.*)/i', $content, $name_match)) {
+        return null;
+    }
+    
+    preg_match('/Version\s*:\s*(.*)/i', $content, $version_match);
+    preg_match('/Description\s*:\s*(.*)/i', $content, $desc_match);
+    preg_match('/Author\s*:\s*(.*)/i', $content, $author_match);
+    
+    return [
+        'name' => trim(strip_tags($name_match[1])),
+        'version' => isset($version_match[1]) ? trim(strip_tags($version_match[1])) : 'Unknown',
+        'description' => isset($desc_match[1]) ? trim(strip_tags($desc_match[1])) : '',
+        'author' => isset($author_match[1]) ? trim(strip_tags($author_match[1])) : ''
+    ];
+}
+
+/**
+ * List all installed themes
+ */
+function list_themes($site_path) {
+    $themes_dir = $site_path . '/wp-content/themes';
+    if (!is_dir($themes_dir)) {
+        return [];
+    }
+    
+    $themes = [];
+    $entries = array_diff(scandir($themes_dir), ['.', '..']);
+    
+    foreach ($entries as $entry) {
+        $entry_path = $themes_dir . '/' . $entry;
+        if (is_dir($entry_path)) {
+            $style_css = $entry_path . '/style.css';
+            if (file_exists($style_css)) {
+                $details = get_theme_details($style_css);
+                if ($details) {
+                    $details['folder'] = $entry;
+                    $themes[] = $details;
+                }
+            }
+        }
+    }
+    return $themes;
+}
+
+/**
+ * Get active theme from database
+ */
+function get_active_theme($site_path) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) return '';
+    
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    try {
+        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+        $pdo = new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 2
+        ]);
+        
+        $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'stylesheet'");
+        $stmt->execute();
+        return $stmt->fetchColumn() ?: '';
+    } catch (Exception $e) {
+        // fail silently
+    }
+    return '';
+}
+
+/**
+ * Activate a theme in the database
+ */
+function activate_theme($site_path, $theme_folder) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) {
+        throw new Exception("wp-config.php not found.");
+    }
+    
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+    $pdo = new PDO($dsn, $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_TIMEOUT => 2
+    ]);
+    
+    $template = $theme_folder;
+    $theme_style_css = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
+    if (file_exists($theme_style_css)) {
+        $style_content = file_get_contents($theme_style_css);
+        if (preg_match('/Template\s*:\s*(.*)/i', $style_content, $tmpl_match)) {
+            $template = trim($tmpl_match[1]);
+        }
+    }
+    
+    $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name = 'template'");
+    $stmt->execute([$template]);
+    
+    $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name = 'stylesheet'");
+    $stmt->execute([$theme_folder]);
+    
+    return true;
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -1154,6 +1286,35 @@ function run_api() {
                 }
                 toggle_plugin_status($_POST['path'], $_POST['plugin_file'], $_POST['status']);
                 echo json_encode(['success' => true, 'message' => 'Plugin status updated successfully.']);
+                break;
+                
+            case 'list_themes':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $themes = list_themes($_POST['path']);
+                $active = get_active_theme($_POST['path']);
+                
+                $response_themes = [];
+                foreach ($themes as $theme) {
+                    $theme['active'] = ($theme['folder'] === $active);
+                    $response_themes[] = $theme;
+                }
+                echo json_encode(['success' => true, 'themes' => $response_themes]);
+                break;
+
+            case 'activate_theme':
+                if (empty($_POST['path']) || empty($_POST['theme_folder'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                activate_theme($_POST['path'], $_POST['theme_folder']);
+                echo json_encode(['success' => true, 'message' => 'Theme activated successfully.']);
                 break;
                 
             case 'update_plugin':

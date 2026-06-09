@@ -388,7 +388,7 @@ body {
 /* ── Expanded layout columns ── */
 .card-expanded-grid {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
+    grid-template-columns: 1.2fr 1fr 1fr;
     gap: 16px;
     padding: 16px;
 }
@@ -695,6 +695,7 @@ function toggleCard(i) {
     chev.classList.toggle('open');
     if (isOpen) {
         loadPlugins(i);
+        loadThemes(i);
     }
 }
 
@@ -776,6 +777,83 @@ async function togglePlugin(siteIdx, plugIdx, file, isActive) {
     }
 }
 
+/* ─── Theme Manager ─── */
+async function loadThemes(i) {
+    const s = allSites[i];
+    const container = document.getElementById('theme-list-' + i);
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Loading themes...</div>';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('list_themes'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            if (!d.themes.length) {
+                container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">No themes installed.</div>';
+                return;
+            }
+            container.innerHTML = d.themes.map((t, idx) => {
+                const actionText = t.active ? 'Active' : 'Activate';
+                const actionBtnClass = t.active ? 'btn-secondary' : 'btn-primary';
+                const statusBadge = t.active 
+                    ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
+                    : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
+                const disabledAttr = t.active ? 'disabled' : '';
+                
+                return `
+                <div class="plugin-item">
+                    <div class="plugin-info">
+                        <div class="plugin-name" title="${esc(t.name)}">${esc(t.name)}</div>
+                        <div class="plugin-desc" title="${esc(t.description)}">${esc(t.description)}</div>
+                        <div class="plugin-meta">v${esc(t.version)} | By ${esc(t.author)} | ${statusBadge}</div>
+                    </div>
+                    <div class="plugin-toggle">
+                        <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                            ${actionText}
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load themes.</div>';
+    }
+}
+
+async function activateTheme(siteIdx, themeIdx, folder) {
+    const s = allSites[siteIdx];
+    const btn = document.getElementById(`btn-theme-${siteIdx}-${themeIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('theme_folder', folder);
+        
+        const r = await fetch(apiUrl('activate_theme'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast('Theme activated successfully!', 'success');
+            loadThemes(siteIdx);
+        } else {
+            toast(d.error || 'Failed to activate theme.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 /* ─── File Lock Protection ─── */
 async function toggleLock(i) {
     const s = allSites[i];
@@ -819,14 +897,15 @@ async function toggleLock(i) {
             }
         } else {
             toast(d.error || 'Failed to update file protection.', 'error');
-            btn.disabled = false;
             btn.textContent = originalText;
         }
     } catch (err) {
         toast('Connection error.', 'error');
-        btn.disabled = false;
         btn.textContent = originalText;
+    } finally {
+        btn.disabled = false;
     }
+}
 }
 
 /* ─── Refresh screenshot ─── */
@@ -952,6 +1031,19 @@ function renderSites(sites) {
                         <div class="plugin-list" id="plugin-list-${i}">
                             <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
                                 Expanding card will load plugins...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Third Column: Theme Manager -->
+                    <div>
+                        <div class="card-sec-title">
+                            <span>🎨 Installed Themes</span>
+                            <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
+                        </div>
+                        <div class="plugin-list" id="theme-list-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                                Expanding card will load themes...
                             </div>
                         </div>
                     </div>
