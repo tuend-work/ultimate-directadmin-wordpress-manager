@@ -1578,6 +1578,14 @@ function install_wordpress_instance($params, $home) {
         }
         
         $zip_tmp = $_FILES['zip_file']['tmp_name'];
+        
+        // Save copy to .wp-cache for debugging
+        $cache_dir = $home . '/.wp-cache';
+        if (!is_dir($cache_dir)) {
+            mkdir($cache_dir, 0755, true);
+        }
+        @copy($zip_tmp, $cache_dir . '/uploaded_backup.zip');
+        
         $zip = new ZipArchive;
         if ($zip->open($zip_tmp) === TRUE) {
             $zip->extractTo($target_dir);
@@ -2086,6 +2094,7 @@ function run_api() {
                 break;
                 
             case 'install':
+                wp_manager_log("Install API triggered. POST: " . json_encode($_POST) . " | FILES: " . json_encode($_FILES) . " | CONTENT_TYPE: " . ($_SERVER['CONTENT_TYPE'] ?? '') . " | CONTENT_LENGTH: " . ($_SERVER['CONTENT_LENGTH'] ?? ''));
                 $mode = $_POST['mode'] ?? 'fresh';
                 if ($mode === 'zip') {
                     $required = ['domain', 'db_name', 'db_user', 'db_pass'];
@@ -2095,7 +2104,8 @@ function run_api() {
                         }
                     }
                     if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
-                        throw new Exception("Vui lòng tải lên tệp ZIP source code hợp lệ!");
+                        $err_code = $_FILES['zip_file']['error'] ?? 'missing';
+                        throw new Exception("Vui lòng tải lên tệp ZIP source code hợp lệ! (Mã lỗi: {$err_code})");
                     }
                 } else {
                     $required = ['domain', 'db_name', 'db_user', 'db_pass', 'site_title', 'admin_user', 'admin_pass', 'admin_email'];
