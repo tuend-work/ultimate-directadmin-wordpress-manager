@@ -1,31 +1,20 @@
 <?php
 /**
  * Scanner Debugging Script
- * Run this on your server: php test_scan.php
+ * Upload to the plugin directory, then run: php test_scan.php
  */
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
-if ($username === 'root' || $username === 'nobody') {
-    // If run as root, try to guess or use the first user
-    echo "Running as root. Checking users in /home...\n";
-    $users = array_diff(scandir('/home'), ['.', '..']);
-    foreach ($users as $u) {
-        if (is_dir("/home/{$u}/domains")) {
-            $username = $u;
-            break;
-        }
-    }
-}
+$home = getenv('HOME') ?: "/home/{$username}";
 
-$home = "/home/{$username}";
-echo "Detected User: {$username}\n";
-echo "Detected Home Path: {$home}\n\n";
+echo "Detected User : {$username}\n";
+echo "Detected Home : {$home}\n\n";
 
 if (!is_dir($home)) {
-    die("Error: Home directory {$home} does not exist.\n");
+    die("ERROR: Home directory {$home} does not exist.\n");
 }
 
 require_once __DIR__ . '/app.php';
@@ -33,87 +22,83 @@ require_once __DIR__ . '/app.php';
 echo "--- START DIRECTORY SCAN ---\n";
 $domains_dir = $home . '/domains';
 if (!is_dir($domains_dir)) {
-    die("Error: Domains directory {$domains_dir} does not exist.\n");
+    die("ERROR: Domains directory {$domains_dir} does not exist.\n");
 }
 
 $domains = array_diff(scandir($domains_dir), ['.', '..']);
 foreach ($domains as $domain) {
     $domain_path = $domains_dir . '/' . $domain;
-    echo "Found domain folder: {$domain_path}\n";
-    
-    // Check public_html
-    $public_html = $domain_path . '/public_html';
-    if (is_dir($public_html)) {
-        echo "  - public_html exists. Scanning...\n";
-        $installations = [];
-        scan_directory_for_wp_verbose($public_html, $domain, '', $installations);
-        echo "  - Scan completed. Found " . count($installations) . " installations.\n";
-        print_r($installations);
+    if (!is_dir($domain_path)) continue;
+
+    echo "\n[DOMAIN] {$domain_path}\n";
+
+    // Search recursively for every wp-config.php found anywhere under this domain
+    $found_configs = [];
+    find_wp_configs($domain_path, $found_configs);
+
+    if (empty($found_configs)) {
+        echo "  -> No wp-config.php found under this domain folder.\n";
     } else {
-        echo "  - public_html does not exist.\n";
+        foreach ($found_configs as $cfg_path) {
+            echo "  [wp-config.php] {$cfg_path}\n";
+            $readable = is_readable($cfg_path) ? 'YES' : 'NO';
+            echo "    Readable: {$readable}\n";
+
+            $info = parse_wp_config($cfg_path);
+            if ($info) {
+                echo "    Parsed OK:\n";
+                echo "      domain   : {$info['domain']}\n";
+                echo "      subdir   : {$info['subdir']}\n";
+                echo "      siteurl  : {$info['siteurl']}\n";
+                echo "      blogname : {$info['blogname']}\n";
+                echo "      version  : {$info['version']}\n";
+                echo "      db_name  : {$info['db_name']}\n";
+                echo "      status   : {$info['status']}\n";
+            } else {
+                echo "    Parsing FAILED.\n";
+            }
+        }
     }
 }
 
-function scan_directory_for_wp_verbose($dir, $domain, $sub_path, &$installations, $depth = 0, &$scanned_paths = null) {
-    if ($depth > 2) {
-        echo "    [Depth > 2] Skipping: {$dir}\n";
-        return;
-    }
-    
-    if ($scanned_paths === null) {
-        $scanned_paths = [];
-    }
-    
+echo "\n--- FULL SCAN (via scan_wordpress_installations) ---\n";
+$results = scan_wordpress_installations($home, $username);
+echo "Total installations found: " . count($results) . "\n";
+foreach ($results as $i => $site) {
+    echo "\n  [" . ($i+1) . "] {$site['blogname']} ({$site['siteurl']})\n";
+    echo "      path    : {$site['path']}\n";
+    echo "      domain  : {$site['domain']}\n";
+    echo "      version : {$site['version']}\n";
+    echo "      status  : {$site['status']}\n";
+}
+
+// ---------------------------------------------------------------
+// Helper: recursively find all wp-config.php files (no depth limit)
+// ---------------------------------------------------------------
+function find_wp_configs($dir, &$results, &$visited = null, $depth = 0) {
+    if ($depth > 6) return;
+
+    if ($visited === null) $visited = [];
     $real = realpath($dir);
-    echo "    [Depth {$depth}] Checking directory: {$dir} (Realpath: {$real})\n";
-    if ($real === false) {
-        echo "      -> Realpath failed.\n";
-        return;
+    if ($real === false || isset($visited[$real])) return;
+    $visited[$real] = true;
+
+    $wp_config = $dir . '/wp-config.php';
+    if (file_exists($wp_config)) {
+        $results[] = $wp_config;
+        return; // Don't recurse inside a WP install
     }
-    if (isset($scanned_paths[$real])) {
-        echo "      -> Already scanned: {$real}\n";
-        return;
-    }
-    $scanned_paths[$real] = true;
-    
-    $wp_config_path = $dir . '/wp-config.php';
-    echo "      Checking wp-config.php: {$wp_config_path}\n";
-    if (file_exists($wp_config_path)) {
-        echo "      -> FOUND wp-config.php!\n";
-        $readable = is_readable($wp_config_path) ? 'YES' : 'NO';
-        echo "      -> Readable by current user: {$readable}\n";
-        
-        // Attempt parsing
-        $info = parse_wp_config($wp_config_path, $domain, $sub_path);
-        if ($info) {
-            echo "      -> Parsed successfully.\n";
-            $installations[] = $info;
-        } else {
-            echo "      -> Parsing failed.\n";
-        }
-        return;
-    }
-    
-    if (!is_dir($dir)) {
-        echo "      -> Is not a directory.\n";
-        return;
-    }
-    
-    $files = @scandir($dir);
-    if ($files === false) {
-        echo "      -> Unable to read directory (Permission denied?)\n";
-        return;
-    }
-    
-    $files = array_diff($files, ['.', '..']);
-    foreach ($files as $file) {
-        $path = $dir . '/' . $file;
+
+    $entries = @scandir($dir);
+    if (!$entries) return;
+
+    foreach (array_diff($entries, ['.', '..']) as $entry) {
+        $path = $dir . '/' . $entry;
         if (is_dir($path)) {
-            if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
+            if (in_array($entry, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git'])) {
                 continue;
             }
-            $next_sub_path = $sub_path === '' ? $file : $sub_path . '/' . $file;
-            scan_directory_for_wp_verbose($path, $domain, $next_sub_path, $installations, $depth + 1, $scanned_paths);
+            find_wp_configs($path, $results, $visited, $depth + 1);
         }
     }
 }

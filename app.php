@@ -84,42 +84,71 @@ function set_permissions_recursive($dir) {
 /**
  * Parse wp-config.php and extract metadata
  */
-function parse_wp_config($wp_config_path, $domain, $sub_path) {
+function parse_wp_config($wp_config_path) {
     if (!file_exists($wp_config_path)) return null;
     
-    // Auto-detect if $sub_path starts with a configured subdomain prefix and remap it
-    if ($sub_path !== '') {
-        $parts = explode('/', $sub_path);
-        $first_part = $parts[0];
-        
-        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
-        $home = getenv('HOME') ?: "/home/{$username}";
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            $home = 'C:/Users/local_user';
-        }
-        
-        $is_sub = false;
-        // Check in subdomains.list
-        $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
-        if (file_exists($sub_list_file)) {
-            $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            if ($lines !== false) {
-                foreach ($lines as $line) {
-                    if (trim($line) === $first_part) {
-                        $is_sub = true;
-                        break;
-                    }
+    // Auto-detect domain and sub-path from path
+    $domain = '';
+    $sub_path = '';
+    
+    $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+    $home = getenv('HOME') ?: "/home/{$username}";
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $home = 'C:/Users/local_user';
+    }
+    
+    $domains_prefix = $home . '/domains/';
+    $site_path = dirname($wp_config_path);
+    if (strpos($site_path, $domains_prefix) === 0) {
+        $relative = substr($site_path, strlen($domains_prefix));
+        $parts = explode('/', $relative);
+        if (count($parts) > 0) {
+            $domain = $parts[0];
+            
+            // Check if it's in a subdomains directory: e.g. domain.com/subdomains/sub/public_html
+            $subdomains_index = array_search('subdomains', $parts);
+            if ($subdomains_index !== false && isset($parts[$subdomains_index + 1])) {
+                $subdomain_name = $parts[$subdomains_index + 1];
+                $domain = $subdomain_name . '.' . $domain;
+                
+                $pub_index = array_search('public_html', $parts);
+                if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                    $sub_path = implode('/', array_slice($parts, $pub_index + 1));
+                }
+            } else {
+                $pub_index = array_search('public_html', $parts);
+                if ($pub_index !== false && $pub_index < count($parts) - 1) {
+                    $sub_path = implode('/', array_slice($parts, $pub_index + 1));
                 }
             }
-        }
-        // Also check if physical /domains/{domain}/subdomains/{first_part} exists
-        if (is_dir($home . '/domains/' . $domain . '/subdomains/' . $first_part)) {
-            $is_sub = true;
-        }
-        
-        if ($is_sub) {
-            $domain = $first_part . '.' . $domain;
-            $sub_path = implode('/', array_slice($parts, 1));
+            
+            // If it's in public_html, check if the first folder inside public_html is a configured subdomain
+            if ($sub_path !== '') {
+                $sub_parts = explode('/', $sub_path);
+                $first_part = $sub_parts[0];
+                
+                $is_sub = false;
+                $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
+                if (file_exists($sub_list_file)) {
+                    $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                    if ($lines !== false) {
+                        foreach ($lines as $line) {
+                            if (trim($line) === $first_part) {
+                                $is_sub = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (is_dir($home . '/domains/' . $domain . '/subdomains/' . $first_part)) {
+                    $is_sub = true;
+                }
+                
+                if ($is_sub) {
+                    $domain = $first_part . '.' . $domain;
+                    $sub_path = implode('/', array_slice($sub_parts, 1));
+                }
+            }
         }
     }
     
@@ -207,10 +236,10 @@ function parse_wp_config($wp_config_path, $domain, $sub_path) {
 }
 
 /**
- * Scan directory recursively up to 2 sub-levels for WP config (supports symlinks safely)
+ * Scan directory recursively up to 3 sub-levels for WP config (supports symlinks safely)
  */
-function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth = 0, &$scanned_paths = null) {
-    if ($depth > 2) return;
+function scan_directory_for_wp($dir, &$installations, $depth = 0, &$scanned_paths = null) {
+    if ($depth > 3) return;
     
     if ($scanned_paths === null) {
         $scanned_paths = [];
@@ -224,7 +253,7 @@ function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth
     
     $wp_config_path = $dir . '/wp-config.php';
     if (file_exists($wp_config_path)) {
-        $info = parse_wp_config($wp_config_path, $domain, $sub_path);
+        $info = parse_wp_config($wp_config_path);
         if ($info) {
             $installations[] = $info;
         }
@@ -232,15 +261,17 @@ function scan_directory_for_wp($dir, $domain, $sub_path, &$installations, $depth
     }
     
     if (!is_dir($dir)) return;
-    $files = array_diff(scandir($dir), ['.', '..']);
+    $files = @scandir($dir);
+    if ($files === false) return;
+    
+    $files = array_diff($files, ['.', '..']);
     foreach ($files as $file) {
         $path = $dir . '/' . $file;
         if (is_dir($path)) {
             if (in_array($file, ['wp-admin', 'wp-includes', 'wp-content', 'node_modules', '.git', '.wp-cache'])) {
                 continue;
             }
-            $next_sub_path = $sub_path === '' ? $file : $sub_path . '/' . $file;
-            scan_directory_for_wp($path, $domain, $next_sub_path, $installations, $depth + 1, $scanned_paths);
+            scan_directory_for_wp($path, $installations, $depth + 1, $scanned_paths);
         }
     }
 }
@@ -258,23 +289,8 @@ function scan_wordpress_installations($home, $username) {
             $domain_path = $domains_dir . '/' . $domain;
             if (!is_dir($domain_path)) continue;
             
-            // 1. Scan standard public_html folder
-            $public_html = $domain_path . '/public_html';
-            if (is_dir($public_html)) {
-                scan_directory_for_wp($public_html, $domain, '', $installations);
-            }
-            
-            // 2. Scan dedicated subdomains folder if it exists
-            $subdomains_dir = $domain_path . '/subdomains';
-            if (is_dir($subdomains_dir)) {
-                $subdomains = array_diff(scandir($subdomains_dir), ['.', '..']);
-                foreach ($subdomains as $subdomain) {
-                    $sub_pub_html = $subdomains_dir . '/' . $subdomain . '/public_html';
-                    if (is_dir($sub_pub_html)) {
-                        scan_directory_for_wp($sub_pub_html, $subdomain . '.' . $domain, '', $installations);
-                    }
-                }
-            }
+            // Scan everything inside the domain folder recursively!
+            scan_directory_for_wp($domain_path, $installations);
         }
     }
     
