@@ -90,7 +90,9 @@ function is_wordpress_locked($site_path) {
     }
     $wp_config = $site_path . '/wp-config.php';
     if (!file_exists($wp_config)) return false;
-    $output = shell_exec("lsattr " . escapeshellarg($wp_config) . " 2>/dev/null");
+    
+    $lsattr_path = trim(@shell_exec('which lsattr 2>/dev/null') ?: '/usr/bin/lsattr');
+    $output = @shell_exec("{$lsattr_path} " . escapeshellarg($wp_config) . " 2>/dev/null");
     if ($output) {
         $parts = preg_split('/\s+/', trim($output));
         if (!empty($parts[0]) && strpos($parts[0], 'i') !== false) {
@@ -114,12 +116,22 @@ function lock_wordpress_instance($site_path) {
             'message' => 'WordPress files successfully locked (Mock on Windows).'
         ];
     }
+    
     $esc_path = escapeshellarg($site_path);
-    shell_exec("sudo chattr +i {$esc_path}/wp-config.php 2>/dev/null");
-    shell_exec("sudo chattr -R +i {$esc_path}/wp-includes 2>/dev/null");
-    shell_exec("sudo chattr -R +i {$esc_path}/wp-admin 2>/dev/null");
-    shell_exec("sudo chattr -R +i {$esc_path}/wp-content/plugins 2>/dev/null");
-    shell_exec("sudo chattr -R +i {$esc_path}/wp-content/themes 2>/dev/null");
+    $chattr_path = trim(@shell_exec('which chattr 2>/dev/null') ?: '/usr/bin/chattr');
+    
+    $output1 = @shell_exec("sudo {$chattr_path} +i {$esc_path}/wp-config.php 2>&1");
+    $output2 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-includes 2>&1");
+    $output3 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-admin 2>&1");
+    $output4 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-content/plugins 2>&1");
+    $output5 = @shell_exec("sudo {$chattr_path} -R +i {$esc_path}/wp-content/themes 2>&1");
+    
+    if (!is_wordpress_locked($site_path)) {
+        $errors = array_filter(array_map('trim', [$output1, $output2, $output3, $output4, $output5]));
+        $err_msg = !empty($errors) ? implode(" | ", $errors) : "lsattr did not detect the lock. Please check if sudo requires a password.";
+        throw new Exception("Lock failed: " . $err_msg);
+    }
+    
     return [
         'success' => true,
         'message' => 'WordPress files successfully locked (Immutable).'
@@ -140,12 +152,22 @@ function unlock_wordpress_instance($site_path) {
             'message' => 'WordPress files successfully unlocked (Mock on Windows).'
         ];
     }
+    
     $esc_path = escapeshellarg($site_path);
-    shell_exec("sudo chattr -i {$esc_path}/wp-config.php 2>/dev/null");
-    shell_exec("sudo chattr -R -i {$esc_path}/wp-includes 2>/dev/null");
-    shell_exec("sudo chattr -R -i {$esc_path}/wp-admin 2>/dev/null");
-    shell_exec("sudo chattr -R -i {$esc_path}/wp-content/plugins 2>/dev/null");
-    shell_exec("sudo chattr -R -i {$esc_path}/wp-content/themes 2>/dev/null");
+    $chattr_path = trim(@shell_exec('which chattr 2>/dev/null') ?: '/usr/bin/chattr');
+    
+    $output1 = @shell_exec("sudo {$chattr_path} -i {$esc_path}/wp-config.php 2>&1");
+    $output2 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-includes 2>&1");
+    $output3 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-admin 2>&1");
+    $output4 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-content/plugins 2>&1");
+    $output5 = @shell_exec("sudo {$chattr_path} -R -i {$esc_path}/wp-content/themes 2>&1");
+    
+    if (is_wordpress_locked($site_path)) {
+        $errors = array_filter(array_map('trim', [$output1, $output2, $output3, $output4, $output5]));
+        $err_msg = !empty($errors) ? implode(" | ", $errors) : "lsattr still detects the lock. Please check if sudo requires a password.";
+        throw new Exception("Unlock failed: " . $err_msg);
+    }
+    
     return [
         'success' => true,
         'message' => 'WordPress files successfully unlocked (Writable).'
