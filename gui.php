@@ -790,7 +790,7 @@ function toast(msg, type='info') {
             if (!parentToastArea) {
                 parentToastArea = window.parent.document.createElement('div');
                 parentToastArea.id = 'plugin-toast-area';
-                parentToastArea.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 6px; pointer-events: none;';
+                parentToastArea.style.cssText = 'position: fixed; top: 100px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 6px; pointer-events: none;';
                 window.parent.document.body.appendChild(parentToastArea);
             }
             targetDoc = window.parent.document;
