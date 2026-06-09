@@ -28,19 +28,6 @@ if ($POST_STRING != "") {
     foreach ($post_array as $key => $value) {
         $_POST[urldecode($key)] = urldecode($value);
     }
-} else {
-    // Read from standard input for raw POST payloads
-    $raw_post_data = "";
-    $f = fopen('php://stdin', 'r');
-    if ($f) {
-        while ($line = fgets($f)) {
-            $raw_post_data .= $line;
-        }
-        fclose($f);
-    }
-    if ($raw_post_data !== "") {
-        parse_str($raw_post_data, $_POST);
-    }
 }
 
 /**
