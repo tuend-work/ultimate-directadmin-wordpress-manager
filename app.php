@@ -2222,40 +2222,52 @@ function clone_wordpress_instance($params, $home) {
     }
     
     $dump_file = sys_get_temp_dir() . '/clone_dump_' . time() . '.sql';
+    $dump_error_file = sys_get_temp_dir() . '/clone_dump_err_' . time() . '.log';
+    
     $cmd_dump = sprintf(
-        'mysqldump -h %s -u %s -p%s %s > %s 2>&1',
+        'mysqldump -h %s -u %s -p%s %s > %s 2>%s',
         escapeshellarg($src_db_host),
         escapeshellarg($src_db_user),
         escapeshellarg($src_db_pass),
         escapeshellarg($src_db_name),
-        escapeshellarg($dump_file)
+        escapeshellarg($dump_file),
+        escapeshellarg($dump_error_file)
     );
     
-    $output = [];
     $retval = null;
-    exec($cmd_dump, $output, $retval);
+    exec($cmd_dump, $output_dump, $retval);
+    
     if ($retval !== 0) {
+        $err_msg = file_exists($dump_error_file) ? file_get_contents($dump_error_file) : '';
+        @unlink($dump_error_file);
+        @unlink($dump_file);
         rmdir_recursive($target_dir);
-        throw new Exception("Lỗi khi xuất database nguồn: " . implode("\n", $output));
+        throw new Exception("Lỗi khi xuất database nguồn: " . $err_msg);
     }
+    @unlink($dump_error_file);
     
     // 3. Import target DB
+    $import_error_file = sys_get_temp_dir() . '/clone_import_err_' . time() . '.log';
     $cmd_import = sprintf(
-        'mysql -h localhost -u %s -p%s %s < %s 2>&1',
+        'mysql -h localhost -u %s -p%s %s < %s 2>%s',
         escapeshellarg($db_user),
         escapeshellarg($db_pass),
         escapeshellarg($db_name),
-        escapeshellarg($dump_file)
+        escapeshellarg($dump_file),
+        escapeshellarg($import_error_file)
     );
-    $output_import = [];
+    
     $retval_import = null;
     exec($cmd_import, $output_import, $retval_import);
     @unlink($dump_file);
     
     if ($retval_import !== 0) {
+        $err_msg = file_exists($import_error_file) ? file_get_contents($import_error_file) : '';
+        @unlink($import_error_file);
         rmdir_recursive($target_dir);
-        throw new Exception("Lỗi khi nhập database đích: " . implode("\n", $output_import));
+        throw new Exception("Lỗi khi nhập database đích: " . $err_msg);
     }
+    @unlink($import_error_file);
     
     // 4. Update wp-config.php in target
     $tgt_config = $target_dir . '/wp-config.php';
