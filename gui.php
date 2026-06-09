@@ -568,7 +568,7 @@ let deletePath = '', deleteDb = '';
 
 /* ─── Screenshot service (free, no key) ─── */
 function thumbUrl(siteurl) {
-    return 'https://image.thum.io/get/width/400/crop/260/noanimate/' + siteurl;
+    return 'https://image.thum.io/get/width/1024/crop/768/noanimate/' + siteurl;
 }
 
 /* ─── API helper ─── */
