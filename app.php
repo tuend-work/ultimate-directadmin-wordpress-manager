@@ -3503,7 +3503,7 @@ function run_api() {
             default:
                 throw new Exception("Unknown action parameter: " . $action);
         }
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         wp_manager_log("Thao tác thất bại. Action: {$action} | Lỗi: " . $e->getMessage());
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
