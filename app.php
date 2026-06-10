@@ -2279,6 +2279,7 @@ function clone_wordpress_instance($params, $home) {
     // 4. Update wp-config.php in target
     $tgt_config = $target_dir . '/wp-config.php';
     if (file_exists($tgt_config)) {
+        @chmod($tgt_config, 0644); // Ensure it is writable
         $content = file_get_contents($tgt_config);
         $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
         $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
@@ -2303,6 +2304,7 @@ function clone_wordpress_instance($params, $home) {
         }
         
         file_put_contents($tgt_config, $content);
+        @chmod($tgt_config, 0600); // Restore secure permissions
     }
     
     // 5. Database search and replace
@@ -2477,6 +2479,7 @@ function install_wordpress_instance($params, $home) {
             // Update wp-config.php with new database details
             $wp_config_path = $target_dir . '/wp-config.php';
             if (file_exists($wp_config_path)) {
+                @chmod($wp_config_path, 0644); // Ensure it is writable
                 $content = file_get_contents($wp_config_path);
                 
                 // Extract db table prefix
@@ -2507,7 +2510,7 @@ function install_wordpress_instance($params, $home) {
                 }
                 
                 file_put_contents($wp_config_path, $content);
-                @chmod($wp_config_path, 0600);
+                @chmod($wp_config_path, 0600); // Restore secure permissions
             }
             
             if ($retval !== 0) {
