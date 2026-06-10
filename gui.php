@@ -97,11 +97,6 @@ div#iframe-container{
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 900; color: #fff;
 }
-.topbar .logo-img {
-    width: 24px; height: 24px;
-    border-radius: 4px;
-    object-fit: cover;
-}
 .topbar .user { margin-left: auto; color: var(--text2); font-size: 12px; display: flex; align-items: center; gap: 8px; }
 
 /* ── Toolbar ── */
@@ -586,7 +581,7 @@ input:disabled + .slider {
 <!-- Top bar -->
 <div class="topbar">
     <div class="logo">
-        <img src="images/logo.png" alt="Logo" class="logo-img">
+        <div class="logo-icon">W</div>
         Ultimate WordPress Manager
     </div>
     <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
