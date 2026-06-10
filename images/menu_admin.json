@@ -5,7 +5,7 @@
     "entries": [
       {
         "name": "Ultimate WordPress Manager",
-        "icon": "/CMD_PLUGINS/ultimate-directadmin-wordpress-manager/images/admin_icon.png",
+        "icon": "/CMD_PLUGINS/ultimate-directadmin-wordpress-manager/images/admin_icon.svg",
         "href": "/CMD_PLUGINS_ADMIN/ultimate-directadmin-wordpress-manager/index.html",
         "newTab": true
       }
