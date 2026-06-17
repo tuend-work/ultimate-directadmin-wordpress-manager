@@ -203,7 +203,7 @@ div#iframe-container{
 .site-thumb .thumb-loader.hidden { display: none; }
 
 /* Site info */
-.site-info { flex: 1; min-width: 0; }
+.site-info { flex-shrink: 0; min-width: 0; max-width: 200px; }
 .site-name {
     font-size: 14px; font-weight: 600; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -212,6 +212,19 @@ div#iframe-container{
 .site-url { font-size: 11px; color: var(--text2); }
 .site-url a { color: var(--blue); text-decoration: none; }
 .site-url a:hover { text-decoration: underline; }
+
+/* Files Path + File Manager in header */
+.header-path {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 8px;
+}
+.header-path-label {
+    flex: 1; min-width: 0;
+    font-size: 11.5px; color: var(--text3);
+    font-family: monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Badges row */
 .badges { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
@@ -2049,6 +2062,11 @@ function renderSites(sites) {
                     <div class="site-name">${esc(s.blogname)}</div>
                     <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank" onclick="event.stopPropagation()">${esc(s.siteurl)}</a></div>
                 </div>
+                <!-- Files Path + File Manager (header) -->
+                <div class="header-path" onclick="event.stopPropagation()">
+                    <span class="header-path-label">📁 ${esc(pathShort)}</span>
+                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
+                </div>
                 <!-- Badges -->
                 <div class="badges">
                     ${statusBadge}
@@ -2085,13 +2103,6 @@ function renderSites(sites) {
                 <!-- Tab 1: Overview Details -->
                 <div class="card-tab-content active" id="tab-content-${i}-details">
                     <div class="card-sec-title">ℹ️ Installation Details</div>
-                    <div style="display:flex; align-items:center; gap:10px; padding: 8px 0 12px 0; border-bottom: 1px solid var(--border); margin-bottom:12px;" onclick="event.stopPropagation()">
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-size:10px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px;">Files Path</div>
-                            <div style="font-size:13px; color:var(--text1); font-family:monospace; word-break:break-all;">${esc(pathShort)}</div>
-                        </div>
-                        <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})" style="flex-shrink:0;">📂 File Manager</button>
-                    </div>
                     <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
                         <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
                         <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
