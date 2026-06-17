@@ -2057,6 +2057,8 @@ function renderSites(sites) {
                     <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank" onclick="event.stopPropagation()">${esc(s.siteurl)}</a></div>
                     <div class="site-path" onclick="event.stopPropagation()" title="${esc(pathShort)}">📁 ${esc(pathShort)}</div>
                 </div>
+                <!-- File Manager button -->
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;" onclick="event.stopPropagation(); openFileManager(${i})">📂 File Manager</button>
                 <!-- Badges -->
                 <div class="badges">
                     ${statusBadge}
@@ -2188,7 +2190,6 @@ function renderSites(sites) {
                     <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
-                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
                     <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
                     <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
