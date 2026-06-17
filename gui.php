@@ -2085,6 +2085,13 @@ function renderSites(sites) {
                 <!-- Tab 1: Overview Details -->
                 <div class="card-tab-content active" id="tab-content-${i}-details">
                     <div class="card-sec-title">ℹ️ Installation Details</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding: 8px 0 12px 0; border-bottom: 1px solid var(--border); margin-bottom:12px;" onclick="event.stopPropagation()">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:10px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px;">Files Path</div>
+                            <div style="font-size:13px; color:var(--text1); font-family:monospace; word-break:break-all;">${esc(pathShort)}</div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})" style="flex-shrink:0;">📂 File Manager</button>
+                    </div>
                     <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
                         <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
                         <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
@@ -2092,7 +2099,6 @@ function renderSites(sites) {
                         <div class="detail-item"><label>DB User</label><div class="val">${esc(s.db_user||'—')}</div></div>
                         <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
                         <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
-                        <div class="detail-item" style="grid-column:span 2"><label>Files Path</label><div class="val">${esc(pathShort)}</div></div>
                     </div>
                     <div class="lock-section" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
@@ -2181,7 +2187,6 @@ function renderSites(sites) {
                     <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
-                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
                     <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
                     <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
