@@ -203,7 +203,7 @@ div#iframe-container{
 .site-thumb .thumb-loader.hidden { display: none; }
 
 /* Site info */
-.site-info { flex-shrink: 0; min-width: 0; max-width: 200px; }
+.site-info { flex: 1; min-width: 0; max-width: 340px; }
 .site-name {
     font-size: 14px; font-weight: 600; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -212,18 +212,12 @@ div#iframe-container{
 .site-url { font-size: 11px; color: var(--text2); }
 .site-url a { color: var(--blue); text-decoration: none; }
 .site-url a:hover { text-decoration: underline; }
-
-/* Files Path + File Manager in header */
-.header-path {
-    flex: 1; min-width: 0;
-    display: flex; align-items: center; gap: 10px;
-    padding: 0 8px;
-}
-.header-path-label {
-    flex: 1; min-width: 0;
-    font-size: 11.5px; color: var(--text3);
+.site-path {
+    font-size: 10.5px; color: var(--text3);
     font-family: monospace;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 3px;
+    cursor: default;
 }
 
 /* Badges row */
@@ -2061,11 +2055,7 @@ function renderSites(sites) {
                 <div class="site-info">
                     <div class="site-name">${esc(s.blogname)}</div>
                     <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank" onclick="event.stopPropagation()">${esc(s.siteurl)}</a></div>
-                </div>
-                <!-- Files Path + File Manager (header) -->
-                <div class="header-path" onclick="event.stopPropagation()">
-                    <span class="header-path-label">📁 ${esc(pathShort)}</span>
-                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
+                    <div class="site-path" onclick="event.stopPropagation()" title="${esc(pathShort)}">📁 ${esc(pathShort)}</div>
                 </div>
                 <!-- Badges -->
                 <div class="badges">
@@ -2198,6 +2188,7 @@ function renderSites(sites) {
                     <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
                     <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
                     <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
                     <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
