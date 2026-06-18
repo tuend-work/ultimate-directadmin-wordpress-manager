@@ -3012,6 +3012,23 @@ function update_plugin_from_github() {
 
     // ── Strategy 1: dùng SUID wrapper (chạy với quyền root) ──
     if (!$is_win && file_exists($wrapper) && is_executable($wrapper)) {
+
+        // Kiểm tra wrapper có hỗ trợ action 'update' không (tránh lỗi với bản cũ)
+        $probe = shell_exec(escapeshellcmd($wrapper) . ' 2>&1');
+        if ($probe !== null && strpos($probe, 'update') === false) {
+            // Wrapper cũ — chưa được recompile với action 'update'
+            throw new Exception(
+                "Wrapper binary is outdated and does not support 'update' action.\n\n" .
+                "Please run the following commands on the server as root (one-time setup):\n\n" .
+                "  cd {$plugin_dir}/scripts\n" .
+                "  gcc -O2 wrapper.c -o wrapper\n" .
+                "  chown root:diradmin wrapper\n" .
+                "  chmod 4755 wrapper\n" .
+                "  chmod 755 self_update.sh\n\n" .
+                "After that, the Update Plugin button will work automatically."
+            );
+        }
+
         $output  = [];
         $retcode = 0;
         exec(escapeshellcmd($wrapper) . ' update 2>&1', $output, $retcode);
