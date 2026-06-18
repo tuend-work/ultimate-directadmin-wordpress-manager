@@ -2551,7 +2551,20 @@ async function runPluginUpdate() {
         const p=new URLSearchParams({action:'update_plugin'});
         const r=await fetch(apiUrl(),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
         const d=await r.json();
-        if(d.success){log(d.message,'ok');log('Done. Please reload.','ok');}
+        if(d.success){
+            log(d.message,'ok');
+            log('✅ Done! Tự động tải lại trang sau 3 giây...','ok');
+            let sec = 3;
+            const countdown = setInterval(() => {
+                sec--;
+                if (sec > 0) {
+                    log('⏳ Đang tải lại sau ' + sec + 's...','ok');
+                } else {
+                    clearInterval(countdown);
+                    location.reload(true);
+                }
+            }, 1000);
+        }
         else log('Error: '+d.error,'err');
     } catch(e){log('Connection error: '+e.message,'err');}
     finally{document.getElementById('btn-update-done').disabled=false;}

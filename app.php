@@ -3073,6 +3073,11 @@ function update_plugin_from_github() {
         // Reset permissions
         set_permissions_recursive($plugin_dir);
         
+        // Clear PHP opcode cache so new files are loaded immediately
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+        
         // Cleanup temp extraction
         rmdir_recursive($extract_temp);
         @unlink($temp_zip);
