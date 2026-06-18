@@ -1309,6 +1309,9 @@ function update_wordpress_plugin($site_path, $plugin_file) {
         $fallback_used = true;
         wp_manager_log("Plugin ZIP not found on WordPress.org for {$slug}. Falling back to native WordPress upgrade...");
         
+        $_GET['force-check'] = 1;
+        $_GET['force-lookup'] = 1;
+        
         $plugin_path = $site_path . '/wp-content/plugins/' . $plugin_file;
         $orig_version = false;
         if (file_exists($plugin_path)) {
@@ -1324,7 +1327,7 @@ function update_wordpress_plugin($site_path, $plugin_file) {
             
             delete_site_transient('update_plugins');
             if (function_exists('wp_clean_plugins_cache')) {
-                wp_clean_plugins_cache();
+                wp_clean_plugins_cache(true);
             }
             wp_update_plugins();
             
@@ -1425,6 +1428,9 @@ function update_wordpress_theme($site_path, $theme_folder) {
     if ($http_code !== 200 || !$data) {
         $fallback_used = true;
         wp_manager_log("Theme ZIP not found on WordPress.org for {$theme_folder}. Falling back to native WordPress upgrade...");
+        
+        $_GET['force-check'] = 1;
+        $_GET['force-lookup'] = 1;
         
         $theme_style_path = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
         $orig_version = false;
@@ -1619,6 +1625,9 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
         $fallback_used = true;
         wp_manager_log("Plugin ZIP not found on WordPress.org for {$slug}. Falling back to native WordPress upgrade...");
         
+        $_GET['force-check'] = 1;
+        $_GET['force-lookup'] = 1;
+        
         $plugin_path = $site_path . '/wp-content/plugins/' . $plugin_file;
         $orig_version = false;
         if (file_exists($plugin_path)) {
@@ -1634,7 +1643,7 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
             
             delete_site_transient('update_plugins');
             if (function_exists('wp_clean_plugins_cache')) {
-                wp_clean_plugins_cache();
+                wp_clean_plugins_cache(true);
             }
             wp_update_plugins();
             
@@ -1758,6 +1767,9 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
     if ($http_code !== 200 || !$data) {
         $fallback_used = true;
         wp_manager_log("Theme ZIP not found on WordPress.org for {$theme_folder}. Falling back to native WordPress upgrade...");
+        
+        $_GET['force-check'] = 1;
+        $_GET['force-lookup'] = 1;
         
         $theme_style_path = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
         $orig_version = false;
@@ -2188,7 +2200,7 @@ function download_and_extract_wordpress($target_dir, $home) {
  */
 function wp_manager_log($msg) {
     $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
-    $home = getenv('HOME') ?: "/home/{$username}";
+    $home = getenv('HOME') ?: getenv('USERPROFILE') ?: "/home/{$username}";
     $log_file = $home . '/.ultimate_wp_manager_debug.log';
     $timestamp = date('Y-m-d H:i:s');
     @file_put_contents($log_file, "[{$timestamp}] {$msg}\n", FILE_APPEND);
@@ -4129,14 +4141,19 @@ function list_user_zip_files($home) {
  * Helper to change plugin file version header
  */
 function change_plugin_file_version($file_path, $new_version) {
-    if (!file_exists($file_path)) return false;
+    if (!file_exists($file_path)) {
+        wp_manager_log("change_plugin_file_version: File not found: " . $file_path);
+        return false;
+    }
     $content = file_get_contents($file_path);
-    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', $content, $matches)) {
+    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', $content, $matches)) {
         $orig_version = trim($matches[2]);
-        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', '${1}' . $new_version, $content);
+        wp_manager_log("change_plugin_file_version: Found version: " . $orig_version . " in " . $file_path . ". Changing to " . $new_version);
+        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', '${1}' . $new_version, $content, 1);
         file_put_contents($file_path, $new_content);
         return $orig_version;
     }
+    wp_manager_log("change_plugin_file_version: Version header not found in " . $file_path);
     return false;
 }
 
@@ -4144,13 +4161,18 @@ function change_plugin_file_version($file_path, $new_version) {
  * Helper to change theme style.css version header
  */
 function change_theme_style_version($style_css_path, $new_version) {
-    if (!file_exists($style_css_path)) return false;
+    if (!file_exists($style_css_path)) {
+        wp_manager_log("change_theme_style_version: File not found: " . $style_css_path);
+        return false;
+    }
     $content = file_get_contents($style_css_path);
-    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', $content, $matches)) {
+    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', $content, $matches)) {
         $orig_version = trim($matches[2]);
-        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', '${1}' . $new_version, $content);
+        wp_manager_log("change_theme_style_version: Found version: " . $orig_version . " in " . $style_css_path . ". Changing to " . $new_version);
+        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', '${1}' . $new_version, $content, 1);
         file_put_contents($style_css_path, $new_content);
         return $orig_version;
     }
+    wp_manager_log("change_theme_style_version: Version header not found in " . $style_css_path);
     return false;
 }
