@@ -1126,6 +1126,74 @@ async function loadPlugins(i) {
     }
 }
 
+async function updateAllPlugins(siteIdx) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-plug-upall-${siteIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating all...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+
+        const r = await fetch(apiUrl('update_all_wp_plugins'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'All plugins updated successfully!', 'success');
+            loadPlugins(siteIdx);
+        } else {
+            toast(d.error || 'Plugins update failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function updateAllThemes(siteIdx) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before updating themes.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-theme-upall-${siteIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating all...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+
+        const r = await fetch(apiUrl('update_all_wp_themes'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'All themes updated successfully!', 'success');
+            loadThemes(siteIdx);
+        } else {
+            toast(d.error || 'Themes update failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 async function updatePlugin(siteIdx, plugIdx, file) {
     const s = allSites[siteIdx];
     if (s.locked) {
@@ -2118,7 +2186,6 @@ function renderSites(sites) {
                 <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
                 <div class="sep"></div>
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
-                <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
             </div>
 
             <!-- Card body (expanded) -->
@@ -2194,6 +2261,13 @@ function renderSites(sites) {
                             ${s.wp_debug_enabled ? '⚙️ Tắt' : '⚡ Bật'}
                         </button>
                     </div>
+                    <!-- Danger Zone / Delete Website -->
+                    <div class="lock-section" style="margin-top: 24px; border-top: 1px solid rgba(248,81,73,0.3); padding-top: 16px;" onclick="event.stopPropagation()">
+                        <div class="lock-status-label" style="color: var(--red); font-weight: 500;">
+                            🗑️ Gỡ bỏ website này hoàn toàn khỏi hệ thống (Không thể hoàn tác)
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
+                    </div>
                 </div>
 
                 <!-- Tab 1.5: Security & Protection -->
@@ -2213,7 +2287,10 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-plugins">
                     <div class="card-sec-title">
                         <span>🔌 Installed Plugins</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" id="btn-plug-upall-${i}" onclick="updateAllPlugins(${i})">↑ Update All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
+                        </div>
                     </div>
                     <div class="plugin-list" id="plugin-list-${i}">
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
@@ -2226,7 +2303,10 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-themes">
                     <div class="card-sec-title">
                         <span>🎨 Installed Themes</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" id="btn-theme-upall-${i}" onclick="updateAllThemes(${i})">↑ Update All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
+                        </div>
                     </div>
                     <div class="plugin-list" id="theme-list-${i}">
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">

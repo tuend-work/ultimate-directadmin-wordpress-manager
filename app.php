@@ -1358,6 +1358,92 @@ function update_wordpress_theme($site_path, $theme_folder) {
 }
 
 /**
+ * Update all WordPress plugins at once using native upgrader.
+ */
+function update_all_wordpress_plugins($site_path) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.");
+    }
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        
+        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        
+        wp_update_plugins();
+        $updates = get_site_transient('update_plugins');
+        if (!$updates || empty($updates->response)) {
+            return ['success' => true, 'message' => 'All plugins are already up to date.'];
+        }
+        
+        $plugin_files = array_keys($updates->response);
+        if (empty($plugin_files)) {
+            return ['success' => true, 'message' => 'All plugins are already up to date.'];
+        }
+
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Plugin_Upgrader($skin);
+        $result = $upgrader->bulk_upgrade($plugin_files);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+
+    return ['success' => true, 'message' => 'All eligible plugins updated successfully.'];
+}
+
+/**
+ * Update all WordPress themes at once using native upgrader.
+ */
+function update_all_wordpress_themes($site_path) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating themes.");
+    }
+
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        
+        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+        require_once ABSPATH . 'wp-admin/includes/theme.php';
+        
+        wp_update_themes();
+        $updates = get_site_transient('update_themes');
+        if (!$updates || empty($updates->response)) {
+            return ['success' => true, 'message' => 'All themes are already up to date.'];
+        }
+        
+        $theme_folders = array_keys($updates->response);
+        if (empty($theme_folders)) {
+            return ['success' => true, 'message' => 'All themes are already up to date.'];
+        }
+
+        $skin = new Automatic_Upgrader_Skin();
+        $upgrader = new Theme_Upgrader($skin);
+        $result = $upgrader->bulk_upgrade($theme_folders);
+    } finally {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+    }
+
+    if (is_wp_error($result)) {
+        throw new Exception($result->get_error_message());
+    }
+
+    return ['success' => true, 'message' => 'All eligible themes updated successfully.'];
+}
+
+/**
  * Reinstall a plugin by fetching from WordPress.org
  */
 function reinstall_wordpress_plugin($site_path, $plugin_file) {
@@ -3434,6 +3520,23 @@ function run_api() {
                 echo json_encode($res);
                 break;
                 
+            case 'update_all_wp_plugins':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                wp_manager_log("Cập nhật tất cả plugins cho website: " . $_POST['path']);
+                $res = update_all_wordpress_plugins($_POST['path']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật tất cả plugins thành công.");
+                } else {
+                    wp_manager_log("Cập nhật tất cả plugins thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
+                echo json_encode($res);
+                break;
+                
             case 'reinstall_wp_plugin':
                 if (empty($_POST['path']) || empty($_POST['plugin_file'])) {
                     throw new Exception("Missing parameters.");
@@ -3517,6 +3620,23 @@ function run_api() {
                     wp_manager_log("Cập nhật theme thành công.");
                 } else {
                     wp_manager_log("Cập nhật theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
+                }
+                echo json_encode($res);
+                break;
+                
+            case 'update_all_wp_themes':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                wp_manager_log("Cập nhật tất cả themes cho website: " . $_POST['path']);
+                $res = update_all_wordpress_themes($_POST['path']);
+                if (isset($res['success']) && $res['success']) {
+                    wp_manager_log("Cập nhật tất cả themes thành công.");
+                } else {
+                    wp_manager_log("Cập nhật tất cả themes thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
                 echo json_encode($res);
                 break;
