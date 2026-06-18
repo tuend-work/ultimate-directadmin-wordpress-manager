@@ -4146,10 +4146,10 @@ function change_plugin_file_version($file_path, $new_version) {
         return false;
     }
     $content = file_get_contents($file_path);
-    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', $content, $matches)) {
-        $orig_version = trim($matches[2]);
+    if (preg_match('/Version\s*:\s*([^\r\n]*)/i', $content, $matches)) {
+        $orig_version = trim($matches[1]);
         wp_manager_log("change_plugin_file_version: Found version: " . $orig_version . " in " . $file_path . ". Changing to " . $new_version);
-        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', '${1}' . $new_version, $content, 1);
+        $new_content = preg_replace('/Version\s*:\s*[^\r\n]*/i', 'Version:              ' . $new_version, $content, 1);
         file_put_contents($file_path, $new_content);
         return $orig_version;
     }
@@ -4166,10 +4166,10 @@ function change_theme_style_version($style_css_path, $new_version) {
         return false;
     }
     $content = file_get_contents($style_css_path);
-    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', $content, $matches)) {
-        $orig_version = trim($matches[2]);
+    if (preg_match('/Version\s*:\s*([^\r\n]*)/i', $content, $matches)) {
+        $orig_version = trim($matches[1]);
         wp_manager_log("change_theme_style_version: Found version: " . $orig_version . " in " . $style_css_path . ". Changing to " . $new_version);
-        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([0-9a-zA-Z.-]+)/mi', '${1}' . $new_version, $content, 1);
+        $new_content = preg_replace('/Version\s*:\s*[^\r\n]*/i', 'Version:              ' . $new_version, $content, 1);
         file_put_contents($style_css_path, $new_content);
         return $orig_version;
     }
