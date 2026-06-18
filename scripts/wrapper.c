@@ -113,8 +113,20 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     
+    // Handle 'update' action — runs self_update.sh as root to update plugin files
+    if (strcmp(action, "update") == 0) {
+        const char *update_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/self_update.sh";
+        if (access(update_sh, X_OK) != 0) {
+            fprintf(stderr, "Error: self_update.sh not found or not executable at %s\n", update_sh);
+            return 1;
+        }
+        execl("/bin/bash", "bash", update_sh, NULL);
+        perror("Error: execl failed");
+        return 1;
+    }
+
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
-        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', or 'get_domain_config'.\n");
+        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', or 'get_domain_config'.\n");
         return 1;
     }
     

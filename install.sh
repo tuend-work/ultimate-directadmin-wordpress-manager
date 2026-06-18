@@ -59,6 +59,7 @@ find "$PLUGIN_DIR" -type f \( -name "*.sh" -o -name "*.html" -o -name "*.raw" -o
 
 # Set executable permissions for scripts and panel entry points
 chmod 755 "$PLUGIN_DIR"/scripts/*.sh 2>/dev/null
+chmod 755 "$PLUGIN_DIR/scripts/self_update.sh" 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/admin/index.html 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/admin/index.raw 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/reseller/index.html 2>/dev/null

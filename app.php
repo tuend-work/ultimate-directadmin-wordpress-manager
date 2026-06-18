@@ -2998,25 +2998,56 @@ function update_plugin_from_github() {
     }
 
     $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+    $wrapper    = $plugin_dir . '/scripts/wrapper';
+    $is_win     = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
+    if ($is_win) {
         $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
+        $wrapper    = null; // wrapper not available on Windows dev
     }
 
-    // ── Pre-flight: kiểm tra quyền ghi ──
     if (!is_dir($plugin_dir)) {
         throw new Exception("Plugin directory not found: {$plugin_dir}");
     }
+
+    // ── Strategy 1: dùng SUID wrapper (chạy với quyền root) ──
+    if (!$is_win && file_exists($wrapper) && is_executable($wrapper)) {
+        $output  = [];
+        $retcode = 0;
+        exec(escapeshellcmd($wrapper) . ' update 2>&1', $output, $retcode);
+        $out_str = implode("\n", $output);
+
+        if ($retcode !== 0) {
+            throw new Exception("Wrapper update failed (exit {$retcode}):\n{$out_str}");
+        }
+
+        // Clear PHP opcode cache
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+
+        return [
+            'success' => true,
+            'message' => "Plugin updated via system wrapper successfully.\n" . $out_str
+        ];
+    }
+
+    // ── Strategy 2 (Windows dev / fallback): copy trực tiếp nếu có quyền ghi ──
     if (!is_writable($plugin_dir)) {
-        $owner = '';
-        $proc  = '';
+        $owner = $proc = '?';
         if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
             $o = posix_getpwuid(fileowner($plugin_dir)); $owner = $o['name'] ?? '?';
             $p = posix_getpwuid(posix_geteuid());        $proc  = $p['name'] ?? '?';
         }
+        $wrapper_path = $plugin_dir . '/scripts/wrapper';
         throw new Exception(
             "Permission denied: cannot write to plugin directory.\n" .
-            "Dir owner: {$owner} | Process user: {$proc}\n" .
-            "Fix: chown -R {$proc} {$plugin_dir}"
+            "Dir owner: {$owner} | Process user: {$proc}\n\n" .
+            "The SUID wrapper was not found or not executable.\n" .
+            "On the server, run as root:\n" .
+            "  gcc -O2 {$wrapper_path}.c -o {$wrapper_path}\n" .
+            "  chown root:diradmin {$wrapper_path}\n" .
+            "  chmod 4755 {$wrapper_path}"
         );
     }
 
