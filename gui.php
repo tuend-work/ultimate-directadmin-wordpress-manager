@@ -2176,7 +2176,31 @@ function openFileManager(i) {
 
 /* ─── Open phpMyAdmin ─── */
 function openPhpMyAdmin(i) {
-    window.open('/CMD_PMA', '_blank');
+    const s = allSites[i];
+    if (!s || !s.db_name) {
+        toast('Database name not found for this site.', 'error');
+        return;
+    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/CMD_PMA_LOGIN';
+    form.target = '_blank';
+
+    const dbInput = document.createElement('input');
+    dbInput.type = 'hidden';
+    dbInput.name = 'name';
+    dbInput.value = s.db_name;
+    form.appendChild(dbInput);
+
+    const domainInput = document.createElement('input');
+    domainInput.type = 'hidden';
+    domainInput.name = 'domain';
+    domainInput.value = s.domain || '';
+    form.appendChild(domainInput);
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 
 /* ─── Render ─── */
