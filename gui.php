@@ -311,7 +311,7 @@ div#iframe-container{
 .card-action-row {
     display: flex; gap: 8px; flex-wrap: wrap;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--border2);
+    border-top: 1px solid var(--border2);
     background: var(--bg3);
     align-items: center;
 }
@@ -2109,6 +2109,18 @@ function renderSites(sites) {
                 <span class="chevron" id="cv-${i}">▶</span>
             </div>
 
+            <!-- Action row (Always visible) -->
+            <div class="card-action-row" onclick="event.stopPropagation()">
+                <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
+                <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
+                <div class="sep"></div>
+                <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
+                <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
+                <div class="sep"></div>
+                <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
+                <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
+            </div>
+
             <!-- Card body (expanded) -->
             <div class="card-body" id="cb-${i}">
                 <!-- Big screenshot strip -->
@@ -2121,18 +2133,6 @@ function renderSites(sites) {
                     <div class="shot-refresh">
                         <button class="btn btn-secondary btn-sm" onclick="refreshShot(${i})">⟳ Refresh</button>
                     </div>
-                </div>
-
-                <!-- Action row -->
-                <div class="card-action-row" onclick="event.stopPropagation()">
-                    <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
-                    <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
-                    <div class="sep"></div>
-                    <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
-                    <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
-                    <div class="sep"></div>
-                    <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
-                    <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
                 </div>
 
                 <!-- Tabs headers -->
