@@ -4,6 +4,18 @@
  * GUI — Dark theme, wide layout, with site screenshots
  */
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
+
+// Read plugin version from plugin.conf
+$plugin_version = '1.1.3';
+$conf_file = __DIR__ . '/plugin.conf';
+if (is_readable($conf_file)) {
+    foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (strncmp($line, 'version=', 8) === 0) {
+            $plugin_version = trim(substr($line, 8));
+            break;
+        }
+    }
+}
 $isAdmin  = is_admin_user();
 
 // Fetch server IP and hostname
@@ -590,6 +602,7 @@ input:disabled + .slider {
     <div class="logo">
         <div class="logo-icon">W</div>
         Ultimate WordPress Manager
+        <span style="font-size:10px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:2px;letter-spacing:.3px;">v<?php echo htmlspecialchars($plugin_version); ?></span>
     </div>
     <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
         <span><?php echo htmlspecialchars($server_ip); ?></span> | <span><?php echo htmlspecialchars($hostname); ?></span>
