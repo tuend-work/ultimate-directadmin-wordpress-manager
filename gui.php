@@ -1090,10 +1090,10 @@ async function loadPlugins(i) {
                 const updateBadge = p.update_available
                     ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
                     : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
-                const updateDisabled = p.update_package_available ? '' : 'disabled';
-                const updateTitle = p.update_package_available
+                const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
+                const updateTitle = p.update_available
                     ? 'Update this plugin'
-                    : (p.update_available ? 'No update package available for this plugin' : 'Plugin is already up to date');
+                    : 'Force update/reinstall this plugin (already at latest version)';
                 
                 return `
                 <div class="plugin-item">
@@ -1405,10 +1405,10 @@ async function loadThemes(i) {
                 const updateBadge = t.update_available
                     ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
                     : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
-                const updateDisabled = t.update_package_available ? '' : 'disabled';
-                const updateTitle = t.update_package_available
+                const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
+                const updateTitle = t.update_available
                     ? 'Update this theme'
-                    : (t.update_available ? 'No update package available for this theme' : 'Theme is already up to date');
+                    : 'Force update/reinstall this theme (already at latest version)';
                 
                 return `
                 <div class="plugin-item">
