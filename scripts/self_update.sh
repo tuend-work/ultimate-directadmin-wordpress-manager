@@ -68,10 +68,40 @@ chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 # Re-compile and restore SUID wrapper (critical for future updates)
 if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
     echo "[update] Re-compiling SUID wrapper..."
-    gcc -O2 "$PLUGIN_DIR/scripts/wrapper.c" -o "$PLUGIN_DIR/scripts/wrapper"
-    chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
-    chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
-    echo "[update] SUID wrapper compiled successfully."
+    
+    GCC_BIN=""
+    for try_gcc in gcc cc /usr/bin/gcc /usr/local/bin/gcc; do
+        if command -v "$try_gcc" >/dev/null 2>&1; then
+            GCC_BIN="$try_gcc"
+            break
+        fi
+    done
+
+    COMPILED=0
+    if [ -n "$GCC_BIN" ]; then
+        if "$GCC_BIN" -O2 "$PLUGIN_DIR/scripts/wrapper.c" -o "$PLUGIN_DIR/scripts/wrapper.tmp" 2>/dev/null; then
+            mv -f "$PLUGIN_DIR/scripts/wrapper.tmp" "$PLUGIN_DIR/scripts/wrapper"
+            COMPILED=1
+        else
+            rm -f "$PLUGIN_DIR/scripts/wrapper.tmp"
+        fi
+    fi
+
+    if [ "$COMPILED" -eq 1 ]; then
+        chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
+        chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
+        echo "[update] SUID wrapper compiled successfully."
+    else
+        echo "[update] WARNING: SUID wrapper compilation failed (gcc/cc failed or not installed)."
+        if [ -f "$PLUGIN_DIR/scripts/wrapper" ]; then
+            echo "[update] Existing wrapper binary found. Restoring its root ownership and SUID permissions..."
+            chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
+            chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
+            echo "[update] Existing wrapper SUID permissions restored."
+        else
+            echo "[update] WARNING: No existing wrapper binary found to restore."
+        fi
+    fi
 fi
 
 echo "[update] Cleanup..."
