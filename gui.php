@@ -2181,6 +2181,18 @@ function openPhpMyAdmin(i) {
         toast('Database name not found for this site.', 'error');
         return;
     }
+
+    let domain = '';
+    if (s.path) {
+        const parts = s.path.split('/domains/');
+        if (parts.length > 1) {
+            domain = parts[1].split('/')[0];
+        }
+    }
+    if (!domain) {
+        domain = s.domain || '';
+    }
+
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = '/CMD_PMA_LOGIN';
@@ -2195,7 +2207,7 @@ function openPhpMyAdmin(i) {
     const domainInput = document.createElement('input');
     domainInput.type = 'hidden';
     domainInput.name = 'domain';
-    domainInput.value = s.domain || '';
+    domainInput.value = domain;
     form.appendChild(domainInput);
 
     document.body.appendChild(form);
