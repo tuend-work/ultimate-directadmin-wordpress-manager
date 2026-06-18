@@ -4,9 +4,10 @@
  * Core Backend Controller
  */
 
-// Enable error reporting
+// Log errors but never display them to stdout (would corrupt JSON API responses)
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 
 // Start output buffering to capture any accidental warnings/notices and protect CGI headers
 ob_start();
@@ -3008,12 +3009,19 @@ function update_plugin_from_github() {
     $ch = curl_init($github_zip_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
     curl_setopt($ch, CURLOPT_USERAGENT, 'DirectAdmin-WordPress-Manager-Updater');
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $data = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curl_error = curl_error($ch);
     curl_close($ch);
     
+    if ($curl_error) {
+        throw new Exception("GitHub connection failed: {$curl_error}");
+    }
     if ($http_code !== 200 || !$data) {
         throw new Exception("Update download failed from GitHub (HTTP Code: {$http_code}).");
     }
@@ -3101,16 +3109,23 @@ function run_gui() {
  * Handle API Endpoint actions
  */
 function run_api() {
+    // Suppress display_errors inside API to prevent any PHP warning from corrupting JSON output
+    ini_set('display_errors', 0);
+
     // Clear any warnings/notices captured in output buffer to keep CGI headers clean
-    if (ob_get_length()) {
-        ob_clean();
+    while (ob_get_level() > 0) {
+        ob_end_clean();
     }
-    
+
     // Standard CGI headers for DirectAdmin raw mode (HTTP/1.1 is standard)
     echo "HTTP/1.1 200 OK\r\n";
     echo "Content-Type: application/json; charset=utf-8\r\n";
     echo "Access-Control-Allow-Origin: *\r\n";
     echo "\r\n";
+
+    // Start a fresh output buffer so that any stray output during action handling
+    // is captured and discarded — only the explicit json_encode() will be echoed.
+    ob_start();
     
     $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $home = getenv('HOME') ?: "/home/{$username}";
@@ -3562,8 +3577,14 @@ function run_api() {
         }
     } catch (Throwable $e) {
         wp_manager_log("Thao tác thất bại. Action: {$action} | Lỗi: " . $e->getMessage());
+        // Discard any stray output that leaked into the inner buffer before writing the error JSON
+        ob_end_clean();
+        ob_start();
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
+    // Flush inner buffer (JSON body) to the actual output stream
+    $json_body = ob_get_clean();
+    echo $json_body;
     exit;
 }
 
