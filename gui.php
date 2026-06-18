@@ -1103,7 +1103,7 @@ async function loadPlugins(i) {
                         <div class="plugin-meta">Current: v${esc(p.version)} | Latest: v${esc(latestVersion)} | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
+                        <button class="btn btn-sm btn-secondary" data-file="${esc(p.file)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
                             ↑ Update
                         </button>
                         <button class="btn btn-sm btn-secondary" id="btn-plug-reinst-${i}-${idx}" onclick="reinstallPlugin(${i}, ${idx}, '${esc(p.file)}')">
@@ -1134,28 +1134,42 @@ async function updateAllPlugins(siteIdx) {
     }
 
     const btn = document.getElementById(`btn-plug-upall-${siteIdx}`);
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Updating all...';
+    const originalText = btn ? btn.textContent : 'Update All';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Updating all...';
+    }
 
     try {
-        const fd = new FormData();
-        fd.append('path', s.path);
-
-        const r = await fetch(apiUrl('update_all_wp_plugins'), { method: 'POST', body: fd });
-        const d = await r.json();
-
-        if (d.success) {
-            toast(d.message || 'All plugins updated successfully!', 'success');
-            loadPlugins(siteIdx);
+        let updatedCount = 0;
+        const buttons = document.querySelectorAll(`[id^='btn-plug-up-${siteIdx}-']`);
+        for (const b of buttons) {
+            if (b.disabled) continue;
+            const file = b.getAttribute('data-file');
+            if (!file) continue;
+            const parts = b.id.split('-');
+            const plugIdx = parseInt(parts[parts.length - 1]);
+            
+            try {
+                const success = await updatePlugin(siteIdx, plugIdx, file, false);
+                if (success) updatedCount++;
+            } catch (e) {
+                console.error('Failed to update plugin:', file, e);
+            }
+        }
+        if (updatedCount > 0) {
+            toast('All plugins update processed!', 'success');
         } else {
-            toast(d.error || 'Plugins update failed.', 'error');
+            toast('No plugins needed updating.', 'info');
         }
     } catch (err) {
-        toast('Connection error.', 'error');
+        toast('Connection error during bulk update.', 'error');
     } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+        loadPlugins(siteIdx);
     }
 }
 
@@ -1167,42 +1181,58 @@ async function updateAllThemes(siteIdx) {
     }
 
     const btn = document.getElementById(`btn-theme-upall-${siteIdx}`);
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Updating all...';
+    const originalText = btn ? btn.textContent : 'Update All';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Updating all...';
+    }
 
     try {
-        const fd = new FormData();
-        fd.append('path', s.path);
-
-        const r = await fetch(apiUrl('update_all_wp_themes'), { method: 'POST', body: fd });
-        const d = await r.json();
-
-        if (d.success) {
-            toast(d.message || 'All themes updated successfully!', 'success');
-            loadThemes(siteIdx);
+        let updatedCount = 0;
+        const buttons = document.querySelectorAll(`[id^='btn-theme-up-${siteIdx}-']`);
+        for (const b of buttons) {
+            if (b.disabled) continue;
+            const folder = b.getAttribute('data-folder');
+            if (!folder) continue;
+            const parts = b.id.split('-');
+            const themeIdx = parseInt(parts[parts.length - 1]);
+            
+            try {
+                const success = await updateTheme(siteIdx, themeIdx, folder, false);
+                if (success) updatedCount++;
+            } catch (e) {
+                console.error('Failed to update theme:', folder, e);
+            }
+        }
+        if (updatedCount > 0) {
+            toast('All themes update processed!', 'success');
         } else {
-            toast(d.error || 'Themes update failed.', 'error');
+            toast('No themes needed updating.', 'info');
         }
     } catch (err) {
-        toast('Connection error.', 'error');
+        toast('Connection error during bulk update.', 'error');
     } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+        loadThemes(siteIdx);
     }
 }
 
-async function updatePlugin(siteIdx, plugIdx, file) {
+async function updatePlugin(siteIdx, plugIdx, file, reloadAfter = true) {
     const s = allSites[siteIdx];
     if (s.locked) {
         toast('Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.', 'error');
-        return;
+        return false;
     }
 
     const btn = document.getElementById(`btn-plug-up-${siteIdx}-${plugIdx}`);
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
+    const originalText = btn ? btn.textContent : 'Update';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+    }
 
     try {
         const fd = new FormData();
@@ -1214,16 +1244,27 @@ async function updatePlugin(siteIdx, plugIdx, file) {
 
         if (d.success) {
             toast(d.message || 'Plugin updated successfully!', 'success');
-            loadPlugins(siteIdx);
+            if (reloadAfter) {
+                loadPlugins(siteIdx);
+            } else if (btn) {
+                btn.textContent = 'Updated';
+            }
+            return true;
         } else {
             toast(d.error || 'Plugin update failed.', 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+            return false;
         }
     } catch (err) {
         toast('Connection error.', 'error');
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+        return false;
     }
 }
 
@@ -1377,7 +1418,7 @@ async function loadThemes(i) {
                         <div class="plugin-meta">Current: v${esc(t.version)} | Latest: v${esc(latestVersion)} | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
+                        <button class="btn btn-sm btn-secondary" data-folder="${esc(t.folder)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ↑ Update
                         </button>
                         <button class="btn btn-sm btn-secondary" id="btn-theme-reinst-${i}-${idx}" onclick="reinstallTheme(${i}, ${idx}, '${esc(t.folder)}')">
@@ -1400,17 +1441,19 @@ async function loadThemes(i) {
     }
 }
 
-async function updateTheme(siteIdx, themeIdx, folder) {
+async function updateTheme(siteIdx, themeIdx, folder, reloadAfter = true) {
     const s = allSites[siteIdx];
     if (s.locked) {
         toast('Website is under WordPress Lockdown. Please disable Lockdown before updating themes.', 'error');
-        return;
+        return false;
     }
 
     const btn = document.getElementById(`btn-theme-up-${siteIdx}-${themeIdx}`);
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
+    const originalText = btn ? btn.textContent : 'Update';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+    }
 
     try {
         const fd = new FormData();
@@ -1422,16 +1465,27 @@ async function updateTheme(siteIdx, themeIdx, folder) {
 
         if (d.success) {
             toast(d.message || 'Theme updated successfully!', 'success');
-            loadThemes(siteIdx);
+            if (reloadAfter) {
+                loadThemes(siteIdx);
+            } else if (btn) {
+                btn.textContent = 'Updated';
+            }
+            return true;
         } else {
             toast(d.error || 'Theme update failed.', 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+            return false;
         }
     } catch (err) {
         toast('Connection error.', 'error');
-        btn.disabled = false;
-        btn.textContent = originalText;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+        return false;
     }
 }
 
