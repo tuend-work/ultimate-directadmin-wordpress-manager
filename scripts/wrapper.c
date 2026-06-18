@@ -37,15 +37,33 @@ int main(int argc, char *argv[]) {
         perror("Error: Failed to setuid to root");
         return 1;
     }
-    
-    // 2. Validate arguments
-    if (argc < 3) {
-        fprintf(stderr, "Usage:\n  %s <lock|unlock> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0], argv[0]);
+
+    // 2. Check at least action arg is present
+    if (argc < 2) {
+        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0], argv[0]);
         return 1;
     }
-    
+
     const char *action = argv[1];
-    
+
+    // 3. Handle 'update' early — only needs 1 arg (the action itself)
+    if (strcmp(action, "update") == 0) {
+        const char *update_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/self_update.sh";
+        if (access(update_sh, X_OK) != 0) {
+            fprintf(stderr, "Error: self_update.sh not found or not executable at %s\n", update_sh);
+            return 1;
+        }
+        execl("/bin/bash", "bash", update_sh, NULL);
+        perror("Error: execl failed");
+        return 1;
+    }
+
+    // 4. All other actions need at least 3 args
+    if (argc < 3) {
+        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0], argv[0]);
+        return 1;
+    }
+
     // 3. Identify the calling user (real UID)
     uid_t uid = getuid();
     struct passwd *pw = getpwuid(uid);
@@ -112,23 +130,12 @@ int main(int argc, char *argv[]) {
         fclose(f);
         return 0;
     }
-    
-    // Handle 'update' action — runs self_update.sh as root to update plugin files
-    if (strcmp(action, "update") == 0) {
-        const char *update_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/self_update.sh";
-        if (access(update_sh, X_OK) != 0) {
-            fprintf(stderr, "Error: self_update.sh not found or not executable at %s\n", update_sh);
-            return 1;
-        }
-        execl("/bin/bash", "bash", update_sh, NULL);
-        perror("Error: execl failed");
-        return 1;
-    }
 
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
         fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', or 'get_domain_config'.\n");
         return 1;
     }
+
     
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <lock|unlock> <site_path>\n", argv[0]);
