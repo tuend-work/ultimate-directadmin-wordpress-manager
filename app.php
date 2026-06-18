@@ -1561,36 +1561,77 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     
+    $fallback_used = false;
+
     if ($http_code !== 200 || !$data) {
-        throw new Exception("Không thể tải plugin từ WordPress.org (HTTP Code: {$http_code}). Vui lòng kiểm tra lại slug của plugin.");
-    }
-    
-    file_put_contents($temp_zip, $data);
-    
-    // Extract ZIP
-    $zip = new ZipArchive;
-    if ($zip->open($temp_zip) === TRUE) {
-        $plugins_dir = $site_path . '/wp-content/plugins';
-        $target_dir = $plugins_dir . '/' . $slug;
+        $fallback_used = true;
+        wp_manager_log("Plugin ZIP not found on WordPress.org for {$slug}. Falling back to native WordPress upgrade...");
         
-        // Remove old plugin folder
-        if (is_dir($target_dir)) {
-            rmdir_recursive($target_dir);
+        $buffer_level = ob_get_level();
+        ob_start();
+        try {
+            wp_manager_bootstrap_wordpress($site_path);
+            require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            
+            wp_update_plugins();
+            $updates = get_site_transient('update_plugins');
+            $update = $updates->response[$plugin_file] ?? null;
+            if (!$update) {
+                throw new Exception("Không tìm thấy bản cập nhật cho plugin này trên hệ thống hoặc thư viện.");
+            }
+            if (empty($update->package)) {
+                throw new Exception("Đây là plugin bản quyền, vui lòng cập nhật thủ công.");
+            }
+
+            $skin = new Automatic_Upgrader_Skin();
+            $upgrader = new Plugin_Upgrader($skin);
+            $result = $upgrader->upgrade($plugin_file);
+            
+            if (is_wp_error($result)) {
+                throw new Exception($result->get_error_message());
+            }
+            if (!$result) {
+                throw new Exception("Cập nhật plugin thất bại.");
+            }
+        } finally {
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
         }
-        
-        // Extract
-        $zip->extractTo($plugins_dir);
-        $zip->close();
-        @unlink($temp_zip);
-        
-        // Reset permissions
-        set_permissions_recursive($target_dir);
-        
-        return ['success' => true, 'message' => 'Plugin reinstalled successfully.'];
     } else {
-        @unlink($temp_zip);
-        throw new Exception("Không thể giải nén tệp ZIP của plugin.");
+        file_put_contents($temp_zip, $data);
+        
+        // Extract ZIP
+        $zip = new ZipArchive;
+        if ($zip->open($temp_zip) === TRUE) {
+            $plugins_dir = $site_path . '/wp-content/plugins';
+            $target_dir = $plugins_dir . '/' . $slug;
+            
+            // Remove old plugin folder
+            if (is_dir($target_dir)) {
+                rmdir_recursive($target_dir);
+            }
+            
+            // Extract
+            $zip->extractTo($plugins_dir);
+            $zip->close();
+            @unlink($temp_zip);
+            
+            // Reset permissions
+            set_permissions_recursive($target_dir);
+        } else {
+            @unlink($temp_zip);
+            throw new Exception("Không thể giải nén tệp ZIP của plugin.");
+        }
     }
+    
+    return [
+        'success' => true, 
+        'message' => $fallback_used 
+            ? 'Cài đặt lại plugin thành công qua cơ chế WordPress Core.' 
+            : 'Plugin reinstalled successfully.'
+    ];
 }
 
 /**
@@ -1637,36 +1678,78 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     
+    $fallback_used = false;
+
     if ($http_code !== 200 || !$data) {
-        throw new Exception("Không thể tải theme từ WordPress.org (HTTP Code: {$http_code}). Vui lòng kiểm tra lại slug của theme.");
-    }
-    
-    file_put_contents($temp_zip, $data);
-    
-    // Extract ZIP
-    $zip = new ZipArchive;
-    if ($zip->open($temp_zip) === TRUE) {
-        $themes_dir = $site_path . '/wp-content/themes';
-        $target_dir = $themes_dir . '/' . $theme_folder;
+        $fallback_used = true;
+        wp_manager_log("Theme ZIP not found on WordPress.org for {$theme_folder}. Falling back to native WordPress upgrade...");
         
-        // Remove old theme folder
-        if (is_dir($target_dir)) {
-            rmdir_recursive($target_dir);
+        $buffer_level = ob_get_level();
+        ob_start();
+        try {
+            wp_manager_bootstrap_wordpress($site_path);
+            require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+            require_once ABSPATH . 'wp-admin/includes/theme.php';
+            
+            wp_update_themes();
+            $updates = get_site_transient('update_themes');
+            $update = $updates->response[$theme_folder] ?? null;
+            if (!$update) {
+                throw new Exception("Không tìm thấy bản cập nhật cho theme này trên hệ thống hoặc thư viện.");
+            }
+            $package = is_array($update) ? ($update['package'] ?? '') : ($update->package ?? '');
+            if (empty($package)) {
+                throw new Exception("Đây là theme bản quyền, vui lòng cập nhật thủ công.");
+            }
+
+            $skin = new Automatic_Upgrader_Skin();
+            $upgrader = new Theme_Upgrader($skin);
+            $result = $upgrader->upgrade($theme_folder);
+            
+            if (is_wp_error($result)) {
+                throw new Exception($result->get_error_message());
+            }
+            if (!$result) {
+                throw new Exception("Cập nhật theme thất bại.");
+            }
+        } finally {
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
         }
-        
-        // Extract
-        $zip->extractTo($themes_dir);
-        $zip->close();
-        @unlink($temp_zip);
-        
-        // Reset permissions
-        set_permissions_recursive($target_dir);
-        
-        return ['success' => true, 'message' => 'Theme reinstalled successfully.'];
     } else {
-        @unlink($temp_zip);
-        throw new Exception("Không thể giải nén tệp ZIP của theme.");
+        file_put_contents($temp_zip, $data);
+        
+        // Extract ZIP
+        $zip = new ZipArchive;
+        if ($zip->open($temp_zip) === TRUE) {
+            $themes_dir = $site_path . '/wp-content/themes';
+            $target_dir = $themes_dir . '/' . $theme_folder;
+            
+            // Remove old theme folder
+            if (is_dir($target_dir)) {
+                rmdir_recursive($target_dir);
+            }
+            
+            // Extract
+            $zip->extractTo($themes_dir);
+            $zip->close();
+            @unlink($temp_zip);
+            
+            // Reset permissions
+            set_permissions_recursive($target_dir);
+        } else {
+            @unlink($temp_zip);
+            throw new Exception("Không thể giải nén tệp ZIP của theme.");
+        }
     }
+    
+    return [
+        'success' => true, 
+        'message' => $fallback_used 
+            ? 'Cài đặt lại theme thành công qua cơ chế WordPress Core.' 
+            : 'Theme reinstalled successfully.'
+    ];
 }
 
 /**
