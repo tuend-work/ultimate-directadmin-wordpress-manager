@@ -1365,39 +1365,63 @@ function update_all_wordpress_plugins($site_path) {
         throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating plugins.");
     }
 
-    $buffer_level = ob_get_level();
-    ob_start();
-    try {
-        wp_manager_bootstrap_wordpress($site_path);
-        
-        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
-        require_once ABSPATH . 'wp-admin/includes/plugin.php';
-        
-        wp_update_plugins();
-        $updates = get_site_transient('update_plugins');
-        if (!$updates || empty($updates->response)) {
-            return ['success' => true, 'message' => 'All plugins are already up to date.'];
-        }
-        
-        $plugin_files = array_keys($updates->response);
-        if (empty($plugin_files)) {
-            return ['success' => true, 'message' => 'All plugins are already up to date.'];
+    wp_manager_bootstrap_wordpress($site_path);
+    
+    require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    
+    $all_plugins = get_plugins();
+    if (empty($all_plugins)) {
+        return ['success' => true, 'message' => 'Không tìm thấy plugin nào được cài đặt.'];
+    }
+
+    wp_update_plugins();
+    $updates = get_site_transient('update_plugins');
+    $update_response = $updates->response ?? [];
+
+    $success_count = 0;
+    $fail_count = 0;
+
+    foreach (array_keys($all_plugins) as $plugin_file) {
+        if ($plugin_file === 'hello.php') {
+            continue;
         }
 
-        $skin = new Automatic_Upgrader_Skin();
-        $upgrader = new Plugin_Upgrader($skin);
-        $result = $upgrader->bulk_upgrade($plugin_files);
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+        try {
+            // Nếu có bản cập nhật mới, nâng cấp bản mới
+            if (isset($update_response[$plugin_file])) {
+                $buffer_level = ob_get_level();
+                ob_start();
+                try {
+                    $skin = new Automatic_Upgrader_Skin();
+                    $upgrader = new Plugin_Upgrader($skin);
+                    $res = $upgrader->upgrade($plugin_file);
+                } finally {
+                    while (ob_get_level() > $buffer_level) {
+                        ob_end_clean();
+                    }
+                }
+                if ($res && !is_wp_error($res)) {
+                    $success_count++;
+                    continue;
+                }
+            }
+
+            // Ngược lại, cài đặt lại từ thư viện WP.org (đối với plugin nằm trong thư mục)
+            if (strpos($plugin_file, '/') !== false) {
+                reinstall_wordpress_plugin($site_path, $plugin_file);
+                $success_count++;
+            }
+        } catch (Exception $e) {
+            $fail_count++;
+            wp_manager_log("Failed to reinstall/update plugin {$plugin_file}: " . $e->getMessage());
         }
     }
 
-    if (is_wp_error($result)) {
-        throw new Exception($result->get_error_message());
-    }
-
-    return ['success' => true, 'message' => 'All eligible plugins updated successfully.'];
+    return [
+        'success' => true, 
+        'message' => "Đã cài đặt lại/cập nhật thành công {$success_count} plugins." . ($fail_count > 0 ? " Thất bại {$fail_count} plugins (có thể là plugin trả phí/riêng tư)." : "")
+    ];
 }
 
 /**
@@ -1408,39 +1432,57 @@ function update_all_wordpress_themes($site_path) {
         throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before updating themes.");
     }
 
-    $buffer_level = ob_get_level();
-    ob_start();
-    try {
-        wp_manager_bootstrap_wordpress($site_path);
-        
-        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
-        require_once ABSPATH . 'wp-admin/includes/theme.php';
-        
-        wp_update_themes();
-        $updates = get_site_transient('update_themes');
-        if (!$updates || empty($updates->response)) {
-            return ['success' => true, 'message' => 'All themes are already up to date.'];
-        }
-        
-        $theme_folders = array_keys($updates->response);
-        if (empty($theme_folders)) {
-            return ['success' => true, 'message' => 'All themes are already up to date.'];
-        }
+    wp_manager_bootstrap_wordpress($site_path);
+    
+    require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+    require_once ABSPATH . 'wp-admin/includes/theme.php';
+    
+    $all_themes = wp_get_themes();
+    if (empty($all_themes)) {
+        return ['success' => true, 'message' => 'Không tìm thấy theme nào được cài đặt.'];
+    }
 
-        $skin = new Automatic_Upgrader_Skin();
-        $upgrader = new Theme_Upgrader($skin);
-        $result = $upgrader->bulk_upgrade($theme_folders);
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+    wp_update_themes();
+    $updates = get_site_transient('update_themes');
+    $update_response = $updates->response ?? [];
+
+    $success_count = 0;
+    $fail_count = 0;
+
+    foreach ($all_themes as $theme_slug => $theme_obj) {
+        try {
+            // Nếu có bản cập nhật mới, nâng cấp bản mới
+            if (isset($update_response[$theme_slug])) {
+                $buffer_level = ob_get_level();
+                ob_start();
+                try {
+                    $skin = new Automatic_Upgrader_Skin();
+                    $upgrader = new Theme_Upgrader($skin);
+                    $res = $upgrader->upgrade($theme_slug);
+                } finally {
+                    while (ob_get_level() > $buffer_level) {
+                        ob_end_clean();
+                    }
+                }
+                if ($res && !is_wp_error($res)) {
+                    $success_count++;
+                    continue;
+                }
+            }
+
+            // Ngược lại, cài đặt lại từ thư viện WP.org
+            reinstall_wordpress_theme($site_path, $theme_slug);
+            $success_count++;
+        } catch (Exception $e) {
+            $fail_count++;
+            wp_manager_log("Failed to reinstall/update theme {$theme_slug}: " . $e->getMessage());
         }
     }
 
-    if (is_wp_error($result)) {
-        throw new Exception($result->get_error_message());
-    }
-
-    return ['success' => true, 'message' => 'All eligible themes updated successfully.'];
+    return [
+        'success' => true, 
+        'message' => "Đã cài đặt lại/cập nhật thành công {$success_count} themes." . ($fail_count > 0 ? " Thất bại {$fail_count} themes (có thể là theme trả phí/riêng tư)." : "")
+    ];
 }
 
 /**

@@ -1150,11 +1150,10 @@ async function updateAllPlugins(siteIdx) {
             loadPlugins(siteIdx);
         } else {
             toast(d.error || 'Plugins update failed.', 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
         }
     } catch (err) {
         toast('Connection error.', 'error');
+    } finally {
         btn.disabled = false;
         btn.textContent = originalText;
     }
@@ -1184,11 +1183,10 @@ async function updateAllThemes(siteIdx) {
             loadThemes(siteIdx);
         } else {
             toast(d.error || 'Themes update failed.', 'error');
-            btn.disabled = false;
-            btn.textContent = originalText;
         }
     } catch (err) {
         toast('Connection error.', 'error');
+    } finally {
         btn.disabled = false;
         btn.textContent = originalText;
     }
