@@ -2996,16 +2996,34 @@ function update_plugin_from_github() {
     if (!is_admin_user()) {
         throw new Exception("Forbidden: Updates are restricted to Administrators.");
     }
-    
+
     $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-    // LOCAL DEVELOPMENT / WIN FALLBACK
     if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
         $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
     }
-    
+
+    // ── Pre-flight: kiểm tra quyền ghi ──
+    if (!is_dir($plugin_dir)) {
+        throw new Exception("Plugin directory not found: {$plugin_dir}");
+    }
+    if (!is_writable($plugin_dir)) {
+        $owner = '';
+        $proc  = '';
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $o = posix_getpwuid(fileowner($plugin_dir)); $owner = $o['name'] ?? '?';
+            $p = posix_getpwuid(posix_geteuid());        $proc  = $p['name'] ?? '?';
+        }
+        throw new Exception(
+            "Permission denied: cannot write to plugin directory.\n" .
+            "Dir owner: {$owner} | Process user: {$proc}\n" .
+            "Fix: chown -R {$proc} {$plugin_dir}"
+        );
+    }
+
+    // ── Download ZIP from GitHub ──
     $temp_zip = sys_get_temp_dir() . '/plugin_update_' . time() . '.zip';
     $github_zip_url = 'https://github.com/tuend-work/ultimate-directadmin-wordpress-manager/archive/refs/heads/main.zip';
-    
+
     $ch = curl_init($github_zip_url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -3014,82 +3032,102 @@ function update_plugin_from_github() {
     curl_setopt($ch, CURLOPT_USERAGENT, 'DirectAdmin-WordPress-Manager-Updater');
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    $data = curl_exec($ch);
+    $data      = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curl_error = curl_error($ch);
+    $curl_err  = curl_error($ch);
     curl_close($ch);
-    
-    if ($curl_error) {
-        throw new Exception("GitHub connection failed: {$curl_error}");
+
+    if ($curl_err) {
+        throw new Exception("GitHub connection failed: {$curl_err}");
     }
     if ($http_code !== 200 || !$data) {
-        throw new Exception("Update download failed from GitHub (HTTP Code: {$http_code}).");
+        throw new Exception("Download failed from GitHub (HTTP {$http_code}).");
     }
-    
     file_put_contents($temp_zip, $data);
-    
+
+    // ── Extract ZIP ──
     $zip = new ZipArchive;
-    if ($zip->open($temp_zip) === TRUE) {
-        $extract_temp = sys_get_temp_dir() . '/plugin_extract_' . time();
-        mkdir($extract_temp, 0755, true);
-        $zip->extractTo($extract_temp);
-        $zip->close();
-        
-        $src_dir = $extract_temp . '/ultimate-directadmin-wordpress-manager-main';
-        if (!is_dir($src_dir)) {
-            $dirs = array_diff(scandir($extract_temp), ['.', '..']);
-            if (!empty($dirs)) {
-                $src_dir = $extract_temp . '/' . reset($dirs);
-            }
+    if ($zip->open($temp_zip) !== TRUE) {
+        @unlink($temp_zip);
+        throw new Exception("ZIP archive could not be opened/extracted.");
+    }
+
+    $extract_temp = sys_get_temp_dir() . '/plugin_extract_' . time();
+    mkdir($extract_temp, 0755, true);
+    $zip->extractTo($extract_temp);
+    $zip->close();
+
+    $src_dir = $extract_temp . '/ultimate-directadmin-wordpress-manager-main';
+    if (!is_dir($src_dir)) {
+        $dirs = array_diff(scandir($extract_temp), ['.', '..']);
+        if (!empty($dirs)) {
+            $src_dir = $extract_temp . '/' . reset($dirs);
         }
-        
-        if (!is_dir($src_dir)) {
-            rmdir_recursive($extract_temp);
-            @unlink($temp_zip);
-            throw new Exception("Structure error in downloaded ZIP archive.");
-        }
-        
-        // Copy files recursively
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($src_dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST
-        );
-        foreach ($iterator as $item) {
-            $subPath = $iterator->getSubPathName();
-            $target = $plugin_dir . '/' . $subPath;
-            if ($item->isDir()) {
-                if (!is_dir($target)) {
-                    mkdir($target, 0755, true);
-                }
-            } else {
-                $parent_target = dirname($target);
-                if (!is_dir($parent_target)) {
-                    mkdir($parent_target, 0755, true);
-                }
-                copy($item->getPathname(), $target);
-            }
-        }
-        
-        // Reset permissions
-        set_permissions_recursive($plugin_dir);
-        
-        // Clear PHP opcode cache so new files are loaded immediately
-        if (function_exists('opcache_reset')) {
-            opcache_reset();
-        }
-        
-        // Cleanup temp extraction
+    }
+    if (!is_dir($src_dir)) {
         rmdir_recursive($extract_temp);
         @unlink($temp_zip);
-        
-        return [
-            'success' => true,
-            'message' => 'Ultimate WordPress Manager updated from GitHub successfully.'
-        ];
-    } else {
-        @unlink($temp_zip);
-        throw new Exception("ZIP archive could not be extracted.");
+        throw new Exception("Unexpected ZIP structure — source directory not found.");
     }
+
+    // ── Copy files with per-file error checking ──
+    $copied = 0;
+    $failed = [];
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($src_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($iterator as $item) {
+        $subPath = $iterator->getSubPathName();
+        $target  = $plugin_dir . '/' . $subPath;
+        if ($item->isDir()) {
+            if (!is_dir($target) && !mkdir($target, 0755, true)) {
+                $failed[] = "mkdir:{$subPath}";
+            }
+        } else {
+            $parent = dirname($target);
+            if (!is_dir($parent)) {
+                mkdir($parent, 0755, true);
+            }
+            if (!is_writable(is_dir($parent) ? $parent : $plugin_dir)) {
+                $failed[] = "no-perm:{$subPath}";
+                continue;
+            }
+            if (copy($item->getPathname(), $target)) {
+                $copied++;
+            } else {
+                $err = error_get_last();
+                $failed[] = "copy-fail:{$subPath}" . ($err ? " [{$err['message']}]" : '');
+            }
+        }
+    }
+
+    // Cleanup temp
+    rmdir_recursive($extract_temp);
+    @unlink($temp_zip);
+
+    if (!empty($failed)) {
+        $fail_count = count($failed);
+        $sample     = implode('; ', array_slice($failed, 0, 5));
+        throw new Exception(
+            "Update incomplete: {$copied} files copied, {$fail_count} failed.\n" .
+            "Failures: {$sample}\n" .
+            "Fix permissions: chown -R <da_user> {$plugin_dir} && chmod -R 755 {$plugin_dir}"
+        );
+    }
+
+    // Reset permissions
+    set_permissions_recursive($plugin_dir);
+
+    // Clear PHP opcode cache
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+    }
+
+    return [
+        'success' => true,
+        'message' => "Ultimate WordPress Manager updated successfully from GitHub. ({$copied} files replaced)"
+    ];
 }
 
 /**
