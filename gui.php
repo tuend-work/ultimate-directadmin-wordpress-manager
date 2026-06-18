@@ -2166,10 +2166,8 @@ function renderSites(sites) {
                 </div>
                 <!-- Quick actions -->
 
-                <!-- File Manager button -->
-                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;margin-left:auto;" onclick="event.stopPropagation(); openFileManager(${i})">📂 File Manager</button>
                 <!-- Badges -->
-                <div class="badges">
+                <div class="badges" style="margin-left:auto;">
                     ${statusBadge}
                     <span class="badge badge-blue">WP ${esc(s.version)}</span>
                     ${lockBadge}
@@ -2180,9 +2178,9 @@ function renderSites(sites) {
             <!-- Action row (Always visible) -->
             <div class="card-action-row" onclick="event.stopPropagation()">
                 <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
-                <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                 <div class="sep"></div>
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
             </div>
 
             <!-- Card body (expanded) -->
@@ -2219,6 +2217,12 @@ function renderSites(sites) {
                         <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
                     </div>
                     <div class="lock-section" onclick="event.stopPropagation()">
+                        <div class="lock-status-label">
+                            ⚙️ WordPress Core (Phiên bản WordPress hiện tại: <strong>v${esc(s.version)}</strong>)
+                        </div>
+                        <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
+                    </div>
+                    <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
                             ${s.locked 
                                 ? '🔒 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
