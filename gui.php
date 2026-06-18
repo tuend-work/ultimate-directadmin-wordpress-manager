@@ -124,6 +124,36 @@ div#iframe-container{
 .toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 .count-label { margin-left: auto; color: var(--text3); font-size: 12px; }
 
+/* ── Quick Action Bar ── */
+#site-quick-bar {
+    display: none;
+    position: sticky;
+    top: 40px;
+    z-index: 90;
+    background: #161c26;
+    border-bottom: 1px solid var(--blue);
+    box-shadow: 0 2px 12px rgba(47,129,247,.15);
+    padding: 8px 24px;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    animation: qbarSlide .18s ease;
+}
+#site-quick-bar.visible { display: flex; }
+@keyframes qbarSlide {
+    from { opacity:0; transform:translateY(-6px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+#qbar-site-label {
+    font-size: 12px; font-weight: 600; color: var(--text2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 220px;
+    padding-right: 8px;
+    border-right: 1px solid var(--border2);
+    flex-shrink: 0;
+}
+#site-quick-bar .qbar-sep { width:1px; height:18px; background:var(--border2); margin:0 2px; flex-shrink:0; }
+
 /* ── Buttons ── */
 .btn {
     display: inline-flex; align-items: center; gap: 5px;
@@ -632,6 +662,19 @@ input:disabled + .slider {
     <button class="btn btn-secondary btn-sm" onclick="openLogsModal()" style="margin-left: 8px;">📋 Show Logs</button>
 </div>
 
+<!-- Quick Action Bar -->
+<div id="site-quick-bar">
+    <span id="qbar-site-label">—</span>
+    <button class="btn btn-blue btn-sm" id="qbar-magic-login" onclick="doMagicLogin(window._qbarIdx)">⚡ Magic Login</button>
+    <button class="btn btn-primary btn-sm" id="qbar-update-core" onclick="updateCore(window._qbarIdx)">↑ Update Core</button>
+    <div class="qbar-sep"></div>
+    <button class="btn btn-secondary btn-sm" id="qbar-wp-admin" onclick="visitSite(window._qbarIdx, '/wp-admin/')">⊞ WP Admin</button>
+    <button class="btn btn-secondary btn-sm" id="qbar-visit-site" onclick="visitSite(window._qbarIdx, '')">🌐 Visit Site</button>
+    <div class="qbar-sep"></div>
+    <button class="btn btn-secondary btn-sm" id="qbar-clone" onclick="openCloneModal(window._qbarIdx)">👯 Clone Website</button>
+    <button class="btn btn-danger btn-sm" style="margin-left:auto" id="qbar-delete" onclick="openDeleteModal(window._qbarIdx)">🗑 Delete Website</button>
+</div>
+
 <!-- Content -->
 <div class="content">
     <div id="sites-container">
@@ -1000,8 +1043,34 @@ function copyNginxConfig(i) {
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
     const chev = document.getElementById('cv-'+i);
+    const isOpening = !body.classList.contains('open');
+
+    // Close all other cards first
+    document.querySelectorAll('.card-body.open').forEach(el => {
+        if (el.id !== 'cb-'+i) {
+            el.classList.remove('open');
+        }
+    });
+    document.querySelectorAll('.chevron.open').forEach(el => {
+        if (el.id !== 'cv-'+i) {
+            el.classList.remove('open');
+        }
+    });
+
     body.classList.toggle('open');
     chev.classList.toggle('open');
+
+    // Sync quick bar
+    const qbar = document.getElementById('site-quick-bar');
+    if (isOpening && allSites[i]) {
+        const s = allSites[i];
+        window._qbarIdx = i;
+        document.getElementById('qbar-site-label').textContent = s.blogname || s.siteurl;
+        qbar.classList.add('visible');
+    } else {
+        qbar.classList.remove('visible');
+        window._qbarIdx = undefined;
+    }
 }
 
 /* ─── Switch tab ─── */
