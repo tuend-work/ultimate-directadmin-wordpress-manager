@@ -2176,8 +2176,7 @@ function openFileManager(i) {
 
 /* ─── Open phpMyAdmin ─── */
 function openPhpMyAdmin(i) {
-    const s = allSites[i];
-    window.open('/CMD_DB_PMALOGIN?db=' + encodeURIComponent(s.db_name), '_blank');
+    window.open('/CMD_PMA', '_blank');
 }
 
 /* ─── Render ─── */
