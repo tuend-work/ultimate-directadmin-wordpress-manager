@@ -2182,8 +2182,6 @@ function renderSites(sites) {
                 <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
                 <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
                 <div class="sep"></div>
-                <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '/wp-admin/')">⊞ WP Admin</button>
-                <button class="btn btn-secondary btn-sm" onclick="visitSite(${i}, '')">🌐 Visit Site</button>
                 <div class="sep"></div>
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
             </div>
