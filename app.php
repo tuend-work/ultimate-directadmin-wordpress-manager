@@ -1309,6 +1309,12 @@ function update_wordpress_plugin($site_path, $plugin_file) {
         $fallback_used = true;
         wp_manager_log("Plugin ZIP not found on WordPress.org for {$slug}. Falling back to native WordPress upgrade...");
         
+        $plugin_path = $site_path . '/wp-content/plugins/' . $plugin_file;
+        $orig_version = false;
+        if (file_exists($plugin_path)) {
+            $orig_version = change_plugin_file_version($plugin_path, '0.0.1');
+        }
+
         $buffer_level = ob_get_level();
         ob_start();
         try {
@@ -1316,14 +1322,20 @@ function update_wordpress_plugin($site_path, $plugin_file) {
             require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
             
+            delete_site_transient('update_plugins');
+            if (function_exists('wp_clean_plugins_cache')) {
+                wp_clean_plugins_cache();
+            }
             wp_update_plugins();
+            
             $updates = get_site_transient('update_plugins');
             $update = $updates->response[$plugin_file] ?? null;
-            if (!$update) {
-                throw new Exception("Không tìm thấy bản cập nhật cho plugin này trên hệ thống hoặc thư viện.");
-            }
-            if (empty($update->package)) {
-                throw new Exception("Đây là plugin bản quyền, vui lòng cập nhật thủ công.");
+            
+            if (!$update || empty($update->package)) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
+                throw new Exception("Không tìm thấy bản cập nhật qua WordPress Core. Vui lòng cập nhật license của plugin.");
             }
 
             $skin = new Automatic_Upgrader_Skin();
@@ -1331,11 +1343,22 @@ function update_wordpress_plugin($site_path, $plugin_file) {
             $result = $upgrader->upgrade($plugin_file);
             
             if (is_wp_error($result)) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
                 throw new Exception($result->get_error_message());
             }
             if (!$result) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
                 throw new Exception("Cập nhật plugin thất bại.");
             }
+        } catch (Throwable $e) {
+            if ($orig_version !== false) {
+                change_plugin_file_version($plugin_path, $orig_version);
+            }
+            throw $e;
         } finally {
             while (ob_get_level() > $buffer_level) {
                 ob_end_clean();
@@ -1403,6 +1426,12 @@ function update_wordpress_theme($site_path, $theme_folder) {
         $fallback_used = true;
         wp_manager_log("Theme ZIP not found on WordPress.org for {$theme_folder}. Falling back to native WordPress upgrade...");
         
+        $theme_style_path = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
+        $orig_version = false;
+        if (file_exists($theme_style_path)) {
+            $orig_version = change_theme_style_version($theme_style_path, '0.0.1');
+        }
+
         $buffer_level = ob_get_level();
         ob_start();
         try {
@@ -1410,15 +1439,27 @@ function update_wordpress_theme($site_path, $theme_folder) {
             require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
             require_once ABSPATH . 'wp-admin/includes/theme.php';
             
+            delete_site_transient('update_themes');
+            if (function_exists('wp_get_themes')) {
+                wp_get_themes(['errors' => null]);
+            }
             wp_update_themes();
+            
             $updates = get_site_transient('update_themes');
             $update = $updates->response[$theme_folder] ?? null;
+            
             if (!$update) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception("Không tìm thấy bản cập nhật cho theme này trên hệ thống hoặc thư viện.");
             }
             $package = is_array($update) ? ($update['package'] ?? '') : ($update->package ?? '');
             if (empty($package)) {
-                throw new Exception("Đây là theme bản quyền, vui lòng cập nhật thủ công.");
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
+                throw new Exception("Không tìm thấy bản cập nhật qua WordPress Core. Vui lòng cập nhật license của theme.");
             }
 
             $skin = new Automatic_Upgrader_Skin();
@@ -1426,11 +1467,22 @@ function update_wordpress_theme($site_path, $theme_folder) {
             $result = $upgrader->upgrade($theme_folder);
             
             if (is_wp_error($result)) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception($result->get_error_message());
             }
             if (!$result) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception("Cập nhật theme thất bại.");
             }
+        } catch (Throwable $e) {
+            if ($orig_version !== false) {
+                change_theme_style_version($theme_style_path, $orig_version);
+            }
+            throw $e;
         } finally {
             while (ob_get_level() > $buffer_level) {
                 ob_end_clean();
@@ -1567,6 +1619,12 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
         $fallback_used = true;
         wp_manager_log("Plugin ZIP not found on WordPress.org for {$slug}. Falling back to native WordPress upgrade...");
         
+        $plugin_path = $site_path . '/wp-content/plugins/' . $plugin_file;
+        $orig_version = false;
+        if (file_exists($plugin_path)) {
+            $orig_version = change_plugin_file_version($plugin_path, '0.0.1');
+        }
+
         $buffer_level = ob_get_level();
         ob_start();
         try {
@@ -1574,14 +1632,20 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
             require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
             
+            delete_site_transient('update_plugins');
+            if (function_exists('wp_clean_plugins_cache')) {
+                wp_clean_plugins_cache();
+            }
             wp_update_plugins();
+            
             $updates = get_site_transient('update_plugins');
             $update = $updates->response[$plugin_file] ?? null;
-            if (!$update) {
-                throw new Exception("Không tìm thấy bản cập nhật cho plugin này trên hệ thống hoặc thư viện.");
-            }
-            if (empty($update->package)) {
-                throw new Exception("Đây là plugin bản quyền, vui lòng cập nhật thủ công.");
+            
+            if (!$update || empty($update->package)) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
+                throw new Exception("Không tìm thấy bản cập nhật qua WordPress Core. Vui lòng cập nhật license của plugin.");
             }
 
             $skin = new Automatic_Upgrader_Skin();
@@ -1589,11 +1653,22 @@ function reinstall_wordpress_plugin($site_path, $plugin_file) {
             $result = $upgrader->upgrade($plugin_file);
             
             if (is_wp_error($result)) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
                 throw new Exception($result->get_error_message());
             }
             if (!$result) {
+                if ($orig_version !== false) {
+                    change_plugin_file_version($plugin_path, $orig_version);
+                }
                 throw new Exception("Cập nhật plugin thất bại.");
             }
+        } catch (Throwable $e) {
+            if ($orig_version !== false) {
+                change_plugin_file_version($plugin_path, $orig_version);
+            }
+            throw $e;
         } finally {
             while (ob_get_level() > $buffer_level) {
                 ob_end_clean();
@@ -1684,6 +1759,12 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
         $fallback_used = true;
         wp_manager_log("Theme ZIP not found on WordPress.org for {$theme_folder}. Falling back to native WordPress upgrade...");
         
+        $theme_style_path = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
+        $orig_version = false;
+        if (file_exists($theme_style_path)) {
+            $orig_version = change_theme_style_version($theme_style_path, '0.0.1');
+        }
+
         $buffer_level = ob_get_level();
         ob_start();
         try {
@@ -1691,15 +1772,27 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
             require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
             require_once ABSPATH . 'wp-admin/includes/theme.php';
             
+            delete_site_transient('update_themes');
+            if (function_exists('wp_get_themes')) {
+                wp_get_themes(['errors' => null]);
+            }
             wp_update_themes();
+            
             $updates = get_site_transient('update_themes');
             $update = $updates->response[$theme_folder] ?? null;
+            
             if (!$update) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception("Không tìm thấy bản cập nhật cho theme này trên hệ thống hoặc thư viện.");
             }
             $package = is_array($update) ? ($update['package'] ?? '') : ($update->package ?? '');
             if (empty($package)) {
-                throw new Exception("Đây là theme bản quyền, vui lòng cập nhật thủ công.");
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
+                throw new Exception("Không tìm thấy bản cập nhật qua WordPress Core. Vui lòng cập nhật license của theme.");
             }
 
             $skin = new Automatic_Upgrader_Skin();
@@ -1707,11 +1800,22 @@ function reinstall_wordpress_theme($site_path, $theme_folder) {
             $result = $upgrader->upgrade($theme_folder);
             
             if (is_wp_error($result)) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception($result->get_error_message());
             }
             if (!$result) {
+                if ($orig_version !== false) {
+                    change_theme_style_version($theme_style_path, $orig_version);
+                }
                 throw new Exception("Cập nhật theme thất bại.");
             }
+        } catch (Throwable $e) {
+            if ($orig_version !== false) {
+                change_theme_style_version($theme_style_path, $orig_version);
+            }
+            throw $e;
         } finally {
             while (ob_get_level() > $buffer_level) {
                 ob_end_clean();
@@ -4019,4 +4123,34 @@ function list_user_zip_files($home) {
         }
     }
     return $zip_files;
+}
+
+/**
+ * Helper to change plugin file version header
+ */
+function change_plugin_file_version($file_path, $new_version) {
+    if (!file_exists($file_path)) return false;
+    $content = file_get_contents($file_path);
+    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', $content, $matches)) {
+        $orig_version = trim($matches[2]);
+        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', '${1}' . $new_version, $content);
+        file_put_contents($file_path, $new_content);
+        return $orig_version;
+    }
+    return false;
+}
+
+/**
+ * Helper to change theme style.css version header
+ */
+function change_theme_style_version($style_css_path, $new_version) {
+    if (!file_exists($style_css_path)) return false;
+    $content = file_get_contents($style_css_path);
+    if (preg_match('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', $content, $matches)) {
+        $orig_version = trim($matches[2]);
+        $new_content = preg_replace('/^([ \t/*#@]*Version\s*:\s*)([^\r\n]+)/mi', '${1}' . $new_version, $content);
+        file_put_contents($style_css_path, $new_content);
+        return $orig_version;
+    }
+    return false;
 }
