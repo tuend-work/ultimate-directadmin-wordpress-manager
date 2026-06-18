@@ -2174,6 +2174,12 @@ function openFileManager(i) {
     window.open('/CMD_FILE_MANAGER?path=' + encodeURIComponent(path), '_blank');
 }
 
+/* ─── Open phpMyAdmin ─── */
+function openPhpMyAdmin(i) {
+    const s = allSites[i];
+    window.open('/CMD_DB_PMALOGIN?db=' + encodeURIComponent(s.db_name), '_blank');
+}
+
 /* ─── Render ─── */
 function renderSites(sites) {
     const cnt = document.getElementById('sites-container');
@@ -2233,6 +2239,7 @@ function renderSites(sites) {
                 <div class="sep"></div>
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
                 <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
+                <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})">🗄️ phpMyAdmin</button>
             </div>
 
             <!-- Card body (expanded) -->
