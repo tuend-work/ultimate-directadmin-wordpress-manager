@@ -203,7 +203,7 @@ div#iframe-container{
 .site-thumb .thumb-loader.hidden { display: none; }
 
 /* Site info */
-.site-info { flex: 1; min-width: 0; max-width: 340px; }
+.site-info { flex: 1; min-width: 0; }
 .site-name {
     font-size: 14px; font-weight: 600; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2057,16 +2057,16 @@ function renderSites(sites) {
                     <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank" onclick="event.stopPropagation()">${esc(s.siteurl)}</a></div>
                     <div class="site-path" onclick="event.stopPropagation()" title="${esc(pathShort)}">📁 ${esc(pathShort)}</div>
                 </div>
+                <!-- Quick actions -->
+
                 <!-- File Manager button -->
-                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;" onclick="event.stopPropagation(); openFileManager(${i})">📂 File Manager</button>
+                <button class="btn btn-secondary btn-sm" style="flex-shrink:0;margin-left:auto;" onclick="event.stopPropagation(); openFileManager(${i})">📂 File Manager</button>
                 <!-- Badges -->
                 <div class="badges">
                     ${statusBadge}
                     <span class="badge badge-blue">WP ${esc(s.version)}</span>
                     ${lockBadge}
                 </div>
-                <!-- Quick actions -->
-
                 <span class="chevron" id="cv-${i}">▶</span>
             </div>
 
