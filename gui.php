@@ -1006,6 +1006,7 @@ input:disabled + .slider {
 
 <script>
 const DA_USER = '<?php echo $username; ?>';
+const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
 let allSites = [];
 let deletePath = '', deleteDb = '';
 
