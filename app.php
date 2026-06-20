@@ -1221,7 +1221,80 @@ function update_wordpress_core($site_path, $home) {
         file_put_contents($maintenance, "<?php \$upgrading = " . time() . ";");
         @chmod($maintenance, 0644);
 
-        // Clean everything in the site directory except wp-content, wp-config.php, and web server configs
+        // Resolve subdomain directories to prevent deletion
+        $subdomains_dirs = ['subdomains'];
+        $domains_prefix = $home . '/domains/';
+        $domain = '';
+        $site_path_real = realpath($site_path) ?: $site_path;
+        if (strpos($site_path_real, $domains_prefix) === 0) {
+            $relative = substr($site_path_real, strlen($domains_prefix));
+            $parts = explode('/', str_replace('\\', '/', $relative));
+            if (count($parts) > 0) {
+                $domain = $parts[0];
+            }
+        }
+
+        if (!empty($domain)) {
+            $subdomains = [];
+            // Read subdomains.list
+            $sub_list_file = $home . '/domains/' . $domain . '/subdomains.list';
+            if (file_exists($sub_list_file)) {
+                $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if ($lines !== false) {
+                    foreach ($lines as $line) {
+                        $sub = trim($line);
+                        if (!empty($sub)) {
+                            $subdomains[] = $sub;
+                        }
+                    }
+                }
+            }
+            // Read directory contents of domains/domain/subdomains
+            $subs_dir = $home . '/domains/' . $domain . '/subdomains';
+            if (is_dir($subs_dir)) {
+                $sub_dirs = scandir($subs_dir);
+                if ($sub_dirs !== false) {
+                    foreach ($sub_dirs as $sd) {
+                        if ($sd === '.' || $sd === '..') {
+                            continue;
+                        }
+                        if (is_dir($subs_dir . '/' . $sd)) {
+                            $subdomains[] = $sd;
+                        }
+                    }
+                }
+            }
+            $subdomains = array_unique($subdomains);
+
+            $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+            foreach ($subdomains as $sub) {
+                $subdomains_dirs[] = $sub;
+                $subdomains_dirs[] = $sub . '.' . $domain;
+                
+                // Check if it has a custom docroot override
+                if (file_exists($wrapper)) {
+                    try {
+                        $custom_doc = get_custom_docroot_from_configs($domain, $sub, $home, $wrapper);
+                        if (!empty($custom_doc)) {
+                            $custom_doc = str_replace('\\', '/', realpath($custom_doc) ?: $custom_doc);
+                            $site_path_canonical = str_replace('\\', '/', realpath($site_path) ?: $site_path);
+                            if (strpos($custom_doc, $site_path_canonical . '/') === 0) {
+                                $rel = substr($custom_doc, strlen($site_path_canonical) + 1);
+                                $rel_parts = explode('/', $rel);
+                                if (count($rel_parts) > 0 && !empty($rel_parts[0])) {
+                                    $subdomains_dirs[] = $rel_parts[0];
+                                }
+                            }
+                        }
+                    } catch (Throwable $e) {
+                        // ignore wrapper/docroot resolution errors
+                    }
+                }
+            }
+            $subdomains_dirs = array_unique($subdomains_dirs);
+        }
+
+        // Clean everything in the site directory except wp-content, wp-config.php, web server configs, and subdomains
         $files = scandir($site_path);
         if ($files !== false) {
             foreach ($files as $file) {
@@ -1233,6 +1306,10 @@ function update_wordpress_core($site_path, $home) {
                     continue;
                 }
                 if ($file === '.htaccess' || $file === 'php.ini' || $file === '.user.ini') {
+                    continue;
+                }
+                if (is_dir($full_path) && in_array($file, $subdomains_dirs)) {
+                    wp_manager_log("Skipping subdomain directory deletion: " . $file);
                     continue;
                 }
                 
