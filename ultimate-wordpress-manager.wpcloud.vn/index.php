@@ -57,6 +57,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
+// Download process (Publicly accessible for Client Plugins to prevent web server zip blocks)
+if (isset($_GET['action']) && $_GET['action'] === 'download') {
+    $file = $_GET['file'] ?? '';
+    $file = basename($file);
+    $file_path = UPLOAD_DIR . '/' . $file;
+    if ($file && file_exists($file_path)) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $file . '"');
+        header('Content-Length: ' . filesize($file_path));
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        readfile($file_path);
+        exit;
+    } else {
+        http_response_code(404);
+        echo "File not found.";
+        exit;
+    }
+}
+
 // Helper: Load premium list
 function get_store_list() {
     $content = @file_get_contents(DATA_FILE);

@@ -4277,7 +4277,7 @@ function run_api() {
                     file_put_contents($temp_zip, $data);
                 } else {
                     $filename = basename($_POST['file']);
-                    $download_url = "https://ultimate-wordpress-manager.wpcloud.vn/premium_uploads/{$filename}";
+                    $download_url = "https://ultimate-wordpress-manager.wpcloud.vn/index.php?action=download&file={$filename}";
                     
                     $ch = curl_init($download_url);
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
