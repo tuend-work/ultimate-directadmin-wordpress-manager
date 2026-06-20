@@ -2628,7 +2628,7 @@ async function loadPremium(siteIdx) {
     container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Đang tải danh sách Premium...</div>';
     
     try {
-        const r = await fetch(apiUrl('get_premium_list'), { method: 'POST' });
+        const r = await fetch(apiUrl('get_premium_list'));
         const d = await r.json();
         
         if (d.success) {
