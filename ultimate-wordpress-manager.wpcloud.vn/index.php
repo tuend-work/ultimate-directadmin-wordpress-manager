@@ -24,13 +24,23 @@ if (!file_exists(DATA_FILE)) {
 }
 
 // Authentication check
-$authenticated = isset($_SESSION['store_logged_in']) && $_SESSION['store_logged_in'] === true;
+$expected_token = md5(ADMIN_PASSWORD . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+$authenticated = false;
+
+if (isset($_SESSION['store_logged_in']) && $_SESSION['store_logged_in'] === true) {
+    $authenticated = true;
+} elseif (isset($_COOKIE['store_auth']) && $_COOKIE['store_auth'] === $expected_token) {
+    $_SESSION['store_logged_in'] = true; // Sync to session
+    $authenticated = true;
+}
 
 // Login process
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'login') {
     $password = $_POST['password'] ?? '';
     if ($password === ADMIN_PASSWORD) {
         $_SESSION['store_logged_in'] = true;
+        // Set cookie valid for 30 days, HttpOnly to protect against XSS
+        setcookie('store_auth', $expected_token, time() + 86400 * 30, '/', '', false, true);
         header('Location: index.php');
         exit;
     } else {
@@ -42,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     unset($_SESSION['store_logged_in']);
     session_destroy();
+    setcookie('store_auth', '', time() - 3600, '/');
     header('Location: index.php');
     exit;
 }
