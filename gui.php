@@ -2909,6 +2909,7 @@ async function handlePremiumAdd(event, siteIdx) {
             
             const uploadFd = new FormData();
             uploadFd.append('zip_file', fileInput.files[0]);
+            uploadFd.append('zip_file_name', fileInput.files[0].name);
             
             const uploadRes = await fetch(apiUrl('upload_premium_zip'), { method: 'POST', body: uploadFd });
             const uploadData = await uploadRes.json();

@@ -4327,14 +4327,13 @@ function run_api() {
                 if (!is_admin_user()) {
                     throw new Exception("Không có quyền thực hiện hành động này.");
                 }
-                if (empty($_FILES['zip_file'])) {
-                    throw new Exception("Không tìm thấy tệp tải lên.");
+                if (empty($_POST['zip_file']) || !file_exists($_POST['zip_file'])) {
+                    throw new Exception("Không tìm thấy tệp tải lên hoặc tệp tạm không tồn tại.");
                 }
-                $file = $_FILES['zip_file'];
-                if ($file['error'] !== UPLOAD_ERR_OK) {
-                    throw new Exception("Lỗi khi tải tệp lên: " . $file['error']);
-                }
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $temp_file = $_POST['zip_file'];
+                $original_name = $_POST['zip_file_name'] ?? 'uploaded_item.zip';
+                
+                $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
                 if ($ext !== 'zip') {
                     throw new Exception("Chỉ chấp nhận tệp định dạng .zip.");
                 }
@@ -4345,15 +4344,16 @@ function run_api() {
                     @chmod($upload_dir, 0755);
                 }
                 
-                $filename = basename($file['name']);
+                $filename = basename($original_name);
                 $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
                 $dest = $upload_dir . '/' . $filename;
                 
-                if (move_uploaded_file($file['tmp_name'], $dest)) {
+                if (copy($temp_file, $dest)) {
                     @chmod($dest, 0644);
+                    @unlink($temp_file);
                     echo json_encode(['success' => true, 'file' => $filename, 'message' => 'Tải tệp ZIP lên thành công.']);
                 } else {
-                    throw new Exception("Không thể di chuyển tệp đã tải lên vào thư mục lưu trữ.");
+                    throw new Exception("Không thể sao chép tệp đã tải lên vào thư mục lưu trữ.");
                 }
                 break;
 
