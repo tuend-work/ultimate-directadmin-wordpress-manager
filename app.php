@@ -4237,126 +4237,6 @@ function run_api() {
                 echo json_encode(array_merge(['success' => true], $list));
                 break;
 
-            case 'add_premium_item':
-                if (!is_admin_user()) {
-                    throw new Exception("Không có quyền thực hiện hành động này.");
-                }
-                if (empty($_POST['type']) || empty($_POST['item_type']) || empty($_POST['name'])) {
-                    throw new Exception("Thiếu tham số bắt buộc.");
-                }
-                
-                $list = get_premium_list();
-                $type = $_POST['type']; // 'wporg' hoặc 'zip'
-                $item_type = $_POST['item_type']; // 'plugins' hoặc 'themes'
-                
-                $new_item = [
-                    'name' => $_POST['name'],
-                    'type' => $type,
-                    'description' => $_POST['description'] ?? '',
-                ];
-                
-                if ($type === 'wporg') {
-                    if (empty($_POST['slug'])) {
-                        throw new Exception("Thiếu Slug của WordPress.org.");
-                    }
-                    $new_item['slug'] = $_POST['slug'];
-                } else {
-                    if (empty($_POST['file'])) {
-                        throw new Exception("Thiếu tên tệp ZIP.");
-                    }
-                    $zip_file = __DIR__ . '/premium_uploads/' . basename($_POST['file']);
-                    if (!file_exists($zip_file)) {
-                        throw new Exception("Tệp ZIP chưa được tải lên máy chủ.");
-                    }
-                    $new_item['file'] = basename($_POST['file']);
-                }
-                
-                $filtered = [];
-                foreach ($list[$item_type] as $item) {
-                    if ($type === 'wporg' && isset($item['slug']) && $item['slug'] === $new_item['slug']) {
-                        continue;
-                    }
-                    if ($type === 'zip' && isset($item['file']) && $item['file'] === $new_item['file']) {
-                        continue;
-                    }
-                    $filtered[] = $item;
-                }
-                $filtered[] = $new_item;
-                $list[$item_type] = $filtered;
-                
-                save_premium_list($list);
-                wp_manager_log("Admin đã thêm " . ($item_type === 'plugins' ? 'plugin' : 'theme') . " Premium: " . $_POST['name']);
-                echo json_encode(['success' => true, 'message' => 'Thêm mục Premium thành công.']);
-                break;
-
-            case 'delete_premium_item':
-                if (!is_admin_user()) {
-                    throw new Exception("Không có quyền thực hiện hành động này.");
-                }
-                if (empty($_POST['item_type']) || (!isset($_POST['slug']) && !isset($_POST['file']))) {
-                    throw new Exception("Thiếu tham số bắt buộc.");
-                }
-                
-                $list = get_premium_list();
-                $item_type = $_POST['item_type'];
-                $filtered = [];
-                
-                foreach ($list[$item_type] as $item) {
-                    $match = false;
-                    if (isset($_POST['slug']) && isset($item['slug']) && $item['slug'] === $_POST['slug']) {
-                        $match = true;
-                    }
-                    if (isset($_POST['file']) && isset($item['file']) && $item['file'] === $_POST['file']) {
-                        $match = true;
-                        $zip_file = __DIR__ . '/premium_uploads/' . $item['file'];
-                        if (file_exists($zip_file)) {
-                            @unlink($zip_file);
-                        }
-                    }
-                    if (!$match) {
-                        $filtered[] = $item;
-                    }
-                }
-                $list[$item_type] = $filtered;
-                save_premium_list($list);
-                wp_manager_log("Admin đã xóa mục Premium.");
-                echo json_encode(['success' => true, 'message' => 'Xóa mục Premium thành công.']);
-                break;
-
-            case 'upload_premium_zip':
-                if (!is_admin_user()) {
-                    throw new Exception("Không có quyền thực hiện hành động này.");
-                }
-                if (empty($_POST['zip_file']) || !file_exists($_POST['zip_file'])) {
-                    throw new Exception("Không tìm thấy tệp tải lên hoặc tệp tạm không tồn tại.");
-                }
-                $temp_file = $_POST['zip_file'];
-                $original_name = $_POST['zip_file_name'] ?? 'uploaded_item.zip';
-                
-                $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
-                if ($ext !== 'zip') {
-                    throw new Exception("Chỉ chấp nhận tệp định dạng .zip.");
-                }
-                
-                $upload_dir = __DIR__ . '/premium_uploads';
-                if (!is_dir($upload_dir)) {
-                    @mkdir($upload_dir, 0755, true);
-                    @chmod($upload_dir, 0755);
-                }
-                
-                $filename = basename($original_name);
-                $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
-                $dest = $upload_dir . '/' . $filename;
-                
-                if (copy($temp_file, $dest)) {
-                    @chmod($dest, 0644);
-                    @unlink($temp_file);
-                    echo json_encode(['success' => true, 'file' => $filename, 'message' => 'Tải tệp ZIP lên thành công.']);
-                } else {
-                    throw new Exception("Không thể sao chép tệp đã tải lên vào thư mục lưu trữ.");
-                }
-                break;
-
             case 'install_premium_item':
                 if (empty($_POST['path']) || empty($_POST['item_type']) || empty($_POST['item_source']) || (!isset($_POST['slug']) && !isset($_POST['file']))) {
                     throw new Exception("Thiếu tham số bắt buộc.");
@@ -4394,12 +4274,21 @@ function run_api() {
                     file_put_contents($temp_zip, $data);
                 } else {
                     $filename = basename($_POST['file']);
-                    $src_zip = __DIR__ . '/premium_uploads/' . $filename;
-                    if (!file_exists($src_zip)) {
-                        throw new Exception("Tệp ZIP premium không tồn tại trên máy chủ.");
+                    $download_url = "https://ultimate-wordpress-manager.wpcloud.vn/premium_uploads/{$filename}";
+                    
+                    $ch = curl_init($download_url);
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+                    $data = curl_exec($ch);
+                    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+                    
+                    if ($http_code !== 200 || !$data) {
+                        throw new Exception("Không thể tải xuống gói cài đặt ZIP từ máy chủ Premium trung tâm.");
                     }
-                    $temp_zip = $src_zip;
-                    $cleanup_zip = false;
+                    file_put_contents($temp_zip, $data);
+                    $cleanup_zip = true;
                 }
                 
                 $target_dir = $site_path . '/wp-content/' . $item_type;
@@ -4589,32 +4478,28 @@ function change_theme_style_version($style_css_path, $new_version) {
 }
 
 /**
- * Lấy danh sách premium từ file premium.json
+ * Lấy danh sách premium từ Store Web trung tâm
  */
 function get_premium_list() {
-    $file = __DIR__ . '/premium.json';
-    if (!file_exists($file)) {
+    $url = 'https://ultimate-wordpress-manager.wpcloud.vn/premium.json';
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    $data = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200 || !$data) {
         return ['plugins' => [], 'themes' => []];
     }
-    $content = file_get_contents($file);
-    $data = json_decode($content, true);
-    if (!is_array($data)) {
+    $json = json_decode($data, true);
+    if (!is_array($json)) {
         return ['plugins' => [], 'themes' => []];
     }
-    if (!isset($data['plugins'])) $data['plugins'] = [];
-    if (!isset($data['themes'])) $data['themes'] = [];
-    return $data;
-}
-
-/**
- * Ghi danh sách premium vào file premium.json
- */
-function save_premium_list($data) {
-    $file = __DIR__ . '/premium.json';
-    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    file_put_contents($file, $json);
-    @chmod($file, 0644);
-    return true;
+    if (!isset($json['plugins'])) $json['plugins'] = [];
+    if (!isset($json['themes'])) $json['themes'] = [];
+    return $json;
 }
 
 /**
