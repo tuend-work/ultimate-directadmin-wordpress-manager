@@ -603,6 +603,100 @@ input:disabled + .slider {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ── Premium Tab styles ── */
+.premium-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+.premium-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all .2s ease;
+}
+.premium-card:hover {
+    border-color: var(--blue);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.premium-banner {
+    height: 100px;
+    background: linear-gradient(135deg, var(--bg3), var(--border2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    color: var(--text3);
+}
+.premium-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.premium-banner .banner-icon-fallback {
+    font-size: 32px;
+}
+.premium-banner .badge-source {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.premium-card-body {
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.premium-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.premium-card-desc {
+    font-size: 11px;
+    color: var(--text2);
+    height: 34px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+.premium-card-footer {
+    padding: 8px 12px 12px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border2);
+}
+.admin-premium-box {
+    margin-top: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+}
+.admin-premium-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
 </style>
 </head>
 <body>
@@ -1059,6 +1153,11 @@ function switchTab(siteIdx, tabName, event) {
         const list = document.getElementById(`security-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
             loadSecurity(siteIdx);
+        }
+    } else if (tabName === 'premium') {
+        const list = document.getElementById(`premium-list-container-${siteIdx}`);
+        if (list.innerHTML.includes('Clicking Premium tab') || list.innerHTML.includes('will load Premium')) {
+            loadPremium(siteIdx);
         }
     }
 }
@@ -2390,6 +2489,7 @@ function renderSites(sites) {
                     <button class="tab-btn" onclick="switchTab(${i}, 'security', event)">🛡️ Security & Protection</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'premium', event)">✨ Premium</button>
                 </div>
 
                 <!-- Tab 1: Overview Details -->
@@ -2503,9 +2603,420 @@ function renderSites(sites) {
                     </div>
                 </div>
 
+                <!-- Tab 4: Premium -->
+                <div class="card-tab-content" id="tab-content-${i}-premium">
+                    <div class="card-sec-title">
+                        <span>✨ Premium Plugins & Themes</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadPremium(${i})">⟳ Tải lại</button>
+                    </div>
+                    <div id="premium-list-container-${i}">
+                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                            Clicking Premium tab or Refresh will load Premium resources...
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>`;
     }).join('');
+}
+
+/* ─── Premium Manager ─── */
+async function loadPremium(siteIdx) {
+    const s = allSites[siteIdx];
+    const container = document.getElementById('premium-list-container-' + siteIdx);
+    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Đang tải danh sách Premium...</div>';
+    
+    try {
+        const r = await fetch(apiUrl('get_premium_list'), { method: 'POST' });
+        const d = await r.json();
+        
+        if (d.success) {
+            renderPremiumTab(siteIdx, d);
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Không thể tải danh sách Premium.</div>';
+    }
+}
+
+function renderPremiumTab(siteIdx, data) {
+    const s = allSites[siteIdx];
+    const container = document.getElementById('premium-list-container-' + siteIdx);
+    
+    let html = '';
+    
+    html += `<div style="margin-top: 14px;"><h4 style="font-size: 13px; font-weight: 700; color: var(--text); border-left: 3px solid var(--blue); padding-left: 8px;">🔌 Popular Plugins</h4></div>`;
+    if (!data.plugins || !data.plugins.length) {
+        html += `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Chưa có plugin premium nào được cấu hình.</div>`;
+    } else {
+        html += `<div class="premium-grid">`;
+        data.plugins.forEach((p, idx) => {
+            const isWpOrg = p.type === 'wporg';
+            const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
+            const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
+            
+            let bannerHTML = '';
+            if (isWpOrg) {
+                bannerHTML = `<img src="https://ps.w.org/${p.slug}/assets/banner-772x250.png" onerror="this.src='https://ps.w.org/${p.slug}/assets/banner-772x250.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(p.name)}">
+                              <div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">🔌</div>`;
+            } else {
+                bannerHTML = `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
+            }
+            
+            html += `
+            <div class="premium-card">
+                <div class="premium-banner">
+                    ${bannerHTML}
+                    <span class="badge ${badgeClass} badge-source">${badgeText}</span>
+                </div>
+                <div class="premium-card-body">
+                    <div class="premium-card-title" title="${esc(p.name)}">${esc(p.name)}</div>
+                    <div class="premium-card-desc" title="${esc(p.description)}">${esc(p.description || 'Không có mô tả.')}</div>
+                </div>
+                <div class="premium-card-footer">
+                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(p.slug) : 'File: ' + esc(p.file)}</span>
+                    <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-plug-${idx}" onclick="installPremiumItem(${siteIdx}, 'plugins', '${p.type}', '${isWpOrg ? esc(p.slug) : esc(p.file)}', '${esc(p.name)}', this)">
+                        📥 Cài đặt
+                    </button>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+    
+    html += `<div style="margin-top: 24px;"><h4 style="font-size: 13px; font-weight: 700; color: var(--text); border-left: 3px solid var(--green); padding-left: 8px;">🎨 Popular Themes</h4></div>`;
+    if (!data.themes || !data.themes.length) {
+        html += `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Chưa có theme premium nào được cấu hình.</div>`;
+    } else {
+        html += `<div class="premium-grid">`;
+        data.themes.forEach((t, idx) => {
+            const isWpOrg = t.type === 'wporg';
+            const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
+            const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
+            
+            let bannerHTML = '';
+            if (isWpOrg) {
+                bannerHTML = `<img src="https://ts.w.org/wp-content/themes/${t.slug}/screenshot.png" onerror="this.onerror=null; this.src='https://ts.w.org/wp-content/themes/${t.slug}/screenshot.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(t.name)}">
+                              <div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">🎨</div>`;
+            } else {
+                bannerHTML = `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
+            }
+            
+            html += `
+            <div class="premium-card">
+                <div class="premium-banner">
+                    ${bannerHTML}
+                    <span class="badge ${badgeClass} badge-source">${badgeText}</span>
+                </div>
+                <div class="premium-card-body">
+                    <div class="premium-card-title" title="${esc(t.name)}">${esc(t.name)}</div>
+                    <div class="premium-card-desc" title="${esc(t.description)}">${esc(t.description || 'Không có mô tả.')}</div>
+                </div>
+                <div class="premium-card-footer">
+                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(t.slug) : 'File: ' + esc(t.file)}</span>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <label style="font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 2px; cursor: pointer;">
+                            <input type="checkbox" id="premium-activate-theme-${siteIdx}-${idx}" checked style="accent-color: var(--blue);"> Kích hoạt
+                        </label>
+                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-theme-${idx}" onclick="installPremiumItem(${siteIdx}, 'themes', '${t.type}', '${isWpOrg ? esc(t.slug) : esc(t.file)}', '${esc(t.name)}', this, ${idx})">
+                            📥 Cài đặt
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+    
+    if (isAdmin) {
+        html += `
+        <div class="admin-premium-box">
+            <h4 style="font-size: 13px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span>⚙️ Quản lý danh sách Premium (Chỉ dành cho Admin)</span>
+                <span class="badge badge-yellow" style="font-size:10px;">Admin Mode</span>
+            </h4>
+            
+            <form onsubmit="handlePremiumAdd(event, ${siteIdx})" style="margin-top: 14px;">
+                <div class="admin-premium-form">
+                    <div class="form-group">
+                        <label>Loại tài nguyên</label>
+                        <select id="prem-item-type-${siteIdx}" class="form-control">
+                            <option value="plugins">🔌 Plugin</option>
+                            <option value="themes">🎨 Theme</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nguồn cài đặt</label>
+                        <select id="prem-source-type-${siteIdx}" class="form-control" onchange="togglePremiumFormSource(${siteIdx})">
+                            <option value="wporg">WordPress.org (Slug)</option>
+                            <option value="zip">Tải lên file ZIP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tên hiển thị</label>
+                        <input type="text" id="prem-name-${siteIdx}" class="form-control" required placeholder="Ví dụ: WooCommerce">
+                    </div>
+                </div>
+                
+                <div class="admin-premium-form" style="margin-top: 0px;">
+                    <div class="form-group" id="prem-slug-group-${siteIdx}">
+                        <label>Slug của WordPress.org</label>
+                        <input type="text" id="prem-slug-${siteIdx}" class="form-control" placeholder="Ví dụ: woocommerce">
+                    </div>
+                    <div class="form-group" id="prem-file-group-${siteIdx}" style="display: none;">
+                        <label>Chọn file ZIP từ máy tính</label>
+                        <input type="file" id="prem-file-input-${siteIdx}" class="form-control" accept=".zip">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Mô tả ngắn</label>
+                        <input type="text" id="prem-desc-${siteIdx}" class="form-control" placeholder="Mô tả công dụng hoặc tính năng của plugin/theme...">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary" id="btn-prem-add-submit-${siteIdx}">➕ Thêm vào danh sách</button>
+                </div>
+            </form>
+            
+            <div style="margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 14px;">
+                <h5 style="font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase;">Danh sách quản lý hiện tại</h5>
+                <div style="margin-top: 8px; max-height: 250px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; background:var(--bg);">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                        <thead>
+                            <tr style="background: var(--bg2); border-bottom: 1px solid var(--border); color: var(--text2);">
+                                <th style="padding: 8px 12px;">Tên hiển thị</th>
+                                <th style="padding: 8px 12px;">Loại</th>
+                                <th style="padding: 8px 12px;">Nguồn</th>
+                                <th style="padding: 8px 12px;">Định danh (Slug/File)</th>
+                                <th style="padding: 8px 12px; text-align: center; width: 80px;">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${generateAdminTableRows(siteIdx, data)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function generateAdminTableRows(siteIdx, data) {
+    let rows = [];
+    
+    if (data.plugins && data.plugins.length) {
+        data.plugins.forEach((p) => {
+            rows.push(`
+            <tr style="border-bottom: 1px solid var(--border2); color: var(--text2);">
+                <td style="padding: 8px 12px; font-weight: bold; color: var(--text);">${esc(p.name)}</td>
+                <td style="padding: 8px 12px;">🔌 Plugin</td>
+                <td style="padding: 8px 12px;">${p.type === 'wporg' ? 'WordPress.org' : 'ZIP Tải lên'}</td>
+                <td style="padding: 8px 12px; font-family: monospace;">${p.type === 'wporg' ? esc(p.slug) : esc(p.file)}</td>
+                <td style="padding: 8px 12px; text-align: center;">
+                    <button class="btn btn-sm btn-danger" style="font-size: 9px; padding: 2px 6px;" onclick="deletePremiumItem(${siteIdx}, 'plugins', '${p.type}', '${p.type === 'wporg' ? esc(p.slug) : esc(p.file)}')">
+                        🗑 Xóa
+                    </button>
+                </td>
+            </tr>`);
+        });
+    }
+    
+    if (data.themes && data.themes.length) {
+        data.themes.forEach((t) => {
+            rows.push(`
+            <tr style="border-bottom: 1px solid var(--border2); color: var(--text2);">
+                <td style="padding: 8px 12px; font-weight: bold; color: var(--text);">${esc(t.name)}</td>
+                <td style="padding: 8px 12px;">🎨 Theme</td>
+                <td style="padding: 8px 12px;">${t.type === 'wporg' ? 'WordPress.org' : 'ZIP Tải lên'}</td>
+                <td style="padding: 8px 12px; font-family: monospace;">${t.type === 'wporg' ? esc(t.slug) : esc(t.file)}</td>
+                <td style="padding: 8px 12px; text-align: center;">
+                    <button class="btn btn-sm btn-danger" style="font-size: 9px; padding: 2px 6px;" onclick="deletePremiumItem(${siteIdx}, 'themes', '${t.type}', '${t.type === 'wporg' ? esc(t.slug) : esc(t.file)}')">
+                        🗑 Xóa
+                    </button>
+                </td>
+            </tr>`);
+        });
+    }
+    
+    if (!rows.length) {
+        return `<tr><td colspan="5" style="padding: 12px; text-align: center; color: var(--text3);">Chưa có dữ liệu nào.</td></tr>`;
+    }
+    return rows.join('');
+}
+
+function togglePremiumFormSource(siteIdx) {
+    const srcSelect = document.getElementById(`prem-source-type-${siteIdx}`);
+    const slugGroup = document.getElementById(`prem-slug-group-${siteIdx}`);
+    const fileGroup = document.getElementById(`prem-file-group-${siteIdx}`);
+    
+    if (srcSelect.value === 'wporg') {
+        slugGroup.style.display = 'block';
+        fileGroup.style.display = 'none';
+        document.getElementById(`prem-slug-${siteIdx}`).required = true;
+        document.getElementById(`prem-file-input-${siteIdx}`).required = false;
+    } else {
+        slugGroup.style.display = 'none';
+        fileGroup.style.display = 'block';
+        document.getElementById(`prem-slug-${siteIdx}`).required = false;
+        document.getElementById(`prem-file-input-${siteIdx}`).required = true;
+    }
+}
+
+async function handlePremiumAdd(event, siteIdx) {
+    event.preventDefault();
+    const btn = document.getElementById(`btn-prem-add-submit-${siteIdx}`);
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang xử lý...';
+    
+    try {
+        const itemType = document.getElementById(`prem-item-type-${siteIdx}`).value;
+        const sourceType = document.getElementById(`prem-source-type-${siteIdx}`).value;
+        const name = document.getElementById(`prem-name-${siteIdx}`).value;
+        const desc = document.getElementById(`prem-desc-${siteIdx}`).value;
+        
+        const fd = new FormData();
+        fd.append('item_type', itemType);
+        fd.append('type', sourceType);
+        fd.append('name', name);
+        fd.append('description', desc);
+        
+        if (sourceType === 'wporg') {
+            const slug = document.getElementById(`prem-slug-${siteIdx}`).value;
+            fd.append('slug', slug);
+            
+            const r = await fetch(apiUrl('add_premium_item'), { method: 'POST', body: fd });
+            const d = await r.json();
+            if (d.success) {
+                toast(d.message || 'Thêm thành công!', 'success');
+                loadPremium(siteIdx);
+            } else {
+                toast(d.error || 'Thêm thất bại.', 'error');
+            }
+        } else {
+            const fileInput = document.getElementById(`prem-file-input-${siteIdx}`);
+            if (!fileInput.files.length) {
+                toast('Vui lòng chọn tệp ZIP.', 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+                return;
+            }
+            
+            const uploadFd = new FormData();
+            uploadFd.append('zip_file', fileInput.files[0]);
+            
+            const uploadRes = await fetch(apiUrl('upload_premium_zip'), { method: 'POST', body: uploadFd });
+            const uploadData = await uploadRes.json();
+            
+            if (uploadData.success) {
+                fd.append('file', uploadData.file);
+                
+                const r = await fetch(apiUrl('add_premium_item'), { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success) {
+                    toast(d.message || 'Thêm thành công!', 'success');
+                    loadPremium(siteIdx);
+                } else {
+                    toast(d.error || 'Thêm thất bại.', 'error');
+                }
+            } else {
+                toast(uploadData.error || 'Tải file lên thất bại.', 'error');
+            }
+        }
+    } catch (err) {
+        toast('Lỗi hệ thống khi gửi dữ liệu.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function deletePremiumItem(siteIdx, itemType, sourceType, idVal) {
+    if (!confirm('Bạn có chắc chắn muốn xóa mục này khỏi danh sách Premium không?')) {
+        return;
+    }
+    try {
+        const fd = new FormData();
+        fd.append('item_type', itemType);
+        if (sourceType === 'wporg') {
+            fd.append('slug', idVal);
+        } else {
+            fd.append('file', idVal);
+        }
+        
+        const r = await fetch(apiUrl('delete_premium_item'), { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.success) {
+            toast(d.message || 'Đã xóa thành công!', 'success');
+            loadPremium(siteIdx);
+        } else {
+            toast(d.error || 'Xóa thất bại.', 'error');
+        }
+    } catch (err) {
+        toast('Lỗi kết nối máy chủ.', 'error');
+    }
+}
+
+async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName, btnEl, themeIdx = null) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock để cài đặt.', 'error');
+        return;
+    }
+    
+    const originalText = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = '⏳ Cài đặt...';
+    
+    let activate = false;
+    if (itemType === 'themes' && themeIdx !== null) {
+        const chk = document.getElementById(`premium-activate-theme-${siteIdx}-${themeIdx}`);
+        if (chk && chk.checked) {
+            activate = true;
+        }
+    }
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('item_type', itemType);
+        fd.append('item_source', itemSource);
+        if (itemSource === 'wporg') {
+            fd.append('slug', idVal);
+        } else {
+            fd.append('file', idVal);
+        }
+        if (activate) {
+            fd.append('activate', 'true');
+        }
+        
+        const r = await fetch(apiUrl('install_premium_item'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast(`✅ Cài đặt ${itemName} thành công!`, 'success');
+            btnEl.textContent = '✓ Đã cài đặt';
+            btnEl.className = 'btn btn-sm btn-secondary';
+            
+            if (itemType === 'plugins') {
+                loadPlugins(siteIdx);
+            } else {
+                loadThemes(siteIdx);
+            }
+        } else {
+            toast(d.error || 'Cài đặt thất bại.', 'error');
+            btnEl.disabled = false;
+            btnEl.textContent = originalText;
+        }
+    } catch (err) {
+        toast('Lỗi kết nối đến máy chủ.', 'error');
+        btnEl.disabled = false;
+        btnEl.textContent = originalText;
+    }
 }
 
 /* ─── Filter ─── */
