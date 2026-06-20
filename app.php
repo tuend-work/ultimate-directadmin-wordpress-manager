@@ -1221,87 +1221,9 @@ function update_wordpress_core($site_path, $home) {
         file_put_contents($maintenance, "<?php \$upgrading = " . time() . ";");
         @chmod($maintenance, 0644);
 
-        // Resolve subdomain directories to prevent deletion
-        $subdomains_dirs = ['subdomains'];
-        $home_real = realpath($home) ?: $home;
-        $home_real = str_replace('\\', '/', $home_real);
-        $domains_dir = rtrim($home_real, '/') . '/domains';
-        
-        if (is_dir($domains_dir)) {
-            $domain_folders = scandir($domains_dir);
-            if ($domain_folders !== false) {
-                foreach ($domain_folders as $dom) {
-                    if ($dom === '.' || $dom === '..') {
-                        continue;
-                    }
-                    $dom_path = $domains_dir . '/' . $dom;
-                    if (is_dir($dom_path)) {
-                        $subdomains_dirs[] = $dom;
-                        
-                        $subdomains = [];
-                        // Read subdomains.list
-                        $sub_list_file = $dom_path . '/subdomains.list';
-                        if (file_exists($sub_list_file)) {
-                            $lines = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                            if ($lines !== false) {
-                                foreach ($lines as $line) {
-                                    $sub = trim($line);
-                                    if (!empty($sub)) {
-                                        $subdomains[] = $sub;
-                                    }
-                                }
-                            }
-                        }
-                        // Read subdomains directory
-                        $subs_dir = $dom_path . '/subdomains';
-                        if (is_dir($subs_dir)) {
-                            $sub_dirs = scandir($subs_dir);
-                            if ($sub_dirs !== false) {
-                                foreach ($sub_dirs as $sd) {
-                                    if ($sd === '.' || $sd === '..') {
-                                        continue;
-                                    }
-                                    if (is_dir($subs_dir . '/' . $sd)) {
-                                        $subdomains[] = $sd;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        $subdomains = array_unique($subdomains);
-                        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-                        foreach ($subdomains as $sub) {
-                            $subdomains_dirs[] = $sub;
-                            $subdomains_dirs[] = $sub . '.' . $dom;
-                            
-                            // Check if it has a custom docroot override
-                            if (file_exists($wrapper)) {
-                                try {
-                                    $custom_doc = get_custom_docroot_from_configs($dom, $sub, $home, $wrapper);
-                                    if (!empty($custom_doc)) {
-                                        $custom_doc = str_replace('\\', '/', realpath($custom_doc) ?: $custom_doc);
-                                        $site_path_canonical = str_replace('\\', '/', realpath($site_path) ?: $site_path);
-                                        if (strpos($custom_doc, $site_path_canonical . '/') === 0) {
-                                            $rel = substr($custom_doc, strlen($site_path_canonical) + 1);
-                                            $rel_parts = explode('/', $rel);
-                                            if (count($rel_parts) > 0 && !empty($rel_parts[0])) {
-                                                $subdomains_dirs[] = $rel_parts[0];
-                                            }
-                                        }
-                                    }
-                                } catch (Throwable $e) {
-                                    // ignore
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        $subdomains_dirs = array_unique($subdomains_dirs);
-        wp_manager_log("Resolved subdomain directories to skip: " . implode(', ', $subdomains_dirs));
-
-        // Clean everything in the site directory except wp-content, wp-config.php, web server configs, and subdomains
+        // Clean up WordPress core files/directories.
+        // Only delete standard WordPress core directories (wp-admin, wp-includes) and files in the root (except configurations).
+        // Preserve other directories (subdomains, subfolder installations, custom folders) to prevent data loss.
         $files = scandir($site_path);
         if ($files !== false) {
             foreach ($files as $file) {
@@ -1315,13 +1237,14 @@ function update_wordpress_core($site_path, $home) {
                 if ($file === '.htaccess' || $file === 'php.ini' || $file === '.user.ini') {
                     continue;
                 }
-                if (is_dir($full_path) && in_array($file, $subdomains_dirs)) {
-                    wp_manager_log("Skipping subdomain directory deletion: " . $file);
-                    continue;
-                }
                 
                 if (is_dir($full_path)) {
-                    rmdir_recursive($full_path);
+                    if ($file === 'wp-admin' || $file === 'wp-includes') {
+                        rmdir_recursive($full_path);
+                    } else {
+                        wp_manager_log("Preserving custom/subfolder directory: " . $file);
+                        continue;
+                    }
                 } else {
                     @unlink($full_path);
                 }
