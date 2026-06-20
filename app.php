@@ -3928,6 +3928,16 @@ function run_api() {
                 $res = update_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Cập nhật plugin thành công.");
+                    $plugin_path = $_POST['path'] . '/wp-content/plugins/' . $_POST['plugin_file'];
+                    $details = get_plugin_details($plugin_path);
+                    if ($details) {
+                        $details['file'] = $_POST['plugin_file'];
+                        $active = get_active_plugins($_POST['path']);
+                        $details['active'] = in_array($_POST['plugin_file'], $active);
+                        $details['update_available'] = false;
+                        $details['latest_version'] = $details['version'];
+                        $res['plugin'] = $details;
+                    }
                 } else {
                     wp_manager_log("Cập nhật plugin thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
@@ -3962,6 +3972,16 @@ function run_api() {
                 $res = reinstall_wordpress_plugin($_POST['path'], $_POST['plugin_file']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Cài đặt lại plugin thành công.");
+                    $plugin_path = $_POST['path'] . '/wp-content/plugins/' . $_POST['plugin_file'];
+                    $details = get_plugin_details($plugin_path);
+                    if ($details) {
+                        $details['file'] = $_POST['plugin_file'];
+                        $active = get_active_plugins($_POST['path']);
+                        $details['active'] = in_array($_POST['plugin_file'], $active);
+                        $details['update_available'] = false;
+                        $details['latest_version'] = $details['version'];
+                        $res['plugin'] = $details;
+                    }
                 } else {
                     wp_manager_log("Cài đặt lại plugin thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
@@ -4032,6 +4052,16 @@ function run_api() {
                 $res = update_wordpress_theme($_POST['path'], $_POST['theme_folder']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Cập nhật theme thành công.");
+                    $theme_style_css = $_POST['path'] . '/wp-content/themes/' . $_POST['theme_folder'] . '/style.css';
+                    $details = get_theme_details($theme_style_css);
+                    if ($details) {
+                        $details['folder'] = $_POST['theme_folder'];
+                        $active_theme = get_active_theme($_POST['path']);
+                        $details['active'] = ($details['folder'] === $active_theme);
+                        $details['update_available'] = false;
+                        $details['latest_version'] = $details['version'];
+                        $res['theme'] = $details;
+                    }
                 } else {
                     wp_manager_log("Cập nhật theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
@@ -4066,6 +4096,16 @@ function run_api() {
                 $res = reinstall_wordpress_theme($_POST['path'], $_POST['theme_folder']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Cài đặt lại theme thành công.");
+                    $theme_style_css = $_POST['path'] . '/wp-content/themes/' . $_POST['theme_folder'] . '/style.css';
+                    $details = get_theme_details($theme_style_css);
+                    if ($details) {
+                        $details['folder'] = $_POST['theme_folder'];
+                        $active_theme = get_active_theme($_POST['path']);
+                        $details['active'] = ($details['folder'] === $active_theme);
+                        $details['update_available'] = false;
+                        $details['latest_version'] = $details['version'];
+                        $res['theme'] = $details;
+                    }
                 } else {
                     wp_manager_log("Cài đặt lại theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }

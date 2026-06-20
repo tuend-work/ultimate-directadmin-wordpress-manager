@@ -1084,12 +1084,12 @@ async function loadPlugins(i) {
                 const actionText = p.active ? 'Deactivate' : 'Activate';
                 const actionBtnClass = p.active ? 'btn-danger' : 'btn-primary';
                 const statusBadge = p.active 
-                    ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
-                    : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
+                    ? `<span id="plug-status-${i}-${idx}" style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>` 
+                    : `<span id="plug-status-${i}-${idx}" style="color:var(--text3);font-size:11px;">Inactive</span>`;
                 const latestVersion = p.latest_version || p.version || 'Unknown';
                 const updateBadge = p.update_available
-                    ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
-                    : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
+                    ? `<span id="plug-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>`
+                    : `<span id="plug-up-badge-${i}-${idx}" style="color:var(--text3);font-size:11px;">Up to date</span>`;
                 const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
                 const updateTitle = p.update_available
                     ? 'Update this plugin'
@@ -1100,7 +1100,7 @@ async function loadPlugins(i) {
                     <div class="plugin-info">
                         <div class="plugin-name" title="${esc(p.name)}">${esc(p.name)}</div>
                         <div class="plugin-desc" title="${esc(p.description)}">${esc(p.description)}</div>
-                        <div class="plugin-meta">Current: v${esc(p.version)} | Latest: v${esc(latestVersion)} | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
+                        <div class="plugin-meta">Current: <span id="plug-ver-${i}-${idx}">v${esc(p.version)}</span> | Latest: <span id="plug-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
                         <button class="btn btn-sm btn-secondary" data-file="${esc(p.file)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
@@ -1245,7 +1245,19 @@ async function updatePlugin(siteIdx, plugIdx, file, reloadAfter = true) {
         if (d.success) {
             toast(d.message || 'Plugin updated successfully!', 'success');
             if (reloadAfter) {
-                loadPlugins(siteIdx);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Update';
+                }
+                const newPlug = d.plugin;
+                if (newPlug) {
+                    const verEl = document.getElementById(`plug-ver-${siteIdx}-${plugIdx}`);
+                    if (verEl) verEl.textContent = `v${newPlug.version}`;
+                    const latestEl = document.getElementById(`plug-latest-${siteIdx}-${plugIdx}`);
+                    if (latestEl) latestEl.textContent = `v${newPlug.latest_version}`;
+                    const badgeEl = document.getElementById(`plug-up-badge-${siteIdx}-${plugIdx}`);
+                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                }
             } else if (btn) {
                 btn.textContent = 'Updated';
             }
@@ -1286,8 +1298,20 @@ async function togglePlugin(siteIdx, plugIdx, file, isActive) {
         const d = await r.json();
         
         if (d.success) {
-            toast(`Plugin ${isActive ? 'deactivated' : 'activated'} successfully!`, 'success');
-            loadPlugins(siteIdx);
+            const newActive = !isActive;
+            toast(`Plugin ${newActive ? 'activated' : 'deactivated'} successfully!`, 'success');
+            
+            btn.disabled = false;
+            btn.className = `btn btn-sm ${newActive ? 'btn-danger' : 'btn-primary'}`;
+            btn.textContent = newActive ? 'Deactivate' : 'Activate';
+            btn.setAttribute('onclick', `togglePlugin(${siteIdx}, ${plugIdx}, '${file.replace(/'/g, "\\'")}', ${newActive})`);
+            
+            const statusEl = document.getElementById(`plug-status-${siteIdx}-${plugIdx}`);
+            if (statusEl) {
+                statusEl.style.color = newActive ? 'var(--green)' : 'var(--text3)';
+                statusEl.style.fontWeight = newActive ? 'bold' : 'normal';
+                statusEl.textContent = newActive ? 'Active' : 'Inactive';
+            }
         } else {
             toast(d.error || 'Failed to toggle plugin.', 'error');
             btn.disabled = false;
@@ -1325,7 +1349,19 @@ async function reinstallPlugin(siteIdx, plugIdx, file) {
         
         if (d.success) {
             toast(d.message || 'Plugin reinstalled successfully!', 'success');
-            loadPlugins(siteIdx);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+            const newPlug = d.plugin;
+            if (newPlug) {
+                const verEl = document.getElementById(`plug-ver-${siteIdx}-${plugIdx}`);
+                if (verEl) verEl.textContent = `v${newPlug.version}`;
+                const latestEl = document.getElementById(`plug-latest-${siteIdx}-${plugIdx}`);
+                if (latestEl) latestEl.textContent = `v${newPlug.latest_version}`;
+                const badgeEl = document.getElementById(`plug-up-badge-${siteIdx}-${plugIdx}`);
+                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+            }
         } else {
             toast(d.error || 'Failed to reinstall plugin.', 'error');
             btn.disabled = false;
@@ -1363,7 +1399,10 @@ async function deletePlugin(siteIdx, plugIdx, file) {
         
         if (d.success) {
             toast(d.message || 'Plugin deleted successfully!', 'success');
-            loadPlugins(siteIdx);
+            const pluginItem = btn.closest('.plugin-item');
+            if (pluginItem) {
+                pluginItem.remove();
+            }
         } else {
             toast(d.error || 'Failed to delete plugin.', 'error');
             btn.disabled = false;
@@ -1398,13 +1437,13 @@ async function loadThemes(i) {
                 const actionText = t.active ? 'Active' : 'Activate';
                 const actionBtnClass = t.active ? 'btn-secondary' : 'btn-primary';
                 const statusBadge = t.active 
-                    ? '<span style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>' 
-                    : '<span style="color:var(--text3);font-size:11px;">Inactive</span>';
+                    ? `<span id="theme-status-${i}-${idx}" style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>` 
+                    : `<span id="theme-status-${i}-${idx}" style="color:var(--text3);font-size:11px;">Inactive</span>`;
                 const disabledAttr = t.active ? 'disabled' : '';
                 const latestVersion = t.latest_version || t.version || 'Unknown';
                 const updateBadge = t.update_available
-                    ? '<span style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>'
-                    : '<span style="color:var(--text3);font-size:11px;">Up to date</span>';
+                    ? `<span id="theme-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>`
+                    : `<span id="theme-up-badge-${i}-${idx}" style="color:var(--text3);font-size:11px;">Up to date</span>`;
                 const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
                 const updateTitle = t.update_available
                     ? 'Update this theme'
@@ -1415,7 +1454,7 @@ async function loadThemes(i) {
                     <div class="plugin-info">
                         <div class="plugin-name" title="${esc(t.name)}">${esc(t.name)}</div>
                         <div class="plugin-desc" title="${esc(t.description)}">${esc(t.description)}</div>
-                        <div class="plugin-meta">Current: v${esc(t.version)} | Latest: v${esc(latestVersion)} | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
+                        <div class="plugin-meta">Current: <span id="theme-ver-${i}-${idx}">v${esc(t.version)}</span> | Latest: <span id="theme-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
                         <button class="btn btn-sm btn-secondary" data-folder="${esc(t.folder)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
@@ -1466,7 +1505,19 @@ async function updateTheme(siteIdx, themeIdx, folder, reloadAfter = true) {
         if (d.success) {
             toast(d.message || 'Theme updated successfully!', 'success');
             if (reloadAfter) {
-                loadThemes(siteIdx);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Update';
+                }
+                const newTheme = d.theme;
+                if (newTheme) {
+                    const verEl = document.getElementById(`theme-ver-${siteIdx}-${themeIdx}`);
+                    if (verEl) verEl.textContent = `v${newTheme.version}`;
+                    const latestEl = document.getElementById(`theme-latest-${siteIdx}-${themeIdx}`);
+                    if (latestEl) latestEl.textContent = `v${newTheme.latest_version}`;
+                    const badgeEl = document.getElementById(`theme-up-badge-${siteIdx}-${themeIdx}`);
+                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                }
             } else if (btn) {
                 btn.textContent = 'Updated';
             }
@@ -1506,7 +1557,34 @@ async function activateTheme(siteIdx, themeIdx, folder) {
         
         if (d.success) {
             toast('Theme activated successfully!', 'success');
-            loadThemes(siteIdx);
+            
+            const container = document.getElementById('theme-list-' + siteIdx);
+            if (container) {
+                const items = container.querySelectorAll('.plugin-item');
+                items.forEach((item, idx) => {
+                    const statusEl = item.querySelector(`[id^="theme-status-${siteIdx}-"]`);
+                    const actBtn = item.querySelector(`[id^="btn-theme-${siteIdx}-"]`);
+                    const delBtn = item.querySelector(`[id^="btn-theme-del-${siteIdx}-"]`);
+                    
+                    if (actBtn) {
+                        const isThisTheme = actBtn.id === `btn-theme-${siteIdx}-${themeIdx}`;
+                        
+                        actBtn.disabled = isThisTheme;
+                        actBtn.className = `btn btn-sm ${isThisTheme ? 'btn-secondary' : 'btn-primary'}`;
+                        actBtn.textContent = isThisTheme ? 'Active' : 'Activate';
+                        
+                        if (statusEl) {
+                            statusEl.style.color = isThisTheme ? 'var(--green)' : 'var(--text3)';
+                            statusEl.style.fontWeight = isThisTheme ? 'bold' : 'normal';
+                            statusEl.textContent = isThisTheme ? 'Active' : 'Inactive';
+                        }
+                        
+                        if (delBtn) {
+                            delBtn.disabled = isThisTheme;
+                        }
+                    }
+                });
+            }
         } else {
             toast(d.error || 'Failed to activate theme.', 'error');
             btn.disabled = false;
@@ -1544,7 +1622,19 @@ async function reinstallTheme(siteIdx, themeIdx, folder) {
         
         if (d.success) {
             toast(d.message || 'Theme reinstalled successfully!', 'success');
-            loadThemes(siteIdx);
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+            const newTheme = d.theme;
+            if (newTheme) {
+                const verEl = document.getElementById(`theme-ver-${siteIdx}-${themeIdx}`);
+                if (verEl) verEl.textContent = `v${newTheme.version}`;
+                const latestEl = document.getElementById(`theme-latest-${siteIdx}-${themeIdx}`);
+                if (latestEl) latestEl.textContent = `v${newTheme.latest_version}`;
+                const badgeEl = document.getElementById(`theme-up-badge-${siteIdx}-${themeIdx}`);
+                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+            }
         } else {
             toast(d.error || 'Failed to reinstall theme.', 'error');
             btn.disabled = false;
@@ -1586,7 +1676,10 @@ async function deleteTheme(siteIdx, themeIdx, folder) {
         
         if (d.success) {
             toast(d.message || 'Theme deleted successfully!', 'success');
-            loadThemes(siteIdx);
+            const themeItem = btn.closest('.plugin-item');
+            if (themeItem) {
+                themeItem.remove();
+            }
         } else {
             toast(d.error || 'Failed to delete theme.', 'error');
             btn.disabled = false;
