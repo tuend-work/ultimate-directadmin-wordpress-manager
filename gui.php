@@ -2768,7 +2768,17 @@ async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName
         }
         
         const r = await fetch(apiUrl('install_premium_item'), { method: 'POST', body: fd });
-        const d = await r.json();
+        const text = await r.text();
+        let d;
+        try {
+            d = JSON.parse(text);
+        } catch (e) {
+            console.error("Non-JSON response:", text);
+            toast('Lỗi phản hồi từ server: ' + text.substring(0, 150), 'error');
+            btnEl.disabled = false;
+            btnEl.textContent = originalText;
+            return;
+        }
         
         if (d.success) {
             toast(`✅ Cài đặt ${itemName} thành công!`, 'success');
@@ -2786,7 +2796,7 @@ async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName
             btnEl.textContent = originalText;
         }
     } catch (err) {
-        toast('Lỗi kết nối đến máy chủ.', 'error');
+        toast('Lỗi kết nối mạng: ' + (err.message || 'Không rõ nguyên nhân'), 'error');
         btnEl.disabled = false;
         btnEl.textContent = originalText;
     }

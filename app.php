@@ -4264,12 +4264,15 @@ function run_api() {
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                     $data = curl_exec($ch);
                     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curl_err = curl_error($ch);
                     curl_close($ch);
                     
                     if ($http_code !== 200 || !$data) {
-                        throw new Exception("Không thể tải xuống gói cài đặt tự động từ WordPress.org.");
+                        throw new Exception("Không thể tải xuống từ WordPress.org. HTTP Code: {$http_code} | cURL Error: {$curl_err}");
                     }
                     file_put_contents($temp_zip, $data);
                 } else {
@@ -4280,12 +4283,15 @@ function run_api() {
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
                     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
                     $data = curl_exec($ch);
                     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $curl_err = curl_error($ch);
                     curl_close($ch);
                     
                     if ($http_code !== 200 || !$data) {
-                        throw new Exception("Không thể tải xuống gói cài đặt ZIP từ máy chủ Premium trung tâm.");
+                        throw new Exception("Không thể tải xuống ZIP từ Store Web. HTTP Code: {$http_code} | cURL Error: {$curl_err}");
                     }
                     file_put_contents($temp_zip, $data);
                     $cleanup_zip = true;
@@ -4486,6 +4492,8 @@ function get_premium_list() {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     $data = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
