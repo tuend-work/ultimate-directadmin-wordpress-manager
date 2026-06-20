@@ -832,6 +832,53 @@ function get_active_plugins($site_path) {
  * Toggle plugin status (activate/deactivate) directly in the database
  */
 function toggle_plugin_status($site_path, $plugin_file, $status) {
+    $bootstrapped = false;
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $bootstrapped = true;
+    } catch (Throwable $e) {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+        wp_manager_log("Bootstrapping WordPress failed, falling back to direct DB update: " . $e->getMessage());
+    }
+
+    if ($bootstrapped) {
+        try {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            if ($status === 'activate') {
+                $result = activate_plugin($plugin_file);
+                if (is_wp_error($result)) {
+                    throw new Exception($result->get_error_message());
+                }
+            } else {
+                deactivate_plugins($plugin_file);
+            }
+            
+            if (function_exists('wp_cache_delete')) {
+                wp_cache_delete('alloptions', 'options');
+                wp_cache_delete('active_plugins', 'options');
+            }
+            if (function_exists('wp_cache_flush')) {
+                wp_cache_flush();
+            }
+            
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
+            wp_manager_log("Plugin toggled successfully using native WordPress functions.");
+            return true;
+        } catch (Throwable $e) {
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
+            wp_manager_log("Native WordPress toggle failed: " . $e->getMessage() . ". Falling back to direct database update.");
+        }
+    }
+
+    // FALLBACK: Direct Database Update
     $wp_config_path = $site_path . '/wp-config.php';
     if (!file_exists($wp_config_path)) {
         throw new Exception("wp-config.php not found.");
@@ -881,6 +928,18 @@ function toggle_plugin_status($site_path, $plugin_file, $status) {
     
     $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name = 'active_plugins'");
     $stmt->execute([$serialized]);
+
+    // Attempt cache flush via WP-CLI
+    try {
+        $wp_cli = trim(wp_exec('which wp 2>/dev/null') ?: '/usr/local/bin/wp');
+        if (file_exists($wp_cli) || wp_exec("hash wp 2>/dev/null; echo $?")) {
+            $esc_path = escapeshellarg($site_path);
+            wp_exec("{$wp_cli} cache flush --path={$esc_path} --allow-root 2>&1");
+            wp_manager_log("Flushed cache via WP-CLI.");
+        }
+    } catch (Throwable $t) {
+        // Ignore WP-CLI flush errors
+    }
     
     return true;
 }
@@ -975,6 +1034,47 @@ function get_active_theme($site_path) {
  * Activate a theme in the database
  */
 function activate_theme($site_path, $theme_folder) {
+    $bootstrapped = false;
+    $buffer_level = ob_get_level();
+    ob_start();
+    try {
+        wp_manager_bootstrap_wordpress($site_path);
+        $bootstrapped = true;
+    } catch (Throwable $e) {
+        while (ob_get_level() > $buffer_level) {
+            ob_end_clean();
+        }
+        wp_manager_log("Bootstrapping WordPress for theme switch failed, falling back to direct DB update: " . $e->getMessage());
+    }
+
+    if ($bootstrapped) {
+        try {
+            require_once ABSPATH . 'wp-admin/includes/theme.php';
+            switch_theme($theme_folder);
+            
+            if (function_exists('wp_cache_delete')) {
+                wp_cache_delete('alloptions', 'options');
+                wp_cache_delete('template', 'options');
+                wp_cache_delete('stylesheet', 'options');
+            }
+            if (function_exists('wp_cache_flush')) {
+                wp_cache_flush();
+            }
+            
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
+            wp_manager_log("Theme activated successfully using native WordPress functions.");
+            return true;
+        } catch (Throwable $e) {
+            while (ob_get_level() > $buffer_level) {
+                ob_end_clean();
+            }
+            wp_manager_log("Native WordPress theme switch failed: " . $e->getMessage() . ". Falling back to direct database update.");
+        }
+    }
+
+    // FALLBACK: Direct Database Update
     $wp_config_path = $site_path . '/wp-config.php';
     if (!file_exists($wp_config_path)) {
         throw new Exception("wp-config.php not found.");
@@ -1013,6 +1113,18 @@ function activate_theme($site_path, $theme_folder) {
     
     $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name = 'stylesheet'");
     $stmt->execute([$theme_folder]);
+
+    // Attempt cache flush via WP-CLI
+    try {
+        $wp_cli = trim(wp_exec('which wp 2>/dev/null') ?: '/usr/local/bin/wp');
+        if (file_exists($wp_cli) || wp_exec("hash wp 2>/dev/null; echo $?")) {
+            $esc_path = escapeshellarg($site_path);
+            wp_exec("{$wp_cli} cache flush --path={$esc_path} --allow-root 2>&1");
+            wp_manager_log("Flushed cache via WP-CLI.");
+        }
+    } catch (Throwable $t) {
+        // Ignore WP-CLI flush errors
+    }
     
     return true;
 }
