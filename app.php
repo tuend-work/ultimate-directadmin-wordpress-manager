@@ -4493,7 +4493,12 @@ function run_api() {
                 $wrapper = $plugin_dir . '/scripts/wrapper';
                 if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN' && file_exists($wrapper) && is_executable($wrapper)) {
                     $cmd = escapeshellcmd($wrapper) . ' setup_logs ' . escapeshellarg($username) . ' ' . escapeshellarg($domain) . ' ' . escapeshellarg($_POST['path']);
-                    @exec($cmd . ' 2>&1');
+                    $output = [];
+                    $retval = 0;
+                    @exec($cmd . ' 2>&1', $output, $retval);
+                    if ($retval !== 0) {
+                        wp_manager_log("Lỗi khi chạy wrapper setup_logs. Command: {$cmd} | Exit code: {$retval} | Output: " . implode("\n", $output));
+                    }
                 }
                 
                 $log_type = $_POST['log_type'];

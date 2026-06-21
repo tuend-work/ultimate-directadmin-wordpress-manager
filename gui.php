@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.7';
+$plugin_version = '1.3.8';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {

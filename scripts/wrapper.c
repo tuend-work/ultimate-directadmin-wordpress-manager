@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        execl("/bin/bash", "bash", setup_logs_sh, target_user, domain, real_site_path, NULL);
+        execl("/bin/bash", "bash", "-p", setup_logs_sh, target_user, domain, real_site_path, NULL);
         perror("Error: execl failed");
         return 1;
     }

@@ -49,8 +49,31 @@ if [ -z "$SYSTEM_ACCESS_LOG" ]; then
     SYSTEM_ERROR_LOG=$(find /var/log/nginx /var/log/httpd -name "$DOMAIN.error.log" 2>/dev/null | head -n 1)
 fi
 
+# Hàm cấp quyền đi xuyên qua các thư mục cha cho user để đọc được file log gốc
+grant_parent_dirs_x() {
+    local log_file="$1"
+    local u="$2"
+    local dir
+    dir=$(dirname "$log_file")
+    
+    # Đi ngược từ thư mục cha lên đến /var hoặc / (nhưng dừng lại ở /var, /usr)
+    while [ "$dir" != "/" ] && [ "$dir" != "." ] && [ "$dir" != "/var" ] && [ "$dir" != "/usr" ]; do
+        if [ -d "$dir" ]; then
+            if command -v setfacl >/dev/null 2>&1; then
+                setfacl -m "u:$u:x" "$dir" 2>/dev/null || true
+            else
+                chmod o+x "$dir" 2>/dev/null || true
+            fi
+        fi
+        dir=$(dirname "$dir")
+    done
+}
+
 # 4. Tạo symlink và setfacl/chmod
 if [ -n "$SYSTEM_ACCESS_LOG" ] && [ -f "$SYSTEM_ACCESS_LOG" ]; then
+    # Cấp quyền đi xuyên qua các thư mục cha
+    grant_parent_dirs_x "$SYSTEM_ACCESS_LOG" "$USER"
+
     # Tạo symlink access log
     USER_ACCESS_LINK="$USER_LOGS_DIR/$DOMAIN.log"
     if [ ! -L "$USER_ACCESS_LINK" ] && [ ! -f "$USER_ACCESS_LINK" ]; then
@@ -67,6 +90,9 @@ if [ -n "$SYSTEM_ACCESS_LOG" ] && [ -f "$SYSTEM_ACCESS_LOG" ]; then
 fi
 
 if [ -n "$SYSTEM_ERROR_LOG" ] && [ -f "$SYSTEM_ERROR_LOG" ]; then
+    # Cấp quyền đi xuyên qua các thư mục cha
+    grant_parent_dirs_x "$SYSTEM_ERROR_LOG" "$USER"
+
     # Tạo symlink error log
     USER_ERROR_LINK="$USER_LOGS_DIR/$DOMAIN.error.log"
     if [ ! -L "$USER_ERROR_LINK" ] && [ ! -f "$USER_ERROR_LINK" ]; then
