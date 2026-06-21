@@ -4596,6 +4596,11 @@ function run_api() {
                     }
                 }
                 
+                if (preg_match('/^__WP_MANAGER_LOG_FILE__=(.+?)(\r?\n|$)/', $log_content, $log_path_match)) {
+                    $filepath = trim($log_path_match[1]);
+                    $log_content = preg_replace('/^__WP_MANAGER_LOG_FILE__=.+?(\r?\n|$)/', '', $log_content, 1);
+                }
+
                 $lines_arr = explode("\n", $log_content);
                 $filtered_lines = [];
                 $search = $_POST['search'] ?? '';

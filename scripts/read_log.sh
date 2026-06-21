@@ -93,6 +93,7 @@ if [ -z "$LOG_FILE" ]; then
 fi
 
 if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
+    echo "__WP_MANAGER_LOG_FILE__=$LOG_FILE"
     tail -n "$LINES" "$LOG_FILE"
 else
     echo "[Hệ thống] Tệp tin log cho tên miền $DOMAIN không tồn tại hoặc chưa có dữ liệu ghi nhận."

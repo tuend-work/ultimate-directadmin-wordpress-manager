@@ -1245,7 +1245,9 @@ function onLogTypeChanged(i) {
     }
     
     const term = document.getElementById(`log-terminal-${i}`);
+    const pathInfo = document.getElementById(`log-path-info-${i}`);
     term.value = "[Hệ thống] Đang tải log mới...";
+    if (pathInfo) pathInfo.textContent = "Đang tải log từ: ...";
     
     fetchLogData(i);
 }
@@ -1263,6 +1265,7 @@ async function fetchLogData(i) {
     const lines = document.getElementById(`log-lines-${i}`).value;
     const timeFilter = document.getElementById(`log-time-${i}`).value;
     const term = document.getElementById(`log-terminal-${i}`);
+    const pathInfo = document.getElementById(`log-path-info-${i}`);
     
     let fileTypes = [];
     if (type === 'access') {
@@ -1293,15 +1296,18 @@ async function fetchLogData(i) {
             
             const isScrollAtBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 30;
             
+            if (pathInfo) pathInfo.textContent = `Đang tải log từ: ${d.filepath || d.log_path || "Không xác định"}`;
             term.value = d.logs || "[Hệ thống] Tệp tin log rỗng hoặc không có dòng nào khớp với bộ lọc.";
             
             if (isScrollAtBottom || term.value.includes("[Hệ thống] Đang tải log")) {
                 term.scrollTop = term.scrollHeight;
             }
         } else {
+            if (pathInfo) pathInfo.textContent = "Đang tải log từ: Không xác định";
             term.value = `[Lỗi hệ thống] ${d.error || 'Không thể lấy dữ liệu log.'}`;
         }
     } catch (err) {
+        if (pathInfo) pathInfo.textContent = "Đang tải log từ: Không xác định";
         term.value = `[Lỗi kết nối] Không thể kết nối tới máy chủ.`;
     }
 }
@@ -2843,6 +2849,10 @@ function renderSites(sites) {
                             <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;">🗑 Xóa log</button>
                         </div>
                         
+                        <div id="log-path-info-${i}" style="border-top: 2px solid var(--red); padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
+                            Đang tải log từ: ...
+                        </div>
+
                         <div id="log-filetype-filters-${i}" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text2); border-top: 1px dashed var(--border); padding-top: 8px;">
                             <span style="font-weight: bold;">Lọc loại file:</span>
                             <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php_backend" checked onchange="onLogFilterChanged(${i})"> PHP Backend</label>
