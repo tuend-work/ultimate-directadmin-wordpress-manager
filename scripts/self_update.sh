@@ -65,9 +65,9 @@ chmod 755 "$PLUGIN_DIR/reseller/index.raw"  2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/user/index.html"    2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 
-# Re-compile and restore SUID wrapper (critical for future updates)
+# Rebuild and restore SUID wrapper (critical for future updates)
 if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
-    echo "[update] Re-compiling SUID wrapper..."
+    echo "[update] Rebuilding SUID wrapper..."
     
     GCC_BIN=""
     for try_gcc in gcc cc /usr/bin/gcc /usr/local/bin/gcc; do
@@ -79,18 +79,20 @@ if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
 
     COMPILED=0
     if [ -n "$GCC_BIN" ]; then
-        if "$GCC_BIN" -O2 "$PLUGIN_DIR/scripts/wrapper.c" -o "$PLUGIN_DIR/scripts/wrapper.tmp" 2>/dev/null; then
-            mv -f "$PLUGIN_DIR/scripts/wrapper.tmp" "$PLUGIN_DIR/scripts/wrapper"
+        if cd "$PLUGIN_DIR/scripts" && "$GCC_BIN" -O2 wrapper.c -o wrapper.update.tmp 2>/dev/null; then
+            chown root:diradmin "$PLUGIN_DIR/scripts/wrapper.update.tmp"
+            chmod 4755 "$PLUGIN_DIR/scripts/wrapper.update.tmp"
+            mv -f "$PLUGIN_DIR/scripts/wrapper.update.tmp" "$PLUGIN_DIR/scripts/wrapper"
             COMPILED=1
         else
-            rm -f "$PLUGIN_DIR/scripts/wrapper.tmp"
+            rm -f "$PLUGIN_DIR/scripts/wrapper.update.tmp"
         fi
     fi
 
     if [ "$COMPILED" -eq 1 ]; then
         chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
         chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
-        echo "[update] SUID wrapper compiled successfully."
+        echo "[update] SUID wrapper rebuilt successfully."
     else
         echo "[update] WARNING: SUID wrapper compilation failed (gcc/cc failed or not installed)."
         if [ -f "$PLUGIN_DIR/scripts/wrapper" ]; then
@@ -103,6 +105,9 @@ if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
         fi
     fi
 fi
+
+chmod 755 "$PLUGIN_DIR/scripts/read_log.sh" 2>/dev/null || true
+chmod 755 "$PLUGIN_DIR/scripts/self_update.sh" 2>/dev/null || true
 
 echo "[update] Cleanup..."
 rm -rf "$TMP_DIR"

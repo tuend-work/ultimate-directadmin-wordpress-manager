@@ -3531,7 +3531,7 @@ function update_plugin_from_github() {
                 "  gcc -O2 wrapper.c -o wrapper\n" .
                 "  chown root:diradmin wrapper\n" .
                 "  chmod 4755 wrapper\n" .
-                "  chmod 755 self_update.sh\n\n" .
+                "  chmod 755 self_update.sh read_log.sh\n\n" .
                 "After that, the Update Plugin button will work automatically."
             );
         }
@@ -3569,9 +3569,11 @@ function update_plugin_from_github() {
             "Dir owner: {$owner} | Process user: {$proc}\n\n" .
             "The SUID wrapper was not found or not executable.\n" .
             "On the server, run as root:\n" .
-            "  gcc -O2 {$wrapper_path}.c -o {$wrapper_path}\n" .
-            "  chown root:diradmin {$wrapper_path}\n" .
-            "  chmod 4755 {$wrapper_path}"
+            "  cd {$plugin_dir}/scripts\n" .
+            "  gcc -O2 wrapper.c -o wrapper\n" .
+            "  chown root:diradmin wrapper\n" .
+            "  chmod 4755 wrapper\n" .
+            "  chmod 755 self_update.sh read_log.sh"
         );
     }
 
