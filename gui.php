@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.24';
+$plugin_version = '1.3.25';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -68,7 +68,7 @@ if (strpos($server_ip, ':') !== false) {
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    font-size: 13px;
+    font-size: 17px;
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -98,19 +98,19 @@ div#iframe-container{
 .topbar .logo {
     color: var(--text);
     font-weight: 700;
-    font-size: 14px;
+    font-size: 18px;
     display: flex;
     align-items: center;
 }
 .topbar .logo-icon {
-    font-size: 20px;
+    font-size: 26px;
     color: var(--blue);
     margin-right: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
-.topbar .user { margin-left: auto; color: var(--text2); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.topbar .user { margin-left: auto; color: var(--text2); font-size: 16px; display: flex; align-items: center; gap: 8px; }
 
 /* ── Toolbar ── */
 .toolbar {
@@ -123,7 +123,7 @@ div#iframe-container{
     flex-wrap: wrap;
 }
 .toolbar-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-.count-label { margin-left: auto; color: var(--text3); font-size: 12px; }
+.count-label { margin-left: auto; color: var(--text3); font-size: 16px; }
 
 
 
@@ -131,7 +131,7 @@ div#iframe-container{
 .btn {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 6px 14px;
-    font-size: 12px; font-family: inherit;
+    font-size: 16px; font-family: inherit;
     border-radius: 6px; cursor: pointer;
     text-decoration: none;
     border: 1px solid transparent;
@@ -152,7 +152,7 @@ div#iframe-container{
 .btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
 .btn-danger:hover:not(:disabled) { background: var(--red); color: #fff; }
 
-.btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 4px; }
+.btn-sm { padding: 4px 10px; font-size: 14px; border-radius: 4px; }
 
 /* ── Content ── */
 .content { padding: 20px 24px; max-width: 100%; width: 100%; }
@@ -164,7 +164,7 @@ div#iframe-container{
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
-    font-size: 12px;
+    font-size: 16px;
     font-family: inherit;
     width: 280px;
 }
@@ -213,22 +213,22 @@ div#iframe-container{
 .site-thumb .thumb-loader {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; color: var(--text3);
+    font-size: 23px; color: var(--text3);
 }
 .site-thumb .thumb-loader.hidden { display: none; }
 
 /* Site info */
 .site-info { flex: 1; min-width: 0; }
 .site-name {
-    font-size: 14px; font-weight: 600; color: var(--text);
+    font-size: 18px; font-weight: 600; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-bottom: 2px;
 }
-.site-url { font-size: 11px; color: var(--text2); }
+.site-url { font-size: 14px; color: var(--text2); }
 .site-url a { color: var(--blue); text-decoration: none; }
 .site-url a:hover { text-decoration: underline; }
 .site-path {
-    font-size: 10.5px; color: var(--text3);
+    font-size: 14px; color: var(--text3);
     font-family: monospace;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     margin-top: 3px;
@@ -241,7 +241,7 @@ div#iframe-container{
     display: inline-flex; align-items: center; gap: 3px;
     padding: 3px 9px;
     border-radius: 12px;
-    font-size: 11px; font-weight: 500;
+    font-size: 14px; font-weight: 500;
     border: 1px solid transparent;
 }
 .badge-green  { background: #0d1f12; color: var(--green); border-color: #1a4223; }
@@ -254,7 +254,7 @@ div#iframe-container{
 .card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 
 /* Chevron */
-.chevron { color: var(--text3); font-size: 10px; transition: transform .2s; margin-left: 4px; }
+.chevron { color: var(--text3); font-size: 13px; transition: transform .2s; margin-left: 4px; }
 .chevron.open { transform: rotate(90deg); }
 
 /* ── Expanded card body ── */
@@ -282,7 +282,7 @@ div#iframe-container{
 }
 .card-screenshot-bar .shot-label {
     position: absolute; bottom: 10px; left: 14px;
-    font-size: 11px; color: var(--text3);
+    font-size: 14px; color: var(--text3);
 }
 .card-screenshot-bar .shot-refresh {
     position: absolute; bottom: 8px; right: 12px;
@@ -297,14 +297,14 @@ div#iframe-container{
 }
 .detail-item label {
     display: block;
-    font-size: 10px; font-weight: 700;
+    font-size: 13px; font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .6px;
     color: var(--text3);
     margin-bottom: 3px;
 }
 .detail-item .val {
-    font-size: 12px; color: var(--text2);
+    font-size: 16px; color: var(--text2);
     font-family: ui-monospace, "SFMono-Regular", monospace;
     word-break: break-all;
 }
@@ -328,7 +328,7 @@ div#iframe-container{
 .empty-state {
     text-align: center; padding: 60px 20px; color: var(--text3);
 }
-.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state .icon { font-size: 52px; margin-bottom: 12px; }
 .empty-state strong { color: var(--text2); display: block; margin-bottom: 6px; }
 
 /* ── Modals ── */
@@ -352,8 +352,8 @@ div#iframe-container{
     border-bottom: 1px solid var(--border);
     display: flex; justify-content: space-between; align-items: center;
 }
-.modal-head h3 { font-size: 15px; font-weight: 700; color: var(--text); }
-.modal-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text3); line-height: 1; }
+.modal-head h3 { font-size: 20px; font-weight: 700; color: var(--text); }
+.modal-close { background: none; border: none; font-size: 23px; cursor: pointer; color: var(--text3); line-height: 1; }
 .modal-close:hover { color: var(--red); }
 .modal-body { padding: 20px; }
 .modal-footer {
@@ -366,7 +366,7 @@ div#iframe-container{
 /* ── Form ── */
 .form-section { margin-bottom: 20px; }
 .form-section-title {
-    font-size: 11px; font-weight: 700;
+    font-size: 14px; font-weight: 700;
     text-transform: uppercase; letter-spacing: .6px;
     color: var(--text3);
     border-bottom: 1px solid var(--border2);
@@ -375,7 +375,7 @@ div#iframe-container{
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-group { margin-bottom: 12px; }
 .form-group label {
-    display: block; font-size: 12px; font-weight: 600;
+    display: block; font-size: 16px; font-weight: 600;
     color: var(--text2); margin-bottom: 4px;
 }
 .form-control {
@@ -383,7 +383,7 @@ div#iframe-container{
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 12px; font-family: inherit; color: var(--text);
+    font-size: 16px; font-family: inherit; color: var(--text);
 }
 .form-control:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(47,129,247,.15); }
 .form-control option { background: var(--bg2); }
@@ -392,7 +392,7 @@ div#iframe-container{
 .input-prefix {
     background: var(--bg3); border: 1px solid var(--border);
     border-right: none; border-radius: 6px 0 0 6px;
-    padding: 6px 10px; font-size: 11px; color: var(--text3); white-space: nowrap;
+    padding: 6px 10px; font-size: 14px; color: var(--text3); white-space: nowrap;
 }
 .input-group .form-control { border-radius: 0 6px 6px 0; }
 .input-group-btn { display: flex; gap: 4px; align-items: stretch; }
@@ -402,7 +402,7 @@ div#iframe-container{
 /* ── Notices ── */
 .notice {
     padding: 10px 14px; border-radius: 6px;
-    font-size: 12px; margin-bottom: 12px;
+    font-size: 16px; margin-bottom: 12px;
 }
 .notice-error { background: #1f0d0d; border: 1px solid #421a1a; color: #f97171; }
 .notice-info  { background: #0d1b2f; border: 1px solid #1a3352; color: #79b8ff; }
@@ -415,7 +415,7 @@ div#iframe-container{
 .toast {
     background: var(--bg2); border: 1px solid var(--border);
     color: var(--text); padding: 10px 16px;
-    border-radius: 6px; font-size: 12px;
+    border-radius: 6px; font-size: 16px;
     box-shadow: 0 4px 16px rgba(0,0,0,.4);
     animation: fadeUp .2s ease; max-width: 340px;
     border-left-width: 3px;
@@ -431,7 +431,7 @@ div#iframe-container{
     border-radius: 6px;
     color: var(--text2);
     font-family: ui-monospace,"SFMono-Regular",monospace;
-    font-size: 12px;
+    font-size: 16px;
     padding: 12px;
     height: 200px;
     overflow-y: auto;
@@ -454,7 +454,7 @@ div#iframe-container{
     border-bottom: 2px solid transparent;
     color: var(--text2);
     padding: 12px 16px;
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     transition: all .15s;
@@ -489,7 +489,7 @@ div#iframe-container{
     border: 1px solid transparent;
     color: var(--text2);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 700;
     padding: 7px 12px;
     border-radius: 4px;
@@ -506,7 +506,7 @@ div#iframe-container{
 .wp-admin-icon {
     width: 16px;
     height: 16px;
-    font-size: 16px;
+    font-size: 21px;
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -527,7 +527,7 @@ div#iframe-container{
     gap: 24px;
 }
 .card-sec-title {
-    font-size: 13px;
+    font-size: 17px;
     font-weight: 700;
     color: var(--text);
     border-bottom: 1px solid var(--border);
@@ -559,7 +559,7 @@ div#iframe-container{
     flex: 1;
 }
 .plugin-name {
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
@@ -567,7 +567,7 @@ div#iframe-container{
     text-overflow: ellipsis;
 }
 .plugin-desc {
-    font-size: 11px;
+    font-size: 14px;
     color: var(--text2);
     margin-top: 2px;
     white-space: nowrap;
@@ -575,7 +575,7 @@ div#iframe-container{
     text-overflow: ellipsis;
 }
 .plugin-meta {
-    font-size: 11px;
+    font-size: 14px;
     color: var(--text3);
     margin-top: 2px;
 }
@@ -598,7 +598,7 @@ div#iframe-container{
     align-items: center;
     gap: 6px;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 16px;
 }
 /* Toggle Switch */
 .switch {
@@ -685,13 +685,13 @@ input:disabled + .slider {
     object-fit: cover;
 }
 .premium-banner .banner-icon-fallback {
-    font-size: 32px;
+    font-size: 42px;
 }
 .premium-banner .badge-source {
     position: absolute;
     top: 8px;
     right: 8px;
-    font-size: 9px;
+    font-size: 12px;
     padding: 2px 6px;
     border-radius: 4px;
 }
@@ -703,7 +703,7 @@ input:disabled + .slider {
     gap: 6px;
 }
 .premium-card-title {
-    font-size: 13px;
+    font-size: 17px;
     font-weight: 700;
     color: var(--text);
     white-space: nowrap;
@@ -711,7 +711,7 @@ input:disabled + .slider {
     text-overflow: ellipsis;
 }
 .premium-card-desc {
-    font-size: 11px;
+    font-size: 14px;
     color: var(--text2);
     height: 34px;
     overflow: hidden;
@@ -750,16 +750,16 @@ input:disabled + .slider {
     <div class="logo">
         <span class="dashicons dashicons-wordpress logo-icon"></span>
         Ultimate WordPress Manager
-        <span style="font-size:10px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:2px;letter-spacing:.3px;">v<?php echo htmlspecialchars($plugin_version); ?></span>
+        <span style="font-size:13px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:2px;letter-spacing:.3px;">v<?php echo htmlspecialchars($plugin_version); ?></span>
     </div>
-    <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
+    <span style="color:var(--text3);font-size:14px;display:flex;align-items:center;gap:12px;">
         <span><?php echo htmlspecialchars($server_ip); ?></span> | <span><?php echo htmlspecialchars($hostname); ?></span>
-        <a href="/" class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);"><span class="dashicons dashicons-arrow-left-alt2 wp-admin-icon"></span> Back to DirectAdmin</a>
+        <a href="/" class="btn btn-sm btn-secondary" style="font-size:13px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);"><span class="dashicons dashicons-arrow-left-alt2 wp-admin-icon"></span> Back to DirectAdmin</a>
     </span>
     <div class="user">
         <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> <?php echo htmlspecialchars($username); ?></span>
         <?php if ($isAdmin): ?>
-        <span class="badge badge-yellow" style="font-size:10px;">Admin</span>
+        <span class="badge badge-yellow" style="font-size:13px;">Admin</span>
         <?php endif; ?>
     </div>
 </div>
@@ -841,7 +841,7 @@ input:disabled + .slider {
                     </select>
                     <button type="button" class="btn btn-secondary" onclick="loadUserZipFiles()"><span class="dashicons dashicons-update wp-admin-icon"></span> Quét lại</button>
                 </div>
-                <span style="font-size:11px;color:var(--text3)">Hãy upload tệp ZIP sao lưu của bạn lên hosting (qua FTP/File Manager) rồi chọn từ danh sách trên. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
+                <span style="font-size:14px;color:var(--text3)">Hãy upload tệp ZIP sao lưu của bạn lên hosting (qua FTP/File Manager) rồi chọn từ danh sách trên. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
             </div>
         </div>
 
@@ -920,7 +920,7 @@ input:disabled + .slider {
         <div class="form-section">
             <div class="form-section-title">Source Website Path</div>
             <div class="form-group">
-                <code id="clone-src-display" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;word-break:break-all;color:var(--text2);"></code>
+                <code id="clone-src-display" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:14px;word-break:break-all;color:var(--text2);"></code>
             </div>
         </div>
 
@@ -993,9 +993,9 @@ input:disabled + .slider {
     <div class="modal-body">
         <div class="notice notice-error"><span class="dashicons dashicons-warning wp-admin-icon"></span> This action permanently deletes all files and cannot be undone.</div>
         <p style="margin-bottom:10px;color:var(--text2);">Installation path:</p>
-        <code id="del-path" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;word-break:break-all;color:var(--text2);"></code>
+        <code id="del-path" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:14px;word-break:break-all;color:var(--text2);"></code>
         <div style="margin-top:16px;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;color:var(--text2);">
+            <label style="display:flex;align-items:center;gap:8px;font-size:16px;cursor:pointer;color:var(--text2);">
                 <input type="checkbox" id="del-db-check" checked style="width:14px;height:14px;accent-color:var(--red)">
                 Also delete database: <strong id="del-db-name" style="color:var(--text);font-family:monospace;"></strong>
             </label>
@@ -1016,7 +1016,7 @@ input:disabled + .slider {
         <button class="modal-close" onclick="closeModal('modal-logs')">✕</button>
     </div>
     <div class="modal-body" style="padding:15px;">
-        <textarea id="logs-textarea" readonly style="width:100%; height:400px; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:11px; padding:12px; resize:vertical; outline:none; line-height:1.4;"></textarea>
+        <textarea id="logs-textarea" readonly style="width:100%; height:400px; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:14px; padding:12px; resize:vertical; outline:none; line-height:1.4;"></textarea>
     </div>
     <div class="modal-footer">
         <button class="btn btn-secondary" onclick="refreshLogs()"><span class="dashicons dashicons-update wp-admin-icon"></span> Làm mới</button>
@@ -1034,7 +1034,7 @@ input:disabled + .slider {
         <button class="modal-close" onclick="closeModal('modal-update')">✕</button>
     </div>
     <div class="modal-body">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:6px;">Downloads the latest version from GitHub and replaces current plugin files.</p>
+        <p style="font-size:16px;color:var(--text2);margin-bottom:6px;">Downloads the latest version from GitHub and replaces current plugin files.</p>
         <div class="terminal" id="update-terminal"></div>
     </div>
     <div class="modal-footer">
@@ -1098,7 +1098,7 @@ function toast(msg, type='info') {
                 #plugin-toast-area .toast {
                     background: #161b22; border: 1px solid #30363d;
                     color: #e6edf3; padding: 10px 16px;
-                    border-radius: 6px; font-size: 12px;
+                    border-radius: 6px; font-size: 16px;
                     box-shadow: 0 4px 16px rgba(0,0,0,.4);
                     animation: fadeUpParent .2s ease; max-width: 340px;
                     border-left: 3px solid #6e7681;
@@ -1416,7 +1416,7 @@ async function clearLogFile(i) {
 async function loadPlugins(i) {
     const s = allSites[i];
     const container = document.getElementById('plugin-list-' + i);
-    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Loading plugins...</div>';
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">⏳ Loading plugins...</div>';
     
     try {
         const fd = new FormData();
@@ -1426,19 +1426,19 @@ async function loadPlugins(i) {
         
         if (d.success) {
             if (!d.plugins.length) {
-                container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">No plugins installed.</div>';
+                container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">No plugins installed.</div>';
                 return;
             }
             container.innerHTML = d.plugins.map((p, idx) => {
                 const actionText = p.active ? 'Deactivate' : 'Activate';
                 const actionBtnClass = p.active ? 'btn-danger' : 'btn-primary';
                 const statusBadge = p.active 
-                    ? `<span id="plug-status-${i}-${idx}" style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>` 
-                    : `<span id="plug-status-${i}-${idx}" style="color:var(--text3);font-size:11px;">Inactive</span>`;
+                    ? `<span id="plug-status-${i}-${idx}" style="color:var(--green);font-size:14px;font-weight:bold;">Active</span>` 
+                    : `<span id="plug-status-${i}-${idx}" style="color:var(--text3);font-size:14px;">Inactive</span>`;
                 const latestVersion = p.latest_version || p.version || 'Unknown';
                 const updateBadge = p.update_available
-                    ? `<span id="plug-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>`
-                    : `<span id="plug-up-badge-${i}-${idx}" style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                    ? `<span id="plug-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:14px;font-weight:bold;">Update available</span>`
+                    : `<span id="plug-up-badge-${i}-${idx}" style="color:var(--text3);font-size:14px;">Up to date</span>`;
                 const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
                 const updateTitle = p.update_available
                     ? 'Update this plugin'
@@ -1462,10 +1462,10 @@ async function loadPlugins(i) {
                 </div>`;
             }).join('');
         } else {
-            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
         }
     } catch (err) {
-        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load plugins.</div>';
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Cannot load plugins.</div>';
     }
 }
 
@@ -1599,7 +1599,7 @@ async function updatePlugin(siteIdx, plugIdx, file, reloadAfter = true) {
                     const latestEl = document.getElementById(`plug-latest-${siteIdx}-${plugIdx}`);
                     if (latestEl) latestEl.textContent = `v${newPlug.latest_version}`;
                     const badgeEl = document.getElementById(`plug-up-badge-${siteIdx}-${plugIdx}`);
-                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:14px;">Up to date</span>`;
                 }
             } else if (btn) {
                 btn.textContent = 'Updated';
@@ -1703,7 +1703,7 @@ async function reinstallPlugin(siteIdx, plugIdx, file) {
                 const latestEl = document.getElementById(`plug-latest-${siteIdx}-${plugIdx}`);
                 if (latestEl) latestEl.textContent = `v${newPlug.latest_version}`;
                 const badgeEl = document.getElementById(`plug-up-badge-${siteIdx}-${plugIdx}`);
-                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:14px;">Up to date</span>`;
             }
         } else {
             toast(d.error || 'Failed to reinstall plugin.', 'error');
@@ -1763,7 +1763,7 @@ async function deletePlugin(siteIdx, plugIdx, file) {
 async function loadThemes(i) {
     const s = allSites[i];
     const container = document.getElementById('theme-list-' + i);
-    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Loading themes...</div>';
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">⏳ Loading themes...</div>';
     
     try {
         const fd = new FormData();
@@ -1773,20 +1773,20 @@ async function loadThemes(i) {
         
         if (d.success) {
             if (!d.themes.length) {
-                container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">No themes installed.</div>';
+                container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">No themes installed.</div>';
                 return;
             }
             container.innerHTML = d.themes.map((t, idx) => {
                 const actionText = t.active ? 'Active' : 'Activate';
                 const actionBtnClass = t.active ? 'btn-secondary' : 'btn-primary';
                 const statusBadge = t.active 
-                    ? `<span id="theme-status-${i}-${idx}" style="color:var(--green);font-size:11px;font-weight:bold;">Active</span>` 
-                    : `<span id="theme-status-${i}-${idx}" style="color:var(--text3);font-size:11px;">Inactive</span>`;
+                    ? `<span id="theme-status-${i}-${idx}" style="color:var(--green);font-size:14px;font-weight:bold;">Active</span>` 
+                    : `<span id="theme-status-${i}-${idx}" style="color:var(--text3);font-size:14px;">Inactive</span>`;
                 const disabledAttr = t.active ? 'disabled' : '';
                 const latestVersion = t.latest_version || t.version || 'Unknown';
                 const updateBadge = t.update_available
-                    ? `<span id="theme-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:11px;font-weight:bold;">Update available</span>`
-                    : `<span id="theme-up-badge-${i}-${idx}" style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                    ? `<span id="theme-up-badge-${i}-${idx}" style="color:var(--yellow);font-size:14px;font-weight:bold;">Update available</span>`
+                    : `<span id="theme-up-badge-${i}-${idx}" style="color:var(--text3);font-size:14px;">Up to date</span>`;
                 const updateDisabled = ''; // Always enable Update button to allow force reinstalling/cleaning malware
                 const updateTitle = t.update_available
                     ? 'Update this theme'
@@ -1810,10 +1810,10 @@ async function loadThemes(i) {
                 </div>`;
             }).join('');
         } else {
-            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
         }
     } catch (err) {
-        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Cannot load themes.</div>';
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Cannot load themes.</div>';
     }
 }
 
@@ -1853,7 +1853,7 @@ async function updateTheme(siteIdx, themeIdx, folder, reloadAfter = true) {
                     const latestEl = document.getElementById(`theme-latest-${siteIdx}-${themeIdx}`);
                     if (latestEl) latestEl.textContent = `v${newTheme.latest_version}`;
                     const badgeEl = document.getElementById(`theme-up-badge-${siteIdx}-${themeIdx}`);
-                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                    if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:14px;">Up to date</span>`;
                 }
             } else if (btn) {
                 btn.textContent = 'Updated';
@@ -1970,7 +1970,7 @@ async function reinstallTheme(siteIdx, themeIdx, folder) {
                 const latestEl = document.getElementById(`theme-latest-${siteIdx}-${themeIdx}`);
                 if (latestEl) latestEl.textContent = `v${newTheme.latest_version}`;
                 const badgeEl = document.getElementById(`theme-up-badge-${siteIdx}-${themeIdx}`);
-                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:11px;">Up to date</span>`;
+                if (badgeEl) badgeEl.innerHTML = `<span style="color:var(--text3);font-size:14px;">Up to date</span>`;
             }
         } else {
             toast(d.error || 'Failed to reinstall theme.', 'error');
@@ -2034,7 +2034,7 @@ async function deleteTheme(siteIdx, themeIdx, folder) {
 async function loadSecurity(i) {
     const s = allSites[i];
     const container = document.getElementById('security-list-' + i);
-    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Đang quét bảo mật website...</div>';
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">⏳ Đang quét bảo mật website...</div>';
     
     try {
         const fd = new FormData();
@@ -2081,13 +2081,13 @@ async function loadSecurity(i) {
                 
                 return `
                 <div class="plugin-item" style="padding: 10px 14px;">
-                    <div style="font-size: 18px; flex-shrink: 0; margin-right: 8px;"><span class="dashicons ${m.icon} wp-admin-icon"></span></div>
+                    <div style="font-size: 23px; flex-shrink: 0; margin-right: 8px;"><span class="dashicons ${m.icon} wp-admin-icon"></span></div>
                     <div class="plugin-info">
                         <div style="display:flex; align-items:center; gap:8px;">
-                            <span class="plugin-name" style="font-size:12px; font-weight:600; color:var(--text);">${esc(m.title)}</span>
-                            <span class="badge ${badgeClass}" style="padding: 1px 6px; font-size: 9px; line-height: 1;">${badgeText}</span>
+                            <span class="plugin-name" style="font-size:16px; font-weight:600; color:var(--text);">${esc(m.title)}</span>
+                            <span class="badge ${badgeClass}" style="padding: 1px 6px; font-size: 12px; line-height: 1;">${badgeText}</span>
                         </div>
-                        <div class="plugin-desc" style="font-size:11px; color:var(--text2); margin-top: 2px; white-space: normal; line-height: 1.3;" title="${esc(m.desc)}">${esc(m.desc)}</div>
+                        <div class="plugin-desc" style="font-size:14px; color:var(--text2); margin-top: 2px; white-space: normal; line-height: 1.3;" title="${esc(m.desc)}">${esc(m.desc)}</div>
                     </div>
                     <div style="flex-shrink:0; margin-left: 12px; display:flex; align-items:center;">
                         <label class="switch">
@@ -2151,7 +2151,7 @@ if ($query_string ~* "author=[0-9]") {
                         <span style="font-weight:bold;">Vui lòng copy và dán các dòng cấu hình sau vào tệp cấu hình Nginx (server block) của website:</span>
                     </div>
                     <div style="position:relative;">
-                        <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:11px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-${i}">${esc(nginxConfigRules)}</textarea>
+                        <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:14px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-${i}">${esc(nginxConfigRules)}</textarea>
                         <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(${i})"><span class="dashicons dashicons-clipboard wp-admin-icon"></span> Copy</button>
                     </div>
                 </div>
@@ -2160,10 +2160,10 @@ if ($query_string ~* "author=[0-9]") {
             
             container.innerHTML = mainHtml + nginxHtml;
         } else {
-            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
         }
     } catch (err) {
-        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Không thể tải trạng thái bảo mật.</div>';
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Không thể tải trạng thái bảo mật.</div>';
     }
 }
 
@@ -2661,7 +2661,7 @@ function renderSites(sites) {
 
     if (!sites.length) {
         cnt.innerHTML = `<div class="empty-state">
-            <div class="icon"><span class="dashicons dashicons-portfolio wp-admin-icon" style="font-size:40px; width:40px; height:40px;"></span></div>
+            <div class="icon"><span class="dashicons dashicons-portfolio wp-admin-icon" style="font-size:52px; width:40px; height:40px;"></span></div>
             <strong>No WordPress installations found</strong>
             <p>Click <em>Scan Hosting</em> to search, or <em>Install WordPress</em> to add one.</p>
         </div>`;
@@ -2809,7 +2809,7 @@ function renderSites(sites) {
                         <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan & Refresh</button>
                     </div>
                     <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
-                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Clicking Security tab or Scan & Refresh will load status...
                         </div>
                     </div>
@@ -2831,7 +2831,7 @@ function renderSites(sites) {
                         </div>
                     </div>
                     <div class="plugin-list" id="plugin-list-${i}">
-                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Clicking Plugins tab or Refresh will load plugins...
                         </div>
                     </div>
@@ -2852,7 +2852,7 @@ function renderSites(sites) {
                         </div>
                     </div>
                     <div class="plugin-list" id="theme-list-${i}">
-                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Clicking Themes tab or Refresh will load themes...
                         </div>
                     </div>
@@ -2864,23 +2864,23 @@ function renderSites(sites) {
                     </div>
                     <div style="background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;" onclick="event.stopPropagation()">
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <select id="log-type-${i}" class="form-control" style="width: 220px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogTypeChanged(${i})">
+                            <select id="log-type-${i}" class="form-control" style="width: 220px; padding: 4px 8px; font-size: 14px; display: inline-block;" onchange="onLogTypeChanged(${i})">
                                 <option value="wp_debug">WordPress Debug (wp-content/debug.log)</option>
                                 <option value="access">Access Log (Nginx/Apache)</option>
                                 <option value="error">Error Log (Nginx/Apache)</option>
                                 <option value="php_error">PHP Error Log</option>
                             </select>
                             
-                            <input type="text" id="log-search-${i}" placeholder="Tìm kiếm log..." class="toolbar-search" style="width: 160px; padding: 4px 8px; font-size: 11px;" oninput="onLogFilterChanged(${i})">
+                            <input type="text" id="log-search-${i}" placeholder="Tìm kiếm log..." class="toolbar-search" style="width: 160px; padding: 4px 8px; font-size: 14px;" oninput="onLogFilterChanged(${i})">
                             
-                            <select id="log-lines-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
+                            <select id="log-lines-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 14px; display: inline-block;" onchange="onLogFilterChanged(${i})">
                                 <option value="50">50 dòng</option>
                                 <option value="100" selected>100 dòng</option>
                                 <option value="200">200 dòng</option>
                                 <option value="500">500 dòng</option>
                             </select>
                             
-                            <select id="log-time-${i}" class="form-control" style="width: 110px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
+                            <select id="log-time-${i}" class="form-control" style="width: 110px; padding: 4px 8px; font-size: 14px; display: inline-block;" onchange="onLogFilterChanged(${i})">
                                 <option value="0" selected>Mọi lúc</option>
                                 <option value="60">1 phút qua</option>
                                 <option value="300">5 phút qua</option>
@@ -2892,7 +2892,7 @@ function renderSites(sites) {
                                 <option value="86400">24 giờ qua</option>
                             </select>
 
-                            <select id="log-refresh-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogRefreshIntervalChanged(${i})">
+                            <select id="log-refresh-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 14px; display: inline-block;" onchange="onLogRefreshIntervalChanged(${i})">
                                 <option value="1">1s</option>
                                 <option value="3" selected>3s</option>
                                 <option value="5">5s</option>
@@ -2901,15 +2901,15 @@ function renderSites(sites) {
                                 <option value="60">1p</option>
                             </select>
                             
-                            <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-controls-pause wp-admin-icon"></span> Tạm dừng</button>
-                            <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa log</button>
+                            <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 14px;"><span class="dashicons dashicons-controls-pause wp-admin-icon"></span> Tạm dừng</button>
+                            <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 14px;"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa log</button>
                         </div>
                         
-                        <div id="log-path-info-${i}" style=" padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
+                        <div id="log-path-info-${i}" style=" padding-top: 8px; color: var(--text2); font-size: 14px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
                             Đang tải log từ: ...
                         </div>
 
-                        <div id="log-filetype-filters-${i}" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text2); border-top: 1px dashed var(--border); padding-top: 8px;">
+                        <div id="log-filetype-filters-${i}" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: var(--text2); border-top: 1px dashed var(--border); padding-top: 8px;">
                             <span style="font-weight: bold;">Lọc loại file:</span>
                             <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php_backend" checked onchange="onLogFilterChanged(${i})"> PHP Backend</label>
                             <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php" checked onchange="onLogFilterChanged(${i})"> PHP</label>
@@ -2923,7 +2923,7 @@ function renderSites(sites) {
                     </div>
                     
                     <div style="position: relative;" onclick="event.stopPropagation()">
-                        <textarea id="log-terminal-${i}" readonly style="width:100%; height:420px; background:#05070a; border:1px solid var(--border); border-radius:6px; color:#39ff14; font-family:Consolas, 'Fira Code', Monaco, 'Courier New', monospace; font-size:11.5px; padding:12px; margin-top:10px; resize:vertical; outline:none; line-height:1.4; white-space: pre; overflow-wrap: normal; overflow-x: auto;" placeholder="[Hệ thống] Nhật ký đang được tải..."></textarea>
+                        <textarea id="log-terminal-${i}" readonly style="width:100%; height:420px; background:#05070a; border:1px solid var(--border); border-radius:6px; color:#39ff14; font-family:Consolas, 'Fira Code', Monaco, 'Courier New', monospace; font-size:15px; padding:12px; margin-top:10px; resize:vertical; outline:none; line-height:1.4; white-space: pre; overflow-wrap: normal; overflow-x: auto;" placeholder="[Hệ thống] Nhật ký đang được tải..."></textarea>
                     </div>
                 </div>
 
@@ -2987,13 +2987,13 @@ async function loadPremiumItems(siteIdx, itemType, group) {
     const label = itemType === 'plugins'
         ? (group === 'popular' ? 'popular plugins' : 'premium plugins')
         : (group === 'popular' ? 'popular themes' : 'premium themes');
-    container.innerHTML = `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Loading ${label}...</div>`;
+    container.innerHTML = `<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">Loading ${label}...</div>`;
 
     try {
         const data = await fetchPremiumList();
         renderPremiumItems(siteIdx, itemType, group, data);
     } catch (err) {
-        container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">${esc(err.message || 'Cannot load install list.')}</div>`;
+        container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">${esc(err.message || 'Cannot load install list.')}</div>`;
     }
 }
 
@@ -3012,17 +3012,17 @@ function renderPremiumItems(siteIdx, itemType, group, data) {
         : (group === 'popular' ? 'No popular themes configured.' : 'No premium themes configured.');
 
     if (!items.length) {
-        container.innerHTML = `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">${emptyText}</div>`;
+        container.innerHTML = `<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">${emptyText}</div>`;
         return;
     }
 
     container.innerHTML = items.map((item, idx) => {
         const isWpOrg = item.type === 'wporg';
-        const statusBadge = `<span style="color:var(--text3);font-size:11px;">${isWpOrg ? 'WordPress.org' : 'Premium ZIP'}</span>`;
+        const statusBadge = `<span style="color:var(--text3);font-size:14px;">${isWpOrg ? 'WordPress.org' : 'Premium ZIP'}</span>`;
         const sourceMeta = isWpOrg ? `Slug: ${esc(item.slug || '')}` : `File: ${esc(item.file || '')}`;
         const idVal = isWpOrg ? item.slug : item.file;
         const activateTheme = !isPlugin ? `
-                            <label style="font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
+                            <label style="font-size: 13px; color: var(--text2); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
                                 <input type="checkbox" id="premium-activate-theme-${siteIdx}-${group}-${idx}" checked style="accent-color: var(--blue);"> Activate
                             </label>` : '';
         const themeIdxArg = isPlugin ? 'null' : `'${group}-${idx}'`;
@@ -3121,7 +3121,7 @@ function filterSites() {
 /* ─── Fetch list ─── */
 async function fetchSites(scan=false) {
     document.getElementById('sites-container').innerHTML =
-        `<div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin" style="font-size: 40px; width: 40px; height: 40px;"></span></div><strong>${scan?'Scanning directories…':'Loading…'}</strong></div>`;
+        `<div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin" style="font-size: 52px; width: 40px; height: 40px;"></span></div><strong>${scan?'Scanning directories…':'Loading…'}</strong></div>`;
     try {
         const r = await fetch(apiUrl(scan?'scan':'list'));
         const d = await r.json();
