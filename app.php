@@ -832,53 +832,25 @@ function get_active_plugins($site_path) {
  * Toggle plugin status (activate/deactivate) directly in the database
  */
 function toggle_plugin_status($site_path, $plugin_file, $status) {
-    $bootstrapped = false;
-    $buffer_level = ob_get_level();
-    ob_start();
+    // 1. Try toggling plugin using WP-CLI first (safer and runs in a separate process)
     try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $bootstrapped = true;
-    } catch (Throwable $e) {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+        $wp_cli = trim(wp_exec('which wp 2>/dev/null') ?: '/usr/local/bin/wp');
+        if (file_exists($wp_cli) || wp_exec("hash wp 2>/dev/null; echo $?")) {
+            $esc_path = escapeshellarg($site_path);
+            $esc_plugin = escapeshellarg($plugin_file);
+            $cmd_action = ($status === 'activate') ? 'activate' : 'deactivate';
+            $output = wp_exec("{$wp_cli} plugin {$cmd_action} {$esc_plugin} --path={$esc_path} --allow-root 2>&1");
+            if (strpos($output, 'Success:') !== false || strpos($output, 'Already') !== false) {
+                wp_manager_log("Plugin toggled successfully using WP-CLI.");
+                return true;
+            }
+            wp_manager_log("WP-CLI plugin toggle failed: " . $output . ". Falling back to direct DB update.");
         }
-        wp_manager_log("Bootstrapping WordPress failed, falling back to direct DB update: " . $e->getMessage());
+    } catch (Throwable $t) {
+        wp_manager_log("WP-CLI execution error: " . $t->getMessage());
     }
 
-    if ($bootstrapped) {
-        try {
-            require_once ABSPATH . 'wp-admin/includes/plugin.php';
-            if ($status === 'activate') {
-                $result = activate_plugin($plugin_file);
-                if (is_wp_error($result)) {
-                    throw new Exception($result->get_error_message());
-                }
-            } else {
-                deactivate_plugins($plugin_file);
-            }
-            
-            if (function_exists('wp_cache_delete')) {
-                wp_cache_delete('alloptions', 'options');
-                wp_cache_delete('active_plugins', 'options');
-            }
-            if (function_exists('wp_cache_flush')) {
-                wp_cache_flush();
-            }
-            
-            while (ob_get_level() > $buffer_level) {
-                ob_end_clean();
-            }
-            wp_manager_log("Plugin toggled successfully using native WordPress functions.");
-            return true;
-        } catch (Throwable $e) {
-            while (ob_get_level() > $buffer_level) {
-                ob_end_clean();
-            }
-            wp_manager_log("Native WordPress toggle failed: " . $e->getMessage() . ". Falling back to direct database update.");
-        }
-    }
-
-    // FALLBACK: Direct Database Update
+    // 2. FALLBACK: Direct Database Update
     $wp_config_path = $site_path . '/wp-config.php';
     if (!file_exists($wp_config_path)) {
         throw new Exception("wp-config.php not found.");
@@ -1034,47 +1006,24 @@ function get_active_theme($site_path) {
  * Activate a theme in the database
  */
 function activate_theme($site_path, $theme_folder) {
-    $bootstrapped = false;
-    $buffer_level = ob_get_level();
-    ob_start();
+    // 1. Try activating theme using WP-CLI first (safer and runs in a separate process)
     try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $bootstrapped = true;
-    } catch (Throwable $e) {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
+        $wp_cli = trim(wp_exec('which wp 2>/dev/null') ?: '/usr/local/bin/wp');
+        if (file_exists($wp_cli) || wp_exec("hash wp 2>/dev/null; echo $?")) {
+            $esc_path = escapeshellarg($site_path);
+            $esc_theme = escapeshellarg($theme_folder);
+            $output = wp_exec("{$wp_cli} theme activate {$esc_theme} --path={$esc_path} --allow-root 2>&1");
+            if (strpos($output, 'Success:') !== false || strpos($output, 'Already') !== false) {
+                wp_manager_log("Theme activated successfully using WP-CLI.");
+                return true;
+            }
+            wp_manager_log("WP-CLI theme activation failed: " . $output . ". Falling back to direct DB update.");
         }
-        wp_manager_log("Bootstrapping WordPress for theme switch failed, falling back to direct DB update: " . $e->getMessage());
+    } catch (Throwable $t) {
+        wp_manager_log("WP-CLI execution error: " . $t->getMessage());
     }
 
-    if ($bootstrapped) {
-        try {
-            require_once ABSPATH . 'wp-admin/includes/theme.php';
-            switch_theme($theme_folder);
-            
-            if (function_exists('wp_cache_delete')) {
-                wp_cache_delete('alloptions', 'options');
-                wp_cache_delete('template', 'options');
-                wp_cache_delete('stylesheet', 'options');
-            }
-            if (function_exists('wp_cache_flush')) {
-                wp_cache_flush();
-            }
-            
-            while (ob_get_level() > $buffer_level) {
-                ob_end_clean();
-            }
-            wp_manager_log("Theme activated successfully using native WordPress functions.");
-            return true;
-        } catch (Throwable $e) {
-            while (ob_get_level() > $buffer_level) {
-                ob_end_clean();
-            }
-            wp_manager_log("Native WordPress theme switch failed: " . $e->getMessage() . ". Falling back to direct database update.");
-        }
-    }
-
-    // FALLBACK: Direct Database Update
+    // 2. FALLBACK: Direct Database Update
     $wp_config_path = $site_path . '/wp-config.php';
     if (!file_exists($wp_config_path)) {
         throw new Exception("wp-config.php not found.");
@@ -4321,86 +4270,22 @@ function run_api() {
                 
                 $activated = false;
                 
-                // Tạm ẩn object-cache.php và advanced-cache.php để tránh lỗi Cannot redeclare wp_cache_supports()
-                $object_cache_file = $site_path . '/wp-content/object-cache.php';
-                $object_cache_bak = $site_path . '/wp-content/object-cache.php.bak';
-                $has_object_cache = false;
-                if (file_exists($object_cache_file)) {
-                    if (@rename($object_cache_file, $object_cache_bak)) {
-                        $has_object_cache = true;
-                    }
-                }
-                
-                $adv_cache_file = $site_path . '/wp-content/advanced-cache.php';
-                $adv_cache_bak = $site_path . '/wp-content/advanced-cache.php.bak';
-                $has_adv_cache = false;
-                if (file_exists($adv_cache_file)) {
-                    if (@rename($adv_cache_file, $adv_cache_bak)) {
-                        $has_adv_cache = true;
-                    }
-                }
-                
-                try {
-                    if ($item_type === 'plugins') {
-                        $main_file = find_plugin_main_file($target_dir, $folder_name);
-                        if ($main_file) {
-                            $buffer_level = ob_get_level();
-                            ob_start();
-                            try {
-                                wp_manager_bootstrap_wordpress($site_path);
-                                require_once ABSPATH . 'wp-admin/includes/plugin.php';
-                                
-                                $res_act = activate_plugin($main_file);
-                                
-                                if (function_exists('wp_cache_delete')) {
-                                    wp_cache_delete('alloptions', 'options');
-                                    wp_cache_delete('active_plugins', 'options');
-                                }
-                                if (function_exists('wp_cache_flush')) {
-                                    wp_cache_flush();
-                                }
-                                $activated = true;
-                            } catch (Throwable $e) {
-                                wp_manager_log("Kích hoạt plugin thất bại: " . $e->getMessage());
-                            } finally {
-                                while (ob_get_level() > $buffer_level) {
-                                    ob_end_clean();
-                                }
-                            }
-                        }
-                    } else {
-                        if (isset($_POST['activate']) && ($_POST['activate'] === 'true' || $_POST['activate'] === '1')) {
-                            $buffer_level = ob_get_level();
-                            ob_start();
-                            try {
-                                wp_manager_bootstrap_wordpress($site_path);
-                                require_once ABSPATH . 'wp-admin/includes/theme.php';
-                                switch_theme($folder_name);
-                                if (function_exists('wp_cache_delete')) {
-                                    wp_cache_delete('alloptions', 'options');
-                                    wp_cache_delete('template', 'options');
-                                    wp_cache_delete('stylesheet', 'options');
-                                }
-                                if (function_exists('wp_cache_flush')) {
-                                    wp_cache_flush();
-                                }
-                                $activated = true;
-                            } catch (Throwable $e) {
-                                wp_manager_log("Kích hoạt theme thất bại: " . $e->getMessage());
-                            } finally {
-                                while (ob_get_level() > $buffer_level) {
-                                    ob_end_clean();
-                                }
-                            }
+                if ($item_type === 'plugins') {
+                    $main_file = find_plugin_main_file($target_dir, $folder_name);
+                    if ($main_file) {
+                        try {
+                            $activated = toggle_plugin_status($site_path, $main_file, 'activate');
+                        } catch (Throwable $e) {
+                            wp_manager_log("Kích hoạt plugin thất bại: " . $e->getMessage());
                         }
                     }
-                } finally {
-                    // Khôi phục lại các file cache drop-in sau khi chạy xong
-                    if ($has_object_cache && file_exists($object_cache_bak)) {
-                        @rename($object_cache_bak, $object_cache_file);
-                    }
-                    if ($has_adv_cache && file_exists($adv_cache_bak)) {
-                        @rename($adv_cache_bak, $adv_cache_file);
+                } else {
+                    if (isset($_POST['activate']) && ($_POST['activate'] === 'true' || $_POST['activate'] === '1')) {
+                        try {
+                            $activated = activate_theme($site_path, $folder_name);
+                        } catch (Throwable $e) {
+                            wp_manager_log("Kích hoạt theme thất bại: " . $e->getMessage());
+                        }
                     }
                 }
                 
