@@ -3812,22 +3812,33 @@ function log_line_matches_file_types($line, $enabled_types) {
         return true;
     }
     
-    $type = 'other';
+    $matched_types = [];
     if ($ext === 'php') {
-        $type = 'php';
+        $matched_types[] = 'php';
+        $matched_types[] = 'php_backend';
+    } elseif ($ext === '') {
+        $matched_types[] = 'php_backend';
+        $matched_types[] = 'other';
     } elseif ($ext === 'html' || $ext === 'htm') {
-        $type = 'html';
+        $matched_types[] = 'html';
     } elseif ($ext === 'css') {
-        $type = 'css';
+        $matched_types[] = 'css';
     } elseif ($ext === 'js') {
-        $type = 'js';
+        $matched_types[] = 'js';
     } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico'])) {
-        $type = 'image';
+        $matched_types[] = 'image';
     } elseif (in_array($ext, ['woff', 'woff2', 'ttf', 'otf', 'eot'])) {
-        $type = 'font';
+        $matched_types[] = 'font';
+    } else {
+        $matched_types[] = 'other';
     }
     
-    return in_array($type, $enabled_types);
+    foreach ($matched_types as $t) {
+        if (in_array($t, $enabled_types)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**

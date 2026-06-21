@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.11';
+$plugin_version = '1.3.12';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -2845,6 +2845,7 @@ function renderSites(sites) {
                         
                         <div id="log-filetype-filters-${i}" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text2); border-top: 1px dashed var(--border); padding-top: 8px;">
                             <span style="font-weight: bold;">Lọc loại file:</span>
+                            <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php_backend" checked onchange="onLogFilterChanged(${i})"> PHP Backend</label>
                             <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php" checked onchange="onLogFilterChanged(${i})"> PHP</label>
                             <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="html" checked onchange="onLogFilterChanged(${i})"> HTML</label>
                             <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="css" checked onchange="onLogFilterChanged(${i})"> CSS</label>
