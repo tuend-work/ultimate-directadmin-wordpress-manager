@@ -1130,63 +1130,121 @@ function wp_manager_bootstrap_wordpress($site_path) {
 }
 
 /**
- * Fetch available plugin updates from WordPress update transients.
+ * Helper to fetch a site transient directly from options table via PDO (avoiding WP bootstrap)
+ */
+function get_site_transient_from_db($site_path, $transient_name) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    if (!file_exists($wp_config_path)) return null;
+    
+    $content = file_get_contents($wp_config_path);
+    preg_match("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_name_match);
+    preg_match("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_user_match);
+    preg_match("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_pass_match);
+    preg_match("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", $content, $db_host_match);
+    preg_match("/\\\$table_prefix\s*=\s*['\"](.*?)['\"]/", $content, $prefix_match);
+    
+    $db_name = $db_name_match[1] ?? '';
+    $db_user = $db_user_match[1] ?? '';
+    $db_pass = $db_pass_match[1] ?? '';
+    $db_host = $db_host_match[1] ?? 'localhost';
+    $db_prefix = $prefix_match[1] ?? 'wp_';
+    
+    try {
+        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+        $pdo = new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 2
+        ]);
+        
+        $option_name = '_site_transient_' . $transient_name;
+        $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = ?");
+        $stmt->execute([$option_name]);
+        $val = $stmt->fetchColumn();
+        if ($val) {
+            return @unserialize($val);
+        }
+    } catch (Exception $e) {
+        wp_manager_log("PDO unable to fetch transient {$transient_name}: " . $e->getMessage());
+    }
+    return null;
+}
+
+/**
+ * Fetch available plugin updates from WordPress update transients directly from the database.
  */
 function get_wordpress_plugin_update_info($site_path) {
     $updates = [];
-    $buffer_level = ob_get_level();
-    ob_start();
     try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $transient = get_site_transient('update_plugins');
-        foreach (['response' => true, 'no_update' => false] as $bucket => $has_update) {
-            if (!empty($transient->$bucket) && is_array($transient->$bucket)) {
-                foreach ($transient->$bucket as $file => $item) {
-                    $updates[$file] = [
-                        'latest_version' => $item->new_version ?? '',
-                        'update_available' => $has_update,
-                        'update_package_available' => $has_update && !empty($item->package)
-                    ];
+        $transient = get_site_transient_from_db($site_path, 'update_plugins');
+        if ($transient) {
+            $response = is_array($transient) ? ($transient['response'] ?? []) : ($transient->response ?? []);
+            $no_update = is_array($transient) ? ($transient['no_update'] ?? []) : ($transient->no_update ?? []);
+            
+            foreach (['response' => $response, 'no_update' => $no_update] as $bucket => $list) {
+                $has_update = ($bucket === 'response');
+                if (!empty($list) && (is_array($list) || is_object($list))) {
+                    foreach ($list as $file => $item) {
+                        $new_version = '';
+                        $package = '';
+                        if (is_object($item)) {
+                            $new_version = $item->new_version ?? '';
+                            $package = $item->package ?? '';
+                        } elseif (is_array($item)) {
+                            $new_version = $item['new_version'] ?? '';
+                            $package = $item['package'] ?? '';
+                        }
+                        
+                        $updates[$file] = [
+                            'latest_version' => $new_version,
+                            'update_available' => $has_update,
+                            'update_package_available' => $has_update && !empty($package)
+                        ];
+                    }
                 }
             }
         }
     } catch (Throwable $e) {
-        wp_manager_log("Unable to fetch plugin update info: " . $e->getMessage());
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
-        }
+        wp_manager_log("Unable to parse plugin update info from DB: " . $e->getMessage());
     }
     return $updates;
 }
 
 /**
- * Fetch available theme updates from WordPress update transients.
+ * Fetch available theme updates from WordPress update transients directly from the database.
  */
 function get_wordpress_theme_update_info($site_path) {
     $updates = [];
-    $buffer_level = ob_get_level();
-    ob_start();
     try {
-        wp_manager_bootstrap_wordpress($site_path);
-        $transient = get_site_transient('update_themes');
-        foreach (['response' => true, 'no_update' => false] as $bucket => $has_update) {
-            if (!empty($transient->$bucket) && is_array($transient->$bucket)) {
-                foreach ($transient->$bucket as $folder => $item) {
-                    $updates[$folder] = [
-                        'latest_version' => $item['new_version'] ?? ($item->new_version ?? ''),
-                        'update_available' => $has_update,
-                        'update_package_available' => $has_update && !empty($item['package'] ?? ($item->package ?? ''))
-                    ];
+        $transient = get_site_transient_from_db($site_path, 'update_themes');
+        if ($transient) {
+            $response = is_array($transient) ? ($transient['response'] ?? []) : ($transient->response ?? []);
+            $no_update = is_array($transient) ? ($transient['no_update'] ?? []) : ($transient->no_update ?? []);
+            
+            foreach (['response' => $response, 'no_update' => $no_update] as $bucket => $list) {
+                $has_update = ($bucket === 'response');
+                if (!empty($list) && (is_array($list) || is_object($list))) {
+                    foreach ($list as $folder => $item) {
+                        $new_version = '';
+                        $package = '';
+                        if (is_object($item)) {
+                            $new_version = $item->new_version ?? '';
+                            $package = $item->package ?? '';
+                        } elseif (is_array($item)) {
+                            $new_version = $item['new_version'] ?? '';
+                            $package = $item['package'] ?? '';
+                        }
+                        
+                        $updates[$folder] = [
+                            'latest_version' => $new_version,
+                            'update_available' => $has_update,
+                            'update_package_available' => $has_update && !empty($package)
+                        ];
+                    }
                 }
             }
         }
     } catch (Throwable $e) {
-        wp_manager_log("Unable to fetch theme update info: " . $e->getMessage());
-    } finally {
-        while (ob_get_level() > $buffer_level) {
-            ob_end_clean();
-        }
+        wp_manager_log("Unable to parse theme update info from DB: " . $e->getMessage());
     }
     return $updates;
 }
