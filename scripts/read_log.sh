@@ -56,6 +56,14 @@ try_find_log() {
 # 1. Thử với tên domain như truyền vào (domain chính hoặc full subdomain)
 LOG_FILE=$(try_find_log "$DOMAIN")
 
+# 1b. Nếu WordPress/siteurl dùng www nhưng DirectAdmin log nằm ở domain gốc
+if [ -z "$LOG_FILE" ]; then
+    NON_WWW_DOMAIN="${DOMAIN#www.}"
+    if [ "$NON_WWW_DOMAIN" != "$DOMAIN" ]; then
+        LOG_FILE=$(try_find_log "$NON_WWW_DOMAIN")
+    fi
+fi
+
 # 2. Nếu là subdomain, thử định dạng DirectAdmin đảo ngược: {parent}.{sub}.log
 #    ví dụ: sub.domain.com → /var/log/nginx/domains/domain.com.sub.log
 if [ -z "$LOG_FILE" ] && [ -n "$PARENT_DOMAIN" ]; then

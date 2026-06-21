@@ -3882,47 +3882,47 @@ function resolve_site_domain_for_logs($site_path, $home) {
     $site_path_real = str_replace('\\', '/', $site_path_real);
     $home = rtrim(str_replace('\\', '/', $home), '/');
 
+    // DirectAdmin log names are based on the configured domain path, not always WP siteurl.
+    // Prefer /home/{user}/domains/{domain} so a siteurl like www.domain.com still reads domain.com logs.
+    $domains_prefix = $home . '/domains/';
+    if (strpos($site_path_real, $domains_prefix) === 0) {
+        $relative = substr($site_path_real, strlen($domains_prefix));
+        $parts = explode('/', trim($relative, '/'));
+        if (!empty($parts[0])) {
+            $parent_domain = $parts[0];
+            $subdomains_index = array_search('subdomains', $parts, true);
+            if ($subdomains_index !== false && !empty($parts[$subdomains_index + 1])) {
+                return $parts[$subdomains_index + 1] . '.' . $parent_domain;
+            }
+
+            $public_html_index = array_search('public_html', $parts, true);
+            if ($public_html_index !== false && !empty($parts[$public_html_index + 1])) {
+                $first_subdir = $parts[$public_html_index + 1];
+                $sub_list_file = $home . '/domains/' . $parent_domain . '/subdomains.list';
+                if (file_exists($sub_list_file)) {
+                    $subdomains = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+                    if (in_array($first_subdir, array_map('trim', $subdomains), true)) {
+                        return $first_subdir . '.' . $parent_domain;
+                    }
+                }
+                if (is_dir($home . '/domains/' . $parent_domain . '/subdomains/' . $first_subdir)) {
+                    return $first_subdir . '.' . $parent_domain;
+                }
+            }
+
+            return $parent_domain;
+        }
+    }
+
     $wp_config = rtrim($site_path_real, '/') . '/wp-config.php';
     if (file_exists($wp_config)) {
         $info = parse_wp_config($wp_config);
         if (!empty($info['domain'])) {
-            return $info['domain'];
+            return preg_replace('/^www\./i', '', $info['domain']);
         }
     }
 
-    $domains_prefix = $home . '/domains/';
-    if (strpos($site_path_real, $domains_prefix) !== 0) {
-        return '';
-    }
-
-    $relative = substr($site_path_real, strlen($domains_prefix));
-    $parts = explode('/', trim($relative, '/'));
-    if (empty($parts[0])) {
-        return '';
-    }
-
-    $parent_domain = $parts[0];
-    $subdomains_index = array_search('subdomains', $parts, true);
-    if ($subdomains_index !== false && !empty($parts[$subdomains_index + 1])) {
-        return $parts[$subdomains_index + 1] . '.' . $parent_domain;
-    }
-
-    $public_html_index = array_search('public_html', $parts, true);
-    if ($public_html_index !== false && !empty($parts[$public_html_index + 1])) {
-        $first_subdir = $parts[$public_html_index + 1];
-        $sub_list_file = $home . '/domains/' . $parent_domain . '/subdomains.list';
-        if (file_exists($sub_list_file)) {
-            $subdomains = file($sub_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
-            if (in_array($first_subdir, array_map('trim', $subdomains), true)) {
-                return $first_subdir . '.' . $parent_domain;
-            }
-        }
-        if (is_dir($home . '/domains/' . $parent_domain . '/subdomains/' . $first_subdir)) {
-            return $first_subdir . '.' . $parent_domain;
-        }
-    }
-
-    return $parent_domain;
+    return '';
 }
 /**
  * Handle API Endpoint actions
