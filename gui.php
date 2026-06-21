@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.25';
+$plugin_version = '1.3.26';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -258,8 +258,31 @@ div#iframe-container{
 .chevron.open { transform: rotate(90deg); }
 
 /* ── Expanded card body ── */
-.card-body { display: none; border-top: 1px solid var(--border); }
-.card-body.open { display: block; }
+.card-body {
+    display: block;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-top: 1px solid transparent;
+    transform: translateY(-6px);
+    transition:
+        max-height .42s cubic-bezier(.22, 1, .36, 1),
+        opacity .24s ease,
+        transform .32s cubic-bezier(.22, 1, .36, 1),
+        border-color .24s ease;
+    will-change: max-height, opacity, transform;
+}
+.card-body.open {
+    opacity: 1;
+    border-top-color: var(--border);
+    transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+    .card-body {
+        transition: none;
+        transform: none;
+    }
+}
 
 /* Screenshot full-width strip */
 .card-screenshot-bar {
@@ -1149,15 +1172,42 @@ function copyNginxConfig(i) {
 }
 
 /* ─── Toggle card ─── */
+function finishCardAnimation(body, shouldOpen) {
+    const done = (event) => {
+        if (event.target !== body || event.propertyName !== 'max-height') return;
+        body.removeEventListener('transitionend', done);
+        if (shouldOpen && body.classList.contains('open')) {
+            body.style.maxHeight = 'none';
+        }
+    };
+    body.addEventListener('transitionend', done);
+}
+
+function openCardBody(body) {
+    body.classList.add('open');
+    body.style.maxHeight = '0px';
+    body.offsetHeight;
+    body.style.maxHeight = body.scrollHeight + 'px';
+    finishCardAnimation(body, true);
+}
+
+function closeCardBody(body) {
+    if (!body.classList.contains('open')) return;
+    body.style.maxHeight = body.scrollHeight + 'px';
+    body.offsetHeight;
+    body.classList.remove('open');
+    body.style.maxHeight = '0px';
+    finishCardAnimation(body, false);
+}
+
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
     const chev = document.getElementById('cv-'+i);
     const isOpening = !body.classList.contains('open');
 
-    // Close all other cards first and stop their log polling
     document.querySelectorAll('.card-body.open').forEach(el => {
         if (el.id !== 'cb-'+i) {
-            el.classList.remove('open');
+            closeCardBody(el);
             const idx = parseInt(el.id.replace('cb-', ''));
             if (!isNaN(idx)) {
                 stopLogPolling(idx);
@@ -1170,14 +1220,17 @@ function toggleCard(i) {
         }
     });
 
-    body.classList.toggle('open');
-    chev.classList.toggle('open');
-    
-    // Stop polling if card is closed
-    if (!body.classList.contains('open')) {
+    if (isOpening) {
+        openCardBody(body);
+        chev.classList.add('open');
+    } else {
+        closeCardBody(body);
+        chev.classList.remove('open');
+    }
+
+    if (!isOpening) {
         stopLogPolling(i);
     } else {
-        // Start polling if card is opened and logs tab is active
         const activeTab = body.querySelector('.tab-btn.active');
         if (activeTab && activeTab.getAttribute('onclick') && activeTab.getAttribute('onclick').includes("'logs'")) {
             startLogPolling(i);
@@ -1185,7 +1238,7 @@ function toggleCard(i) {
     }
 }
 
-/* ─── Switch tab ─── */
+/* Switch tab */
 function switchTab(siteIdx, tabName, event) {
     if (event) event.stopPropagation();
     
