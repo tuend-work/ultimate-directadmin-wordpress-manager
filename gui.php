@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.18';
+$plugin_version = '1.3.19';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -477,35 +477,42 @@ div#iframe-container{
 .card-tab-content.active {
     display: block;
 }
-.store-tabs {
-    display: flex;
-    gap: 6px;
-    margin: 18px 0 12px;
-    border-bottom: 1px solid var(--border);
+.inline-store-tabs {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: 12px;
 }
 .store-tab-btn {
     background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
+    border: 1px solid transparent;
     color: var(--text2);
     cursor: pointer;
     font-size: 12px;
-    font-weight: 600;
-    padding: 8px 10px;
-    margin-bottom: -1px;
+    font-weight: 700;
+    padding: 7px 12px;
+    border-radius: 4px;
 }
 .store-tab-btn:hover {
     color: var(--text);
+    border-color: var(--border);
 }
 .store-tab-btn.active {
-    color: var(--blue);
-    border-bottom-color: var(--blue);
+    color: var(--text);
+    background: var(--bg3);
+    border-color: var(--border);
 }
-.store-panel {
-    display: none;
+.store-tab-btn.store-cta {
+    background: #ff343a;
+    border-color: #ff343a;
+    color: white;
+    font-size: 16px;
+    line-height: 1;
+    padding: 9px 14px;
 }
-.store-panel.active {
-    display: block;
+.store-tab-btn.store-cta.active {
+    background: #d92d33;
+    border-color: #d92d33;
 }
 .tab-grid-details {
     display: grid;
@@ -1122,6 +1129,9 @@ function genPass(id) {
 function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function escJsArg(s) {
+    return esc(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
 
 /* ─── Copy Nginx Config ─── */
 function copyNginxConfig(i) {
@@ -1196,13 +1206,11 @@ function switchTab(siteIdx, tabName, event) {
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load plugins')) {
             loadPlugins(siteIdx);
         }
-        loadPremiumItems(siteIdx, 'plugins', 'popular');
     } else if (tabName === 'themes') {
         const list = document.getElementById(`theme-list-${siteIdx}`);
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load themes')) {
             loadThemes(siteIdx);
         }
-        loadPremiumItems(siteIdx, 'themes', 'popular');
     } else if (tabName === 'security') {
         const list = document.getElementById(`security-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
@@ -2819,8 +2827,14 @@ function renderSites(sites) {
                 <!-- Tab 2: Plugins -->
                 <div class="card-tab-content" id="tab-content-${i}-plugins">
                     <div class="card-sec-title">
-                        <span>🔌 Installed Plugins</span>
-                        <div style="display:flex; gap:8px;">
+                        <span>
+                            <button class="store-tab-btn active" id="plugin-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'plugins', 'installed', event)">🔌 Installed Plugins</button>
+                            <span class="inline-store-tabs">
+                                <button class="store-tab-btn store-cta" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular</button>
+                                <button class="store-tab-btn store-cta" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium</button>
+                            </span>
+                        </span>
+                        <div style="display:flex; gap:8px;" id="plugin-installed-actions-${i}">
                             <button class="btn btn-primary btn-sm" id="btn-plug-upall-${i}" onclick="updateAllPlugins(${i})">↑ Update All</button>
                             <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
                         </div>
@@ -2830,27 +2844,18 @@ function renderSites(sites) {
                             Clicking Plugins tab or Refresh will load plugins...
                         </div>
                     </div>
-                    <div class="store-tabs" onclick="event.stopPropagation()">
-                        <button class="store-tab-btn active" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular Plugin</button>
-                        <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium Plugin</button>
-                    </div>
-                    <div class="store-panel active" id="plugin-store-panel-${i}-popular">
-                        <div id="plugin-popular-list-container-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Popular Plugin to load installable plugins...</div>
-                        </div>
-                    </div>
-                    <div class="store-panel" id="plugin-store-panel-${i}-premium">
-                        <div id="plugin-premium-list-container-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Premium Plugin to load premium plugins...</div>
-                        </div>
-                    </div>
                 </div>
-
                 <!-- Tab 3: Themes -->
                 <div class="card-tab-content" id="tab-content-${i}-themes">
                     <div class="card-sec-title">
-                        <span>🎨 Installed Themes</span>
-                        <div style="display:flex; gap:8px;">
+                        <span>
+                            <button class="store-tab-btn active" id="theme-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'themes', 'installed', event)">🎨 Installed Themes</button>
+                            <span class="inline-store-tabs">
+                                <button class="store-tab-btn store-cta" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular</button>
+                                <button class="store-tab-btn store-cta" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium</button>
+                            </span>
+                        </span>
+                        <div style="display:flex; gap:8px;" id="theme-installed-actions-${i}">
                             <button class="btn btn-primary btn-sm" id="btn-theme-upall-${i}" onclick="updateAllThemes(${i})">↑ Update All</button>
                             <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
                         </div>
@@ -2858,20 +2863,6 @@ function renderSites(sites) {
                     <div class="plugin-list" id="theme-list-${i}">
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
                             Clicking Themes tab or Refresh will load themes...
-                        </div>
-                    </div>
-                    <div class="store-tabs" onclick="event.stopPropagation()">
-                        <button class="store-tab-btn active" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular Theme</button>
-                        <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium Theme</button>
-                    </div>
-                    <div class="store-panel active" id="theme-store-panel-${i}-popular">
-                        <div id="theme-popular-list-container-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Popular Theme to load installable themes...</div>
-                        </div>
-                    </div>
-                    <div class="store-panel" id="theme-store-panel-${i}-premium">
-                        <div id="theme-premium-list-container-${i}">
-                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Premium Theme to load premium themes...</div>
                         </div>
                     </div>
                 </div>
@@ -2953,21 +2944,36 @@ function renderSites(sites) {
 /* Premium/Popular install lists inside Plugins and Themes tabs */
 let premiumListCache = null;
 
-function premiumContainerId(itemType, group, siteIdx) {
-    const prefix = itemType === 'plugins' ? 'plugin' : 'theme';
-    return `${prefix}-${group}-list-container-${siteIdx}`;
+function storePrefix(itemType) {
+    return itemType === 'plugins' ? 'plugin' : 'theme';
+}
+
+function storeListId(itemType, siteIdx) {
+    return `${storePrefix(itemType)}-list-${siteIdx}`;
+}
+
+function setStoreMode(siteIdx, itemType, group) {
+    const prefix = storePrefix(itemType);
+    document.querySelectorAll(`#cb-${siteIdx} .store-tab-btn[id^="${prefix}-store-tab-"]`).forEach(el => el.classList.remove('active'));
+    const active = document.getElementById(`${prefix}-store-tab-${siteIdx}-${group}`);
+    if (active) active.classList.add('active');
+
+    const actions = document.getElementById(`${prefix}-installed-actions-${siteIdx}`);
+    if (actions) actions.style.display = group === 'installed' ? 'flex' : 'none';
 }
 
 function switchStoreTab(siteIdx, itemType, group, event) {
     if (event) event.stopPropagation();
-    const prefix = itemType === 'plugins' ? 'plugin' : 'theme';
-    document.querySelectorAll(`#cb-${siteIdx} .store-tab-btn[id^="${prefix}-store-tab-"]`).forEach(el => el.classList.remove('active'));
-    document.querySelectorAll(`#cb-${siteIdx} .store-panel[id^="${prefix}-store-panel-"]`).forEach(el => el.classList.remove('active'));
+    setStoreMode(siteIdx, itemType, group);
 
-    const btn = document.getElementById(`${prefix}-store-tab-${siteIdx}-${group}`);
-    const panel = document.getElementById(`${prefix}-store-panel-${siteIdx}-${group}`);
-    if (btn) btn.classList.add('active');
-    if (panel) panel.classList.add('active');
+    if (group === 'installed') {
+        if (itemType === 'plugins') {
+            loadPlugins(siteIdx);
+        } else {
+            loadThemes(siteIdx);
+        }
+        return;
+    }
 
     loadPremiumItems(siteIdx, itemType, group);
 }
@@ -2984,26 +2990,24 @@ async function fetchPremiumList() {
 }
 
 async function loadPremiumItems(siteIdx, itemType, group) {
-    const container = document.getElementById(premiumContainerId(itemType, group, siteIdx));
+    const container = document.getElementById(storeListId(itemType, siteIdx));
     if (!container) return;
-    if (container.dataset.loaded === '1') return;
 
     const label = itemType === 'plugins'
-        ? (group === 'popular' ? 'Popular Plugin' : 'Premium Plugin')
-        : (group === 'popular' ? 'Popular Theme' : 'Premium Theme');
+        ? (group === 'popular' ? 'popular plugins' : 'premium plugins')
+        : (group === 'popular' ? 'popular themes' : 'premium themes');
     container.innerHTML = `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Loading ${label}...</div>`;
 
     try {
         const data = await fetchPremiumList();
         renderPremiumItems(siteIdx, itemType, group, data);
-        container.dataset.loaded = '1';
     } catch (err) {
         container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">${esc(err.message || 'Cannot load install list.')}</div>`;
     }
 }
 
 function renderPremiumItems(siteIdx, itemType, group, data) {
-    const container = document.getElementById(premiumContainerId(itemType, group, siteIdx));
+    const container = document.getElementById(storeListId(itemType, siteIdx));
     if (!container) return;
 
     const allItems = data[itemType] || [];
@@ -3021,47 +3025,32 @@ function renderPremiumItems(siteIdx, itemType, group, data) {
         return;
     }
 
-    let html = '<div class="premium-grid">';
-    items.forEach((item, idx) => {
+    container.innerHTML = items.map((item, idx) => {
         const isWpOrg = item.type === 'wporg';
-        const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
-        const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
-        const slugOrFile = isWpOrg ? item.slug : item.file;
-        const icon = isPlugin ? '🔌' : '🎨';
-        const bannerHTML = isWpOrg
-            ? (isPlugin
-                ? `<img src="https://ps.w.org/${item.slug}/assets/banner-772x250.png" onerror="this.src='https://ps.w.org/${item.slug}/assets/banner-772x250.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(item.name)}"><div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">${icon}</div>`
-                : `<img src="https://ts.w.org/wp-content/themes/${item.slug}/screenshot.png" onerror="this.onerror=null; this.src='https://ts.w.org/wp-content/themes/${item.slug}/screenshot.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(item.name)}"><div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">${icon}</div>`)
-            : `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
+        const statusBadge = `<span style="color:var(--text3);font-size:11px;">${isWpOrg ? 'WordPress.org' : 'Premium ZIP'}</span>`;
+        const sourceMeta = isWpOrg ? `Slug: ${esc(item.slug || '')}` : `File: ${esc(item.file || '')}`;
+        const idVal = isWpOrg ? item.slug : item.file;
         const activateTheme = !isPlugin ? `
-                        <label style="font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 2px; cursor: pointer;">
-                            <input type="checkbox" id="premium-activate-theme-${siteIdx}-${group}-${idx}" checked style="accent-color: var(--blue);"> Kích hoạt
-                        </label>` : '';
+                            <label style="font-size: 10px; color: var(--text2); display: inline-flex; align-items: center; gap: 3px; cursor: pointer;">
+                                <input type="checkbox" id="premium-activate-theme-${siteIdx}-${group}-${idx}" checked style="accent-color: var(--blue);"> Activate
+                            </label>` : '';
         const themeIdxArg = isPlugin ? 'null' : `'${group}-${idx}'`;
 
-        html += `
-            <div class="premium-card">
-                <div class="premium-banner">
-                    ${bannerHTML}
-                    <span class="badge ${badgeClass} badge-source">${badgeText}</span>
-                </div>
-                <div class="premium-card-body">
-                    <div class="premium-card-title" title="${esc(item.name)}">${esc(item.name)}</div>
-                    <div class="premium-card-desc" title="${esc(item.description)}">${esc(item.description || 'Không có mô tả.')}</div>
-                </div>
-                <div class="premium-card-footer">
-                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(item.slug) : 'File: ' + esc(item.file)}</span>
-                    <div style="display: flex; gap: 4px; align-items: center;">
+        return `
+                <div class="plugin-item">
+                    <div class="plugin-info">
+                        <div class="plugin-name" title="${esc(item.name)}">${esc(item.name)}</div>
+                        <div class="plugin-desc" title="${esc(item.description)}">${esc(item.description || 'Không có mô tả.')}</div>
+                        <div class="plugin-meta">${sourceMeta} | ${statusBadge}</div>
+                    </div>
+                    <div class="plugin-toggle">
                         ${activateTheme}
-                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-${isPlugin ? 'plug' : 'theme'}-${group}-${idx}" onclick="installPremiumItem(${siteIdx}, '${itemType}', '${item.type}', '${esc(slugOrFile)}', '${esc(item.name)}', this, ${themeIdxArg})">
-                            📥 Cài đặt
+                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-${isPlugin ? 'plug' : 'theme'}-${group}-${idx}" onclick="installPremiumItem(${siteIdx}, '${itemType}', '${item.type}', '${escJsArg(idVal)}', '${escJsArg(item.name)}', this, ${themeIdxArg})">
+                            📥 Install
                         </button>
                     </div>
-                </div>
-            </div>`;
-    });
-    html += '</div>';
-    container.innerHTML = html;
+                </div>`;
+    }).join('');
 }
 async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName, btnEl, themeIdx = null) {
     const s = allSites[siteIdx];
@@ -3114,6 +3103,7 @@ async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName
             btnEl.textContent = '✓ Đã cài đặt';
             btnEl.className = 'btn btn-sm btn-secondary';
             
+            setStoreMode(siteIdx, itemType, 'installed');
             if (itemType === 'plugins') {
                 loadPlugins(siteIdx);
             } else {
