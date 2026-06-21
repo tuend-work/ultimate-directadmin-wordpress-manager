@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.13';
+$plugin_version = '1.3.15';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1192,19 +1192,15 @@ function startLogPolling(i) {
         logPollStates[i] = {
             paused: false,
             timer: null,
-            lastData: ''
+            lastData: '',
+            intervalMs: getLogPollIntervalMs(i)
         };
     }
-    
+
     if (logPollStates[i].timer) return;
-    
+
     fetchLogData(i);
-    
-    logPollStates[i].timer = setInterval(() => {
-        if (!logPollStates[i].paused) {
-            fetchLogData(i);
-        }
-    }, 3000);
+    restartLogPollingTimer(i);
 }
 
 function stopLogPolling(i) {
@@ -1212,6 +1208,34 @@ function stopLogPolling(i) {
         clearInterval(logPollStates[i].timer);
         logPollStates[i].timer = null;
     }
+}
+
+function getLogPollIntervalMs(i) {
+    const select = document.getElementById(`log-refresh-${i}`);
+    const seconds = parseInt(select ? select.value : '3', 10);
+    return Math.max(seconds || 3, 1) * 1000;
+}
+
+function restartLogPollingTimer(i) {
+    if (!logPollStates[i]) return;
+    if (logPollStates[i].timer) {
+        clearInterval(logPollStates[i].timer);
+        logPollStates[i].timer = null;
+    }
+    logPollStates[i].intervalMs = getLogPollIntervalMs(i);
+    logPollStates[i].timer = setInterval(() => {
+        if (!logPollStates[i].paused) {
+            fetchLogData(i);
+        }
+    }, logPollStates[i].intervalMs);
+}
+
+function onLogRefreshIntervalChanged(i) {
+    if (!logPollStates[i]) {
+        logPollStates[i] = { paused: false, timer: null, lastData: '', intervalMs: getLogPollIntervalMs(i) };
+    }
+    restartLogPollingTimer(i);
+    fetchLogData(i);
 }
 
 function toggleLogPause(i) {
@@ -2836,6 +2860,7 @@ function renderSites(sites) {
                             
                             <select id="log-time-${i}" class="form-control" style="width: 110px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
                                 <option value="0" selected>Mọi lúc</option>
+                                <option value="60">1 phút qua</option>
                                 <option value="300">5 phút qua</option>
                                 <option value="900">15 phút qua</option>
                                 <option value="1800">30 phút qua</option>
@@ -2844,12 +2869,21 @@ function renderSites(sites) {
                                 <option value="43200">12 giờ qua</option>
                                 <option value="86400">24 giờ qua</option>
                             </select>
+
+                            <select id="log-refresh-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogRefreshIntervalChanged(${i})">
+                                <option value="1">1s</option>
+                                <option value="3" selected>3s</option>
+                                <option value="5">5s</option>
+                                <option value="15">15s</option>
+                                <option value="30">30s</option>
+                                <option value="60">1p</option>
+                            </select>
                             
                             <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 11px;">⏸ Tạm dừng</button>
                             <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;">🗑 Xóa log</button>
                         </div>
                         
-                        <div id="log-path-info-${i}" style=" padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
+                        <div id="log-path-info-${i}" style="border-top: 2px solid var(--red); padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
                             Đang tải log từ: ...
                         </div>
 
