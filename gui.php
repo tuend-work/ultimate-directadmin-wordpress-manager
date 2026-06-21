@@ -2883,7 +2883,7 @@ function renderSites(sites) {
                             <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;">🗑 Xóa log</button>
                         </div>
                         
-                        <div id="log-path-info-${i}" style="border-top: 2px solid var(--red); padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
+                        <div id="log-path-info-${i}" style=" padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
                             Đang tải log từ: ...
                         </div>
 
