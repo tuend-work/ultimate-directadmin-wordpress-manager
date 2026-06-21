@@ -237,6 +237,7 @@ $list_data = get_store_list();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate WordPress Manager - Premium Store Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://s.w.org/wp-includes/css/dashicons.min.css">
     <style>
         :root {
             --bg-dark: #090d16;
@@ -623,14 +624,17 @@ $list_data = get_store_list();
             color: white;
         }
 
-        .modal-title {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 18px;
-            color: white;
-            display: flex;
+        .wp-admin-icon {
+            width: 16px;
+            height: 16px;
+            font-size: 16px;
+            line-height: 1;
+            display: inline-flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
+            color: inherit;
+            vertical-align: middle;
+            margin-right: 4px;
         }
     </style>
 </head>
@@ -640,7 +644,7 @@ $list_data = get_store_list();
         <!-- Login Screen -->
         <div class="login-wrapper">
             <div class="login-box">
-                <h2>✨ Premium Store Admin</h2>
+                <h2><span class="dashicons dashicons-store wp-admin-icon"></span> Premium Store Admin</h2>
                 <?php if (isset($error)): ?>
                     <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
                 <?php endif; ?>
@@ -650,7 +654,7 @@ $list_data = get_store_list();
                         <label for="password">Mật khẩu đăng nhập</label>
                         <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required autofocus>
                     </div>
-                    <button type="submit" style="width: 100%; justify-content: center; margin-top: 10px;" class="btn btn-primary">🔓 Đăng nhập Dashboard</button>
+                    <button type="submit" style="width: 100%; justify-content: center; margin-top: 10px;" class="btn btn-primary"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Đăng nhập Dashboard</button>
                 </form>
             </div>
         </div>
@@ -658,10 +662,10 @@ $list_data = get_store_list();
         <!-- Dashboard Screen -->
         <header>
             <div class="container header-content">
-                <h1>👑 Ultimate WP Manager - Premium Store</h1>
+                <h1><span class="dashicons dashicons-awards wp-admin-icon"></span> Ultimate WP Manager - Premium Store</h1>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <a href="premium.json" target="_blank" class="btn btn-logout" style="border-color: rgba(59, 130, 246, 0.4); color: #60a5fa;">📄 Xem premium.json API</a>
-                    <a href="?action=logout" class="btn btn-logout">🚪 Đăng xuất</a>
+                    <a href="premium.json" target="_blank" class="btn btn-logout" style="border-color: rgba(59, 130, 246, 0.4); color: #60a5fa;"><span class="dashicons dashicons-document wp-admin-icon"></span> Xem premium.json API</a>
+                    <a href="?action=logout" class="btn btn-logout"><span class="dashicons dashicons-exit wp-admin-icon"></span> Đăng xuất</a>
                 </div>
             </div>
         </header>
@@ -678,7 +682,7 @@ $list_data = get_store_list();
                 <!-- Left Column: Add Item Form -->
                 <div>
                     <div class="card">
-                        <div class="card-title">➕ Thêm mục Premium mới</div>
+                        <div class="card-title"><span class="dashicons dashicons-plus-alt wp-admin-icon"></span> Thêm mục Premium mới</div>
                         <form method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="action" value="add">
                             
@@ -722,7 +726,7 @@ $list_data = get_store_list();
                                 <textarea name="description" id="description" class="form-control" rows="3" placeholder="Mô tả công dụng hoặc tính năng..."></textarea>
                             </div>
 
-                            <button type="submit" style="width: 100%; justify-content: center; margin-top: 10px;" class="btn btn-primary">➕ Thêm vào Store</button>
+                            <button type="submit" style="width: 100%; justify-content: center; margin-top: 10px;" class="btn btn-primary"><span class="dashicons dashicons-plus wp-admin-icon"></span> Thêm vào Store</button>
                         </form>
                     </div>
                 </div>
@@ -732,7 +736,7 @@ $list_data = get_store_list();
                     <!-- Section: Plugins -->
                     <div class="section-header">
                         <span class="dot dot-blue"></span>
-                        <span>🔌 Danh sách Plugins (<?php echo count($list_data['plugins']); ?>)</span>
+                        <span><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Danh sách Plugins (<?php echo count($list_data['plugins']); ?>)</span>
                     </div>
                     <div class="card" style="padding: 0; overflow: hidden;">
                         <div class="table-responsive">
@@ -770,9 +774,9 @@ $list_data = get_store_list();
                                                 <td style="text-align: center; padding-right: 20px;">
                                                     <div style="display: inline-flex; gap: 6px; justify-content: center;">
                                                         <?php if ($p['type'] === 'zip'): ?>
-                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('plugins', <?php echo $idx; ?>, '<?php echo addslashes($p['name']); ?>')">🔄 Cập nhật</button>
+                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('plugins', <?php echo $idx; ?>, '<?php echo addslashes($p['name']); ?>')"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật</button>
                                                         <?php endif; ?>
-                                                        <a href="?action=delete&type=plugins&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                        <a href="?action=delete&type=plugins&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa</a>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -786,7 +790,7 @@ $list_data = get_store_list();
                     <!-- Section: Themes -->
                     <div class="section-header" style="margin-top: 30px;">
                         <span class="dot dot-success"></span>
-                        <span>🎨 Danh sách Themes (<?php echo count($list_data['themes']); ?>)</span>
+                        <span><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Danh sách Themes (<?php echo count($list_data['themes']); ?>)</span>
                     </div>
                     <div class="card" style="padding: 0; overflow: hidden;">
                         <div class="table-responsive">
@@ -824,9 +828,9 @@ $list_data = get_store_list();
                                                 <td style="text-align: center; padding-right: 20px;">
                                                     <div style="display: inline-flex; gap: 6px; justify-content: center;">
                                                         <?php if ($t['type'] === 'zip'): ?>
-                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('themes', <?php echo $idx; ?>, '<?php echo addslashes($t['name']); ?>')">🔄 Cập nhật</button>
+                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('themes', <?php echo $idx; ?>, '<?php echo addslashes($t['name']); ?>')"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật</button>
                                                         <?php endif; ?>
-                                                        <a href="?action=delete&type=themes&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                        <a href="?action=delete&type=themes&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa</a>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -890,7 +894,7 @@ $list_data = get_store_list();
     <div id="updateZipModal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeUpdateModal()">&times;</span>
-            <div class="modal-title">🔄 Cập nhật tệp ZIP Premium</div>
+            <div class="modal-title"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật tệp ZIP Premium</div>
             <form method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update_zip">
                 <input type="hidden" name="item_type" id="update_item_type" value="">
@@ -906,7 +910,7 @@ $list_data = get_store_list();
                     <input type="file" name="zip_file" id="update_zip_file" class="form-control" accept=".zip" required>
                 </div>
                 
-                <button type="submit" style="width: 100%; justify-content: center; margin-top: 15px;" class="btn btn-primary">🔄 Tải lên & Cập nhật</button>
+                <button type="submit" style="width: 100%; justify-content: center; margin-top: 15px;" class="btn btn-primary"><span class="dashicons dashicons-upload wp-admin-icon"></span> Tải lên & Cập nhật</button>
             </form>
         </div>
     </div>

@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.21';
+$plugin_version = '1.3.23';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -515,9 +515,12 @@ div#iframe-container{
 }
 .store-tab-btn .wp-admin-icon,
 .tab-btn .wp-admin-icon,
-.card-sec-title .wp-admin-icon {
+.card-sec-title .wp-admin-icon,`r`n.btn .wp-admin-icon,`r`n.badge .wp-admin-icon,`r`n.lock-status-label .wp-admin-icon,`r`n.shot-label .wp-admin-icon,`r`n.site-path .wp-admin-icon,`r`n.empty-state .wp-admin-icon {
     flex: 0 0 auto;
 }
+
+.dashicons-spin { animation: dashicons-spin 1s linear infinite; }
+@keyframes dashicons-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .tab-grid-details {
     display: grid;
     grid-template-columns: 1.2fr 1fr;
@@ -751,12 +754,10 @@ input:disabled + .slider {
     </div>
     <span style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:12px;">
         <span><?php echo htmlspecialchars($server_ip); ?></span> | <span><?php echo htmlspecialchars($hostname); ?></span>
-        <a href="/" class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);">
-            ← Back to DirectAdmin
-        </a>
+        <a href="/" class="btn btn-sm btn-secondary" style="font-size:10px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);"><span class="dashicons dashicons-arrow-left-alt2 wp-admin-icon"></span> Back to DirectAdmin</a>
     </span>
     <div class="user">
-        <span>👤 <?php echo htmlspecialchars($username); ?></span>
+        <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> <?php echo htmlspecialchars($username); ?></span>
         <?php if ($isAdmin): ?>
         <span class="badge badge-yellow" style="font-size:10px;">Admin</span>
         <?php endif; ?>
@@ -765,16 +766,16 @@ input:disabled + .slider {
 
 <!-- Toolbar -->
 <div class="toolbar">
-    <button class="btn btn-primary" onclick="openInstallModal()">+ Install WordPress</button>
-    <button class="btn btn-secondary" id="btn-scan" onclick="triggerScan()">⟳ Scan Hosting</button>
+    <button class="btn btn-primary" onclick="openInstallModal()"><span class="dashicons dashicons-plus-alt2 wp-admin-icon"></span> Install WordPress</button>
+    <button class="btn btn-secondary" id="btn-scan" onclick="triggerScan()"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan Hosting</button>
     <?php if ($isAdmin): ?>
     <div class="toolbar-sep"></div>
-    <button class="btn btn-secondary" onclick="openUpdateModal()">↑ Update Plugin</button>
+    <button class="btn btn-secondary" onclick="openUpdateModal()"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update Plugin</button>
     <?php endif; ?>
     <div class="toolbar-sep"></div>
-    <input type="text" id="search-input" class="toolbar-search" placeholder="🔍  Search by name, URL, path…" oninput="filterSites()">
+    <input type="text" id="search-input" class="toolbar-search" placeholder="Search by name, URL, path…" oninput="filterSites()">
     <span class="count-label" id="count-label">Loading…</span>
-    <button class="btn btn-secondary btn-sm" onclick="openLogsModal()" style="margin-left: 8px;">📋 Show Logs</button>
+    <button class="btn btn-secondary btn-sm" onclick="openLogsModal()" style="margin-left: 8px;"><span class="dashicons dashicons-list-view wp-admin-icon"></span> Show Logs</button>
 </div>
 
 
@@ -782,7 +783,7 @@ input:disabled + .slider {
 <!-- Content -->
 <div class="content">
     <div id="sites-container">
-        <div class="empty-state"><div class="icon">⏳</div><strong>Loading installations…</strong></div>
+        <div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span></div><strong>Loading installations…</strong></div>
     </div>
 </div>
 
@@ -838,7 +839,7 @@ input:disabled + .slider {
                     <select id="inst-zip-path" class="form-control">
                         <option value="" disabled selected>Đang quét tệp .zip...</option>
                     </select>
-                    <button type="button" class="btn btn-secondary" onclick="loadUserZipFiles()">⟳ Quét lại</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadUserZipFiles()"><span class="dashicons dashicons-update wp-admin-icon"></span> Quét lại</button>
                 </div>
                 <span style="font-size:11px;color:var(--text3)">Hãy upload tệp ZIP sao lưu của bạn lên hosting (qua FTP/File Manager) rồi chọn từ danh sách trên. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
             </div>
@@ -909,7 +910,7 @@ input:disabled + .slider {
 <div class="modal-overlay" id="modal-clone">
 <div class="modal">
     <div class="modal-head">
-        <h3>👯 Clone WordPress Website</h3>
+        <h3><span class="dashicons dashicons-admin-page wp-admin-icon"></span> Clone WordPress Website</h3>
         <button class="modal-close" onclick="closeModal('modal-clone')">✕</button>
     </div>
     <form onsubmit="executeClone(event)">
@@ -990,7 +991,7 @@ input:disabled + .slider {
         <button class="modal-close" onclick="closeModal('modal-delete')">✕</button>
     </div>
     <div class="modal-body">
-        <div class="notice notice-error">⚠ This action permanently deletes all files and cannot be undone.</div>
+        <div class="notice notice-error"><span class="dashicons dashicons-warning wp-admin-icon"></span> This action permanently deletes all files and cannot be undone.</div>
         <p style="margin-bottom:10px;color:var(--text2);">Installation path:</p>
         <code id="del-path" style="display:block;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;word-break:break-all;color:var(--text2);"></code>
         <div style="margin-top:16px;">
@@ -1011,14 +1012,14 @@ input:disabled + .slider {
 <div class="modal-overlay" id="modal-logs">
 <div class="modal" style="max-width:700px;">
     <div class="modal-head">
-        <h3>📋 Nhật ký hoạt động (System Logs)</h3>
+        <h3><span class="dashicons dashicons-list-view wp-admin-icon"></span> Nhật ký hoạt động (System Logs)</h3>
         <button class="modal-close" onclick="closeModal('modal-logs')">✕</button>
     </div>
     <div class="modal-body" style="padding:15px;">
         <textarea id="logs-textarea" readonly style="width:100%; height:400px; background:#0d1117; border:1px solid var(--border); border-radius:6px; color:#c9d1d9; font-family:monospace; font-size:11px; padding:12px; resize:vertical; outline:none; line-height:1.4;"></textarea>
     </div>
     <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="refreshLogs()">⟳ Làm mới</button>
+        <button class="btn btn-secondary" onclick="refreshLogs()"><span class="dashicons dashicons-update wp-admin-icon"></span> Làm mới</button>
         <button class="btn btn-secondary" onclick="closeModal('modal-logs')">Đóng</button>
     </div>
 </div>
@@ -1029,7 +1030,7 @@ input:disabled + .slider {
 <div class="modal-overlay" id="modal-update">
 <div class="modal" style="max-width:520px;">
     <div class="modal-head">
-        <h3>↑ Update Plugin from GitHub</h3>
+        <h3><span class="dashicons dashicons-upload wp-admin-icon"></span> Update Plugin from GitHub</h3>
         <button class="modal-close" onclick="closeModal('modal-update')">✕</button>
     </div>
     <div class="modal-body">
@@ -1282,11 +1283,11 @@ function toggleLogPause(i) {
     logPollStates[i].paused = !logPollStates[i].paused;
     const btn = document.getElementById(`btn-log-pause-${i}`);
     if (logPollStates[i].paused) {
-        btn.textContent = '▶ Tiếp tục';
+        btn.innerHTML = '<span class="dashicons dashicons-controls-play wp-admin-icon"></span> Tiếp tục';
         btn.className = 'btn btn-sm btn-blue';
         toast('⏸ Đã tạm dừng cập nhật log.');
     } else {
-        btn.textContent = '⏸ Tạm dừng';
+        btn.innerHTML = '<span class="dashicons dashicons-controls-pause wp-admin-icon"></span> Tạm dừng';
         btn.className = 'btn btn-sm btn-secondary';
         toast('▶ Đang tải log thời gian thực...');
         fetchLogData(i);
@@ -1451,18 +1452,12 @@ async function loadPlugins(i) {
                         <div class="plugin-meta">Current: <span id="plug-ver-${i}-${idx}">v${esc(p.version)}</span> | Latest: <span id="plug-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" data-file="${esc(p.file)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')">
-                            ↑ Update
-                        </button>
-                        <button class="btn btn-sm btn-secondary" id="btn-plug-reinst-${i}-${idx}" onclick="reinstallPlugin(${i}, ${idx}, '${esc(p.file)}')">
-                            ⟳ Reinstall
-                        </button>
+                        <button class="btn btn-sm btn-secondary" data-file="${esc(p.file)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-plug-reinst-${i}-${idx}" onclick="reinstallPlugin(${i}, ${idx}, '${esc(p.file)}')"><span class="dashicons dashicons-update wp-admin-icon"></span> Reinstall</button>
                         <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
                             ${actionText}
                         </button>
-                        <button class="btn btn-sm btn-danger" id="btn-plug-del-${i}-${idx}" onclick="deletePlugin(${i}, ${idx}, '${esc(p.file)}')">
-                            🗑 Delete
-                        </button>
+                        <button class="btn btn-sm btn-danger" id="btn-plug-del-${i}-${idx}" onclick="deletePlugin(${i}, ${idx}, '${esc(p.file)}')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Delete</button>
                     </div>
                 </div>`;
             }).join('');
@@ -1805,18 +1800,12 @@ async function loadThemes(i) {
                         <div class="plugin-meta">Current: <span id="theme-ver-${i}-${idx}">v${esc(t.version)}</span> | Latest: <span id="theme-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" data-folder="${esc(t.folder)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')">
-                            ↑ Update
-                        </button>
-                        <button class="btn btn-sm btn-secondary" id="btn-theme-reinst-${i}-${idx}" onclick="reinstallTheme(${i}, ${idx}, '${esc(t.folder)}')">
-                            ⟳ Reinstall
-                        </button>
+                        <button class="btn btn-sm btn-secondary" data-folder="${esc(t.folder)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-theme-reinst-${i}-${idx}" onclick="reinstallTheme(${i}, ${idx}, '${esc(t.folder)}')"><span class="dashicons dashicons-update wp-admin-icon"></span> Reinstall</button>
                         <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
                             ${actionText}
                         </button>
-                        <button class="btn btn-sm btn-danger" ${disabledAttr} id="btn-theme-del-${i}-${idx}" onclick="deleteTheme(${i}, ${idx}, '${esc(t.folder)}')">
-                            🗑 Delete
-                        </button>
+                        <button class="btn btn-sm btn-danger" ${disabledAttr} id="btn-theme-del-${i}-${idx}" onclick="deleteTheme(${i}, ${idx}, '${esc(t.folder)}')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Delete</button>
                     </div>
                 </div>`;
             }).join('');
@@ -2057,24 +2046,24 @@ async function loadSecurity(i) {
             const sec = d.security;
             
             const measures = [
-                { key: 'restrict_files', title: 'Hạn chế quyền wp-config.php', desc: 'Chỉnh sửa phân quyền (Chmod) tệp wp-config.php về quyền đọc tối thiểu (0400/0600) để ngăn các tiến trình hoặc tài khoản khác trên máy chủ đọc trộm thông tin cấu hình.', icon: '🔑' },
-                { key: 'security_keys', title: 'Khóa bảo mật Salt Keys', desc: 'Thay đổi hoặc tạo mới các chuỗi Salt Keys ngẫu nhiên trong tệp wp-config.php để bảo mật mã hóa cookie và phiên đăng nhập của người dùng.', icon: '🛡️' },
-                { key: 'db_prefix', title: 'Thay đổi tiền tố Database', desc: 'Đổi tên toàn bộ các bảng dữ liệu WordPress trong cơ sở dữ liệu MySQL và cập nhật tiền tố cấu hình $table_prefix trong tệp cấu hình wp-config.php.', icon: '🗄️', promptInput: true },
-                { key: 'rename_admin_user', title: 'Đổi tên tài khoản "admin"', desc: 'Thay đổi trực tiếp tên đăng nhập (user_login) của tài khoản quản trị từ mặc định "admin" sang tên mới trong bảng dữ liệu mysql wp_users.', icon: '👤', promptInput: true },
-                { key: 'block_wp_config', title: 'Khóa truy cập wp-config.php', desc: 'Thêm cấu hình chặn truy cập trực tiếp tệp wp-config.php từ trình duyệt bên ngoài vào tệp cấu hình máy chủ .htaccess.', icon: '🚫' },
-                { key: 'block_htaccess', title: 'Khóa truy cập .htaccess', desc: 'Thêm cấu hình chặn hoàn toàn việc đọc và ghi đè trực tiếp tệp cấu hình máy chủ .htaccess và tệp mật khẩu .htpasswd từ trình duyệt thông qua luật trong tệp .htaccess.', icon: '🔒' },
-                { key: 'block_xmlrpc', title: 'Chặn truy cập XML-RPC', desc: 'Thêm cấu hình từ chối và vô hiệu hóa quyền truy cập tệp xmlrpc.php vào tệp cấu hình .htaccess để chống các cuộc tấn công đoán mật khẩu hàng loạt và DDoS qua API XML-RPC.', icon: '⚡' },
-                { key: 'forbid_php_includes', title: 'Chặn chạy PHP trong wp-includes', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-includes/ để chặn trình duyệt thực thi trực tiếp bất kỳ tệp tin .php nào tại đây.', icon: '📁' },
-                { key: 'forbid_php_uploads', title: 'Chặn chạy PHP trong wp-content/uploads', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-content/uploads/ để ngăn chặn tin tặc thực thi các shell/backdoor PHP được tải lên.', icon: '🖼️' },
-                { key: 'disable_php_cache', title: 'Chặn chạy PHP trong wp-content/cache', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-content/cache/ để chặn thực thi trực tiếp các tệp tin .php lưu trong bộ nhớ đệm.', icon: '💾' },
-                { key: 'disallow_file_edit', title: 'Tắt chỉnh sửa file giao diện/plugin', desc: 'Thêm định nghĩa define("DISALLOW_FILE_EDIT", true); vào tệp cấu hình wp-config.php để ẩn hoàn toàn trình chỉnh sửa file giao diện/plugin trong trang admin WordPress.', icon: '✍️' },
-                { key: 'disable_scripts_concat', title: 'Tắt gộp script admin (CONCATENATE_SCRIPTS)', desc: 'Thêm định nghĩa define("CONCATENATE_SCRIPTS", false); vào tệp cấu hình wp-config.php để tắt tính năng gộp mã script của admin.', icon: '⚙️' },
-                { key: 'turn_off_pingbacks', title: 'Tắt tính năng Pingbacks', desc: 'Chạy truy vấn SQL tắt các tùy chọn default_pingback_flag và ping_status trong bảng wp_options và wp_posts của cơ sở dữ liệu để dừng cơ chế Pingbacks.', icon: '📣' },
-                { key: 'bot_protection', title: 'Bảo vệ khỏi Bot xấu & Scrapers', desc: 'Thêm luật RewriteCond chặn các User-Agent của bot xấu (như curl, wget, scrapy...) truy cập vào website thông qua tệp cấu hình máy chủ .htaccess.', icon: '🤖' },
-                { key: 'block_sensitive_files', title: 'Chặn file tài liệu nhạy cảm', desc: 'Thêm luật chặn đọc trực tiếp các tệp thông tin nhạy cảm (readme.html, license.txt, wp-config-sample.php) từ trình duyệt vào tệp cấu hình .htaccess.', icon: '📄' },
-                { key: 'block_author_scans', title: 'Chặn quét tên đăng nhập (Author scan)', desc: 'Thêm cấu hình điều hướng RewriteRule chặn và trả về lỗi 403 đối với mọi yêu cầu quét định danh tác giả (/?author=X) vào tệp cấu hình .htaccess.', icon: '🔍' },
-                { key: 'block_directory_browsing', title: 'Tắt liệt kê thư mục công cộng', desc: 'Thêm dòng lệnh Options -Indexes vào đầu tệp cấu hình máy chủ .htaccess để tắt chế độ tự động hiển thị danh sách tệp tin trong các thư mục.', icon: '📇' },
-                { key: 'block_sensitive_extensions', title: 'Chặn tải file sao lưu (backup files)', desc: 'Thêm luật chặn tải xuống trực tiếp các định dạng tệp sao lưu nguy hiểm (.sql, .bak, .log, .sh, .ini, .dist) từ trình duyệt vào tệp cấu hình .htaccess.', icon: '📦' }
+                { key: 'restrict_files', title: 'Hạn chế quyền wp-config.php', desc: 'Chỉnh sửa phân quyền (Chmod) tệp wp-config.php về quyền đọc tối thiểu (0400/0600) để ngăn các tiến trình hoặc tài khoản khác trên máy chủ đọc trộm thông tin cấu hình.', icon: 'dashicons-admin-network' },
+                { key: 'security_keys', title: 'Khóa bảo mật Salt Keys', desc: 'Thay đổi hoặc tạo mới các chuỗi Salt Keys ngẫu nhiên trong tệp wp-config.php để bảo mật mã hóa cookie và phiên đăng nhập của người dùng.', icon: 'dashicons-shield' },
+                { key: 'db_prefix', title: 'Thay đổi tiền tố Database', desc: 'Đổi tên toàn bộ các bảng dữ liệu WordPress trong cơ sở dữ liệu MySQL và cập nhật tiền tố cấu hình $table_prefix trong tệp cấu hình wp-config.php.', icon: 'dashicons-database', promptInput: true },
+                { key: 'rename_admin_user', title: 'Đổi tên tài khoản "admin"', desc: 'Thay đổi trực tiếp tên đăng nhập (user_login) của tài khoản quản trị từ mặc định "admin" sang tên mới trong bảng dữ liệu mysql wp_users.', icon: 'dashicons-admin-users', promptInput: true },
+                { key: 'block_wp_config', title: 'Khóa truy cập wp-config.php', desc: 'Thêm cấu hình chặn truy cập trực tiếp tệp wp-config.php từ trình duyệt bên ngoài vào tệp cấu hình máy chủ .htaccess.', icon: 'dashicons-hidden' },
+                { key: 'block_htaccess', title: 'Khóa truy cập .htaccess', desc: 'Thêm cấu hình chặn hoàn toàn việc đọc và ghi đè trực tiếp tệp cấu hình máy chủ .htaccess và tệp mật khẩu .htpasswd từ trình duyệt thông qua luật trong tệp .htaccess.', icon: 'dashicons-lock' },
+                { key: 'block_xmlrpc', title: 'Chặn truy cập XML-RPC', desc: 'Thêm cấu hình từ chối và vô hiệu hóa quyền truy cập tệp xmlrpc.php vào tệp cấu hình .htaccess để chống các cuộc tấn công đoán mật khẩu hàng loạt và DDoS qua API XML-RPC.', icon: 'dashicons-dismiss' },
+                { key: 'forbid_php_includes', title: 'Chặn chạy PHP trong wp-includes', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-includes/ để chặn trình duyệt thực thi trực tiếp bất kỳ tệp tin .php nào tại đây.', icon: 'dashicons-media-code' },
+                { key: 'forbid_php_uploads', title: 'Chặn chạy PHP trong wp-content/uploads', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-content/uploads/ để ngăn chặn tin tặc thực thi các shell/backdoor PHP được tải lên.', icon: 'dashicons-format-image' },
+                { key: 'disable_php_cache', title: 'Chặn chạy PHP trong wp-content/cache', desc: 'Tạo tệp cấu hình .htaccess mới trong thư mục wp-content/cache/ để chặn thực thi trực tiếp các tệp tin .php lưu trong bộ nhớ đệm.', icon: 'dashicons-archive' },
+                { key: 'disallow_file_edit', title: 'Tắt chỉnh sửa file giao diện/plugin', desc: 'Thêm định nghĩa define("DISALLOW_FILE_EDIT", true); vào tệp cấu hình wp-config.php để ẩn hoàn toàn trình chỉnh sửa file giao diện/plugin trong trang admin WordPress.', icon: 'dashicons-edit' },
+                { key: 'disable_scripts_concat', title: 'Tắt gộp script admin (CONCATENATE_SCRIPTS)', desc: 'Thêm định nghĩa define("CONCATENATE_SCRIPTS", false); vào tệp cấu hình wp-config.php để tắt tính năng gộp mã script của admin.', icon: 'dashicons-admin-generic' },
+                { key: 'turn_off_pingbacks', title: 'Tắt tính năng Pingbacks', desc: 'Chạy truy vấn SQL tắt các tùy chọn default_pingback_flag và ping_status trong bảng wp_options và wp_posts của cơ sở dữ liệu để dừng cơ chế Pingbacks.', icon: 'dashicons-megaphone' },
+                { key: 'bot_protection', title: 'Bảo vệ khỏi Bot xấu & Scrapers', desc: 'Thêm luật RewriteCond chặn các User-Agent của bot xấu (như curl, wget, scrapy...) truy cập vào website thông qua tệp cấu hình máy chủ .htaccess.', icon: 'dashicons-shield-alt' },
+                { key: 'block_sensitive_files', title: 'Chặn file tài liệu nhạy cảm', desc: 'Thêm luật chặn đọc trực tiếp các tệp thông tin nhạy cảm (readme.html, license.txt, wp-config-sample.php) từ trình duyệt vào tệp cấu hình .htaccess.', icon: 'dashicons-media-document' },
+                { key: 'block_author_scans', title: 'Chặn quét tên đăng nhập (Author scan)', desc: 'Thêm cấu hình điều hướng RewriteRule chặn và trả về lỗi 403 đối với mọi yêu cầu quét định danh tác giả (/?author=X) vào tệp cấu hình .htaccess.', icon: 'dashicons-search' },
+                { key: 'block_directory_browsing', title: 'Tắt liệt kê thư mục công cộng', desc: 'Thêm dòng lệnh Options -Indexes vào đầu tệp cấu hình máy chủ .htaccess để tắt chế độ tự động hiển thị danh sách tệp tin trong các thư mục.', icon: 'dashicons-category' },
+                { key: 'block_sensitive_extensions', title: 'Chặn tải file sao lưu (backup files)', desc: 'Thêm luật chặn tải xuống trực tiếp các định dạng tệp sao lưu nguy hiểm (.sql, .bak, .log, .sh, .ini, .dist) từ trình duyệt vào tệp cấu hình .htaccess.', icon: 'dashicons-portfolio' }
             ];
             
             const mainHtml = `<div style="display:flex; flex-direction:column; gap:8px;">` + measures.map((m, idx) => {
@@ -2092,7 +2081,7 @@ async function loadSecurity(i) {
                 
                 return `
                 <div class="plugin-item" style="padding: 10px 14px;">
-                    <div style="font-size: 18px; flex-shrink: 0; margin-right: 8px;">${m.icon}</div>
+                    <div style="font-size: 18px; flex-shrink: 0; margin-right: 8px;"><span class="dashicons ${m.icon} wp-admin-icon"></span></div>
                     <div class="plugin-info">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span class="plugin-name" style="font-size:12px; font-weight:600; color:var(--text);">${esc(m.title)}</span>
@@ -2157,13 +2146,13 @@ if ($query_string ~* "author=[0-9]") {
                 nginxHtml = `
                 <div style="margin-top:20px; border-top: 1px dashed var(--border); padding-top: 20px;">
                     <div class="notice notice-info" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px; line-height:1.4;">
-                        <strong>🌐 Phát hiện website đang sử dụng Nginx</strong>
+                        <strong><span class="dashicons dashicons-admin-site-alt3 wp-admin-icon"></span> Phát hiện website đang sử dụng Nginx</strong>
                         <span>Hệ thống nhận diện máy chủ web của bạn đang chạy Nginx. Do Nginx không hỗ trợ tệp <code>.htaccess</code>, các luật bảo mật liên quan đến cấu hình web không thể tự động áp dụng.</span>
                         <span style="font-weight:bold;">Vui lòng copy và dán các dòng cấu hình sau vào tệp cấu hình Nginx (server block) của website:</span>
                     </div>
                     <div style="position:relative;">
                         <textarea readonly style="width:100%; height:250px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text2); font-family:monospace; font-size:11px; padding:10px 12px; resize:vertical; outline:none;" id="nginx-config-${i}">${esc(nginxConfigRules)}</textarea>
-                        <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(${i})">📋 Copy</button>
+                        <button class="btn btn-sm btn-secondary" style="position:absolute; top:10px; right:10px;" onclick="copyNginxConfig(${i})"><span class="dashicons dashicons-clipboard wp-admin-icon"></span> Copy</button>
                     </div>
                 </div>
                 `;
@@ -2672,7 +2661,7 @@ function renderSites(sites) {
 
     if (!sites.length) {
         cnt.innerHTML = `<div class="empty-state">
-            <div class="icon">📂</div>
+            <div class="icon"><span class="dashicons dashicons-portfolio wp-admin-icon" style="font-size:40px; width:40px; height:40px;"></span></div>
             <strong>No WordPress installations found</strong>
             <p>Click <em>Scan Hosting</em> to search, or <em>Install WordPress</em> to add one.</p>
         </div>`;
@@ -2684,8 +2673,8 @@ function renderSites(sites) {
             ? '<span class="badge badge-green">● Connected</span>'
             : '<span class="badge badge-red">● DB Error</span>';
         const lockBadge = s.locked
-            ? `<span class="badge badge-yellow" id="hb-lock-${i}">🔒 Lockdown</span>`
-            : `<span class="badge badge-gray" id="hb-lock-${i}">🔓 Unlocked</span>`;
+            ? `<span class="badge badge-yellow" id="hb-lock-${i}"><span class="dashicons dashicons-lock wp-admin-icon"></span> Lockdown</span>`
+            : `<span class="badge badge-gray" id="hb-lock-${i}"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Unlocked</span>`;
         const pathShort = s.path.replace('/home/'+DA_USER+'/', '~/');
         const shotSrc   = thumbUrl(s.siteurl);
 
@@ -2694,7 +2683,7 @@ function renderSites(sites) {
             <div class="card-header" onclick="toggleCard(${i})">
                 <!-- Thumbnail -->
                 <div class="site-thumb">
-                    <div class="thumb-loader" id="tl-${i}">🌐</div>
+                    <div class="thumb-loader" id="tl-${i}"><span class="dashicons dashicons-admin-site-alt3 wp-admin-icon"></span></div>
                     <img src="${esc(shotSrc)}"
                           alt="screenshot"
                           onload="document.getElementById('tl-${i}').classList.add('hidden')"
@@ -2704,7 +2693,7 @@ function renderSites(sites) {
                 <div class="site-info">
                     <div class="site-name">${esc(s.blogname)}</div>
                     <div class="site-url"><a href="${esc(s.siteurl)}" target="_blank" onclick="event.stopPropagation()">${esc(s.siteurl)}</a></div>
-                    <div class="site-path" onclick="event.stopPropagation()" title="${esc(pathShort)}">📁 ${esc(pathShort)}</div>
+                    <div class="site-path" onclick="event.stopPropagation()" title="${esc(pathShort)}"><span class="dashicons dashicons-category wp-admin-icon"></span> ${esc(pathShort)}</div>
                 </div>
                 <!-- Quick actions -->
 
@@ -2719,11 +2708,11 @@ function renderSites(sites) {
 
             <!-- Action row (Always visible) -->
             <div class="card-action-row" onclick="event.stopPropagation()">
-                <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})">⚡ Magic Login</button>
+                <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Magic Login</button>
                 <div class="sep"></div>
-                <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})">👯 Clone Website</button>
-                <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})">📂 File Manager</button>
-                <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})">🗄️ phpMyAdmin</button>
+                <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})"><span class="dashicons dashicons-admin-page wp-admin-icon"></span> Clone Website</button>
+                <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> File Manager</button>
+                <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})"><span class="dashicons dashicons-database wp-admin-icon"></span> phpMyAdmin</button>
             </div>
 
             <!-- Card body (expanded) -->
@@ -2734,9 +2723,9 @@ function renderSites(sites) {
                           alt="Website screenshot"
                           onerror="this.style.opacity='.1'">
                     <div class="shot-overlay"></div>
-                    <span class="shot-label">📷 Live screenshot via thum.io</span>
+                    <span class="shot-label"><span class="dashicons dashicons-camera wp-admin-icon"></span> Live screenshot via thum.io</span>
                     <div class="shot-refresh">
-                        <button class="btn btn-secondary btn-sm" onclick="refreshShot(${i})">⟳ Refresh</button>
+                        <button class="btn btn-secondary btn-sm" onclick="refreshShot(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
                     </div>
                 </div>
 
@@ -2761,10 +2750,9 @@ function renderSites(sites) {
                         <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
                     </div>
                     <div class="lock-section" onclick="event.stopPropagation()">
-                        <div class="lock-status-label">
-                            ⚙️ WordPress Core (Phiên bản WordPress hiện tại: <strong>v${esc(s.version)}</strong>)
+                        <div class="lock-status-label"><span class="dashicons dashicons-wordpress wp-admin-icon"></span> WordPress Core (Phiên bản WordPress hiện tại: <strong>v${esc(s.version)}</strong>)
                         </div>
-                        <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})">↑ Update Core</button>
+                        <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update Core</button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
@@ -2808,10 +2796,9 @@ function renderSites(sites) {
                     </div>
                     <!-- Danger Zone / Delete Website -->
                     <div class="lock-section" style="margin-top: 24px; border-top: 1px solid rgba(248,81,73,0.3); padding-top: 16px;" onclick="event.stopPropagation()">
-                        <div class="lock-status-label" style="color: var(--red); font-weight: 500;">
-                            🗑️ Gỡ bỏ website này hoàn toàn khỏi hệ thống (Không thể hoàn tác)
+                        <div class="lock-status-label" style="color: var(--red); font-weight: 500;"><span class="dashicons dashicons-trash wp-admin-icon"></span> Gỡ bỏ website này hoàn toàn khỏi hệ thống (Không thể hoàn tác)
                         </div>
-                        <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${i})">🗑 Delete Website</button>
+                        <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${i})"><span class="dashicons dashicons-trash wp-admin-icon"></span> Delete Website</button>
                     </div>
                 </div>
 
@@ -2819,7 +2806,7 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-security">
                     <div class="card-sec-title">
                         <span><span class="dashicons dashicons-shield wp-admin-icon"></span> Security Hardening Status</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})">⟳ Scan & Refresh</button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan & Refresh</button>
                     </div>
                     <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
@@ -2834,13 +2821,13 @@ function renderSites(sites) {
                         <span>
                             <button class="store-tab-btn active" id="plugin-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'plugins', 'installed', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Installed Plugins</button>
                             <span class="inline-store-tabs">
-                                <button class="store-tab-btn" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular</button>
-                                <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium</button>
+                                <button class="store-tab-btn" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)"><span class="dashicons dashicons-star-filled wp-admin-icon"></span> Popular</button>
+                                <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)"><span class="dashicons dashicons-products wp-admin-icon"></span> Premium</button>
                             </span>
                         </span>
                         <div style="display:flex; gap:8px;" id="plugin-installed-actions-${i}">
-                            <button class="btn btn-primary btn-sm" id="btn-plug-upall-${i}" onclick="updateAllPlugins(${i})">↑ Update All</button>
-                            <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})">⟳ Refresh</button>
+                            <button class="btn btn-primary btn-sm" id="btn-plug-upall-${i}" onclick="updateAllPlugins(${i})"><span class="dashicons dashicons-upload wp-admin-icon"></span> Update All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadPlugins(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
                         </div>
                     </div>
                     <div class="plugin-list" id="plugin-list-${i}">
@@ -2855,13 +2842,13 @@ function renderSites(sites) {
                         <span>
                             <button class="store-tab-btn active" id="theme-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'themes', 'installed', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Installed Themes</button>
                             <span class="inline-store-tabs">
-                                <button class="store-tab-btn" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular</button>
-                                <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium</button>
+                                <button class="store-tab-btn" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)"><span class="dashicons dashicons-star-filled wp-admin-icon"></span> Popular</button>
+                                <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)"><span class="dashicons dashicons-products wp-admin-icon"></span> Premium</button>
                             </span>
                         </span>
                         <div style="display:flex; gap:8px;" id="theme-installed-actions-${i}">
-                            <button class="btn btn-primary btn-sm" id="btn-theme-upall-${i}" onclick="updateAllThemes(${i})">↑ Update All</button>
-                            <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})">⟳ Refresh</button>
+                            <button class="btn btn-primary btn-sm" id="btn-theme-upall-${i}" onclick="updateAllThemes(${i})"><span class="dashicons dashicons-upload wp-admin-icon"></span> Update All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadThemes(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
                         </div>
                     </div>
                     <div class="plugin-list" id="theme-list-${i}">
@@ -2884,7 +2871,7 @@ function renderSites(sites) {
                                 <option value="php_error">PHP Error Log</option>
                             </select>
                             
-                            <input type="text" id="log-search-${i}" placeholder="🔍 Tìm kiếm log..." class="toolbar-search" style="width: 160px; padding: 4px 8px; font-size: 11px;" oninput="onLogFilterChanged(${i})">
+                            <input type="text" id="log-search-${i}" placeholder="Tìm kiếm log..." class="toolbar-search" style="width: 160px; padding: 4px 8px; font-size: 11px;" oninput="onLogFilterChanged(${i})">
                             
                             <select id="log-lines-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
                                 <option value="50">50 dòng</option>
@@ -2914,8 +2901,8 @@ function renderSites(sites) {
                                 <option value="60">1p</option>
                             </select>
                             
-                            <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 11px;">⏸ Tạm dừng</button>
-                            <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;">🗑 Xóa log</button>
+                            <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-controls-pause wp-admin-icon"></span> Tạm dừng</button>
+                            <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa log</button>
                         </div>
                         
                         <div id="log-path-info-${i}" style=" padding-top: 8px; color: var(--text2); font-size: 11px; font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace; word-break: break-all;">
@@ -3049,9 +3036,7 @@ function renderPremiumItems(siteIdx, itemType, group, data) {
                     </div>
                     <div class="plugin-toggle">
                         ${activateTheme}
-                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-${isPlugin ? 'plug' : 'theme'}-${group}-${idx}" onclick="installPremiumItem(${siteIdx}, '${itemType}', '${item.type}', '${escJsArg(idVal)}', '${escJsArg(item.name)}', this, ${themeIdxArg})">
-                            📥 Install
-                        </button>
+                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-${isPlugin ? 'plug' : 'theme'}-${group}-${idx}" onclick="installPremiumItem(${siteIdx}, '${itemType}', '${item.type}', '${escJsArg(idVal)}', '${escJsArg(item.name)}', this, ${themeIdxArg})"><span class="dashicons dashicons-download wp-admin-icon"></span> Install</button>
                     </div>
                 </div>`;
     }).join('');
@@ -3104,7 +3089,7 @@ async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName
         
         if (d.success) {
             toast(`✅ Cài đặt ${itemName} thành công!`, 'success');
-            btnEl.textContent = '✓ Đã cài đặt';
+            btnEl.innerHTML = '<span class="dashicons dashicons-yes wp-admin-icon"></span> Đã cài đặt';
             btnEl.className = 'btn btn-sm btn-secondary';
             
             setStoreMode(siteIdx, itemType, 'installed');
@@ -3136,7 +3121,7 @@ function filterSites() {
 /* ─── Fetch list ─── */
 async function fetchSites(scan=false) {
     document.getElementById('sites-container').innerHTML =
-        `<div class="empty-state"><div class="icon">⏳</div><strong>${scan?'Scanning directories…':'Loading…'}</strong></div>`;
+        `<div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin" style="font-size: 40px; width: 40px; height: 40px;"></span></div><strong>${scan?'Scanning directories…':'Loading…'}</strong></div>`;
     try {
         const r = await fetch(apiUrl(scan?'scan':'list'));
         const d = await r.json();
@@ -3147,9 +3132,9 @@ async function fetchSites(scan=false) {
 
 async function triggerScan() {
     const btn = document.getElementById('btn-scan');
-    btn.disabled=true; btn.textContent='⏳ Scanning…';
+    btn.disabled=true; btn.innerHTML='<span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span> Scanning…';
     await fetchSites(true);
-    btn.disabled=false; btn.textContent='⟳ Scan Hosting';
+    btn.disabled=false; btn.innerHTML='<span class="dashicons dashicons-update wp-admin-icon"></span> Scan Hosting';
     toast('Scan complete.', 'success');
 }
 
