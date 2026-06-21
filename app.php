@@ -4439,9 +4439,21 @@ function find_plugin_main_file($plugins_dir, $folder_name) {
         return null;
     }
     
+    // Prioritize checking the file that matches the plugin directory name (standard convention)
+    $primary_file = $dir . '/' . $folder_name . '.php';
+    if (file_exists($primary_file)) {
+        $content = file_get_contents($primary_file, false, null, 0, 8192);
+        if (preg_match('/Plugin Name\s*:/i', $content)) {
+            return $folder_name . '/' . $folder_name . '.php';
+        }
+    }
+    
     $files = glob($dir . '/*.php');
     if ($files) {
         foreach ($files as $file) {
+            if (basename($file) === $folder_name . '.php') {
+                continue;
+            }
             $content = file_get_contents($file, false, null, 0, 8192);
             if (preg_match('/Plugin Name\s*:/i', $content)) {
                 return $folder_name . '/' . basename($file);
