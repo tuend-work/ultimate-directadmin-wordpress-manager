@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.20';
+$plugin_version = '1.3.21';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -41,6 +41,7 @@ if (strpos($server_ip, ':') !== false) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://s.w.org/wp-includes/css/dashicons.min.css">
 <title>Ultimate WordPress Manager</title>
 <style>
 /* ── Reset ── */
@@ -501,6 +502,21 @@ div#iframe-container{
     color: var(--text);
     background: var(--bg3);
     border-color: var(--border);
+}
+.wp-admin-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+}
+.store-tab-btn .wp-admin-icon,
+.tab-btn .wp-admin-icon,
+.card-sec-title .wp-admin-icon {
+    flex: 0 0 auto;
 }
 .tab-grid-details {
     display: grid;
@@ -2726,16 +2742,16 @@ function renderSites(sites) {
 
                 <!-- Tabs headers -->
                 <div class="card-tabs" onclick="event.stopPropagation()">
-                    <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)">ℹ️ Overview Details</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'security', event)">🛡️ Security & Protection</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)">📋 Task & Logs</button>
+                    <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)"><span class="dashicons dashicons-info wp-admin-icon"></span> Overview Details</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'security', event)"><span class="dashicons dashicons-shield wp-admin-icon"></span> Security & Protection</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Plugins</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)"><span class="dashicons dashicons-list-view wp-admin-icon"></span> Task & Logs</button>
                 </div>
 
                 <!-- Tab 1: Overview Details -->
                 <div class="card-tab-content active" id="tab-content-${i}-details">
-                    <div class="card-sec-title">ℹ️ Installation Details</div>
+                    <div class="card-sec-title"><span><span class="dashicons dashicons-info wp-admin-icon"></span> Installation Details</span></div>
                     <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
                         <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
                         <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
@@ -2802,7 +2818,7 @@ function renderSites(sites) {
                 <!-- Tab 1.5: Security & Protection -->
                 <div class="card-tab-content" id="tab-content-${i}-security">
                     <div class="card-sec-title">
-                        <span>🛡️ Security Hardening Status</span>
+                        <span><span class="dashicons dashicons-shield wp-admin-icon"></span> Security Hardening Status</span>
                         <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})">⟳ Scan & Refresh</button>
                     </div>
                     <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
@@ -2816,7 +2832,7 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-plugins">
                     <div class="card-sec-title">
                         <span>
-                            <button class="store-tab-btn active" id="plugin-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'plugins', 'installed', event)">🔌 Installed Plugins</button>
+                            <button class="store-tab-btn active" id="plugin-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'plugins', 'installed', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Installed Plugins</button>
                             <span class="inline-store-tabs">
                                 <button class="store-tab-btn" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular</button>
                                 <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium</button>
@@ -2837,7 +2853,7 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-themes">
                     <div class="card-sec-title">
                         <span>
-                            <button class="store-tab-btn active" id="theme-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'themes', 'installed', event)">🎨 Installed Themes</button>
+                            <button class="store-tab-btn active" id="theme-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'themes', 'installed', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Installed Themes</button>
                             <span class="inline-store-tabs">
                                 <button class="store-tab-btn" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular</button>
                                 <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium</button>
@@ -2857,7 +2873,7 @@ function renderSites(sites) {
                 <!-- Tab 5: Logs -->
                 <div class="card-tab-content" id="tab-content-${i}-logs">
                     <div class="card-sec-title">
-                        <span>📋 Trình xem nhật ký hoạt động (Logs Viewer)</span>
+                        <span><span class="dashicons dashicons-list-view wp-admin-icon"></span> Trình xem nhật ký hoạt động (Logs Viewer)</span>
                     </div>
                     <div style="background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;" onclick="event.stopPropagation()">
                         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
