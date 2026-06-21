@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.19';
+$plugin_version = '1.3.20';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -501,18 +501,6 @@ div#iframe-container{
     color: var(--text);
     background: var(--bg3);
     border-color: var(--border);
-}
-.store-tab-btn.store-cta {
-    background: #ff343a;
-    border-color: #ff343a;
-    color: white;
-    font-size: 16px;
-    line-height: 1;
-    padding: 9px 14px;
-}
-.store-tab-btn.store-cta.active {
-    background: #d92d33;
-    border-color: #d92d33;
 }
 .tab-grid-details {
     display: grid;
@@ -2830,8 +2818,8 @@ function renderSites(sites) {
                         <span>
                             <button class="store-tab-btn active" id="plugin-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'plugins', 'installed', event)">🔌 Installed Plugins</button>
                             <span class="inline-store-tabs">
-                                <button class="store-tab-btn store-cta" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular</button>
-                                <button class="store-tab-btn store-cta" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium</button>
+                                <button class="store-tab-btn" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular</button>
+                                <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium</button>
                             </span>
                         </span>
                         <div style="display:flex; gap:8px;" id="plugin-installed-actions-${i}">
@@ -2851,8 +2839,8 @@ function renderSites(sites) {
                         <span>
                             <button class="store-tab-btn active" id="theme-store-tab-${i}-installed" onclick="switchStoreTab(${i}, 'themes', 'installed', event)">🎨 Installed Themes</button>
                             <span class="inline-store-tabs">
-                                <button class="store-tab-btn store-cta" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular</button>
-                                <button class="store-tab-btn store-cta" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium</button>
+                                <button class="store-tab-btn" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular</button>
+                                <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium</button>
                             </span>
                         </span>
                         <div style="display:flex; gap:8px;" id="theme-installed-actions-${i}">
