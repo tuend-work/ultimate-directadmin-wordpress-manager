@@ -151,6 +151,60 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
     }
 }
 
+// Action: Update ZIP file for an existing item
+if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_zip') {
+    $item_type = $_POST['item_type'] ?? ''; // plugins or themes
+    $index = isset($_POST['index']) ? (int)$_POST['index'] : -1;
+    
+    try {
+        $list = get_store_list();
+        if (($item_type !== 'plugins' && $item_type !== 'themes') || !isset($list[$item_type][$index])) {
+            throw new Exception("Tài nguyên không hợp lệ.");
+        }
+        
+        $item = &$list[$item_type][$index];
+        if ($item['type'] !== 'zip') {
+            throw new Exception("Chỉ hỗ trợ cập nhật file ZIP cho tài nguyên Premium ZIP.");
+        }
+        
+        if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception("Vui lòng chọn tệp ZIP hợp lệ.");
+        }
+        
+        $file = $_FILES['zip_file'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'zip') {
+            throw new Exception("Chỉ chấp nhận định dạng tệp .zip.");
+        }
+        
+        $filename = basename($file['name']);
+        $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
+        $filename = time() . '_' . $filename;
+        $dest = UPLOAD_DIR . '/' . $filename;
+        
+        if (move_uploaded_file($file['tmp_name'], $dest)) {
+            @chmod($dest, 0644);
+            
+            // Xóa file ZIP cũ trên server nếu có
+            if (!empty($item['file'])) {
+                $old_file = UPLOAD_DIR . '/' . $item['file'];
+                if (file_exists($old_file)) {
+                    @unlink($old_file);
+                }
+            }
+            
+            // Cập nhật tên file mới vào data
+            $item['file'] = $filename;
+            save_store_list($list);
+            $success_msg = "Cập nhật tệp ZIP cho " . htmlspecialchars($item['name']) . " thành công!";
+        } else {
+            throw new Exception("Không thể lưu trữ tệp tin tải lên máy chủ.");
+        }
+    } catch (Exception $e) {
+        $add_error = $e->getMessage();
+    }
+}
+
 // Action: Delete item
 if ($authenticated && isset($_GET['action']) && $_GET['action'] === 'delete') {
     $item_type = $_GET['type'] ?? ''; // plugins or themes
@@ -516,6 +570,68 @@ $list_data = get_store_list();
         .footer-links a:hover {
             text-decoration: underline;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            width: 100%;
+            max-width: 400px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+            position: relative;
+            animation: modalFadeIn 0.25s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: white;
+        }
+
+        .modal-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -652,7 +768,12 @@ $list_data = get_store_list();
                                                     <?php echo htmlspecialchars($p['type'] === 'wporg' ? ($p['slug'] ?? '') : ($p['file'] ?? '')); ?>
                                                 </td>
                                                 <td style="text-align: center; padding-right: 20px;">
-                                                    <a href="?action=delete&type=plugins&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                    <div style="display: inline-flex; gap: 6px; justify-content: center;">
+                                                        <?php if ($p['type'] === 'zip'): ?>
+                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('plugins', <?php echo $idx; ?>, '<?php echo addslashes($p['name']); ?>')">🔄 Cập nhật</button>
+                                                        <?php endif; ?>
+                                                        <a href="?action=delete&type=plugins&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -701,7 +822,12 @@ $list_data = get_store_list();
                                                     <?php echo htmlspecialchars($t['type'] === 'wporg' ? ($t['slug'] ?? '') : ($t['file'] ?? '')); ?>
                                                 </td>
                                                 <td style="text-align: center; padding-right: 20px;">
-                                                    <a href="?action=delete&type=themes&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                    <div style="display: inline-flex; gap: 6px; justify-content: center;">
+                                                        <?php if ($t['type'] === 'zip'): ?>
+                                                            <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('themes', <?php echo $idx; ?>, '<?php echo addslashes($t['name']); ?>')">🔄 Cập nhật</button>
+                                                        <?php endif; ?>
+                                                        <a href="?action=delete&type=themes&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')">🗑 Xóa</a>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -734,10 +860,56 @@ $list_data = get_store_list();
                     zipInput.required = true;
                 }
             }
+            
+            function openUpdateModal(itemType, index, itemName) {
+                document.getElementById('update_item_type').value = itemType;
+                document.getElementById('update_index').value = index;
+                document.getElementById('update_item_name').value = itemName;
+                document.getElementById('updateZipModal').classList.add('show');
+            }
+
+            function closeUpdateModal() {
+                document.getElementById('updateZipModal').classList.remove('show');
+                document.getElementById('update_zip_file').value = '';
+            }
+
+            // Close modal when clicking outside content
+            window.onclick = function(event) {
+                const modal = document.getElementById('updateZipModal');
+                if (event.target === modal) {
+                    closeUpdateModal();
+                }
+            }
+
             // Khởi chạy khi load trang
             document.addEventListener('DOMContentLoaded', toggleFormFields);
         </script>
     <?php endif; ?>
+
+    <!-- Modal Update ZIP -->
+    <div id="updateZipModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeUpdateModal()">&times;</span>
+            <div class="modal-title">🔄 Cập nhật tệp ZIP Premium</div>
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="update_zip">
+                <input type="hidden" name="item_type" id="update_item_type" value="">
+                <input type="hidden" name="index" id="update_index" value="">
+                
+                <div class="form-group">
+                    <label>Tài nguyên cập nhật</label>
+                    <input type="text" id="update_item_name" class="form-control" style="background-color: rgba(255,255,255,0.05); color: var(--text-muted);" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label for="update_zip_file">Chọn tệp ZIP mới</label>
+                    <input type="file" name="zip_file" id="update_zip_file" class="form-control" accept=".zip" required>
+                </div>
+                
+                <button type="submit" style="width: 100%; justify-content: center; margin-top: 15px;" class="btn btn-primary">🔄 Tải lên & Cập nhật</button>
+            </form>
+        </div>
+    </div>
 
     <footer>
         <div class="container">
