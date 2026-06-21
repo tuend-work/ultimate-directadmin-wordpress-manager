@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.31';
+$plugin_version = '1.3.32';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -2368,19 +2368,19 @@ async function toggleLock(i) {
             
             if (s.locked) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '🔓 Tắt';
-                label.innerHTML = '🔒 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt';
+                label.innerHTML = '<span class="dashicons dashicons-lock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
                 if (hBadge) {
                     hBadge.className = 'badge badge-yellow';
-                    hBadge.textContent = '🔒 Lockdown';
+                    hBadge.innerHTML = '<span class="dashicons dashicons-lock wp-admin-icon"></span> Lockdown';
                 }
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '🔒 Bật';
-                label.innerHTML = '🔓 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật';
+                label.innerHTML = '<span class="dashicons dashicons-unlock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
                 if (hBadge) {
                     hBadge.className = 'badge badge-gray';
-                    hBadge.textContent = '🔓 Unlocked';
+                    hBadge.innerHTML = '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Unlocked';
                 }
             }
         } else {
@@ -2425,12 +2425,12 @@ async function toggleCron(i) {
             
             if (s.disable_wp_cron) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '⚙️ Tắt';
-                label.innerHTML = '⚡ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt';
+                label.innerHTML = '<span class="dashicons dashicons-performance wp-admin-icon"></span> Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '⚡ Bật';
-                label.innerHTML = '⚙️ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-performance wp-admin-icon"></span> Bật';
+                label.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
             }
         } else {
             toast(d.error || 'Failed to update WP Cron status.', 'error');
@@ -2474,12 +2474,12 @@ async function toggleAutoUpdate(i) {
             
             if (s.disable_auto_update) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '⚙️ Tắt';
-                label.innerHTML = '⚡ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt';
+                label.innerHTML = '<span class="dashicons dashicons-update-alt wp-admin-icon"></span> Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '⚡ Bật';
-                label.innerHTML = '⚙️ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bật';
+                label.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
             }
         } else {
             toast(d.error || 'Failed to update Auto Update status.', 'error');
@@ -2524,12 +2524,12 @@ async function toggleDebug(i) {
             
             if (s.wp_debug_enabled) {
                 btn.className = 'btn btn-sm btn-secondary';
-                btn.textContent = '⚙️ Tắt';
-                label.innerHTML = '⚡ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt';
+                label.innerHTML = '<span class="dashicons dashicons-warning wp-admin-icon"></span> WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>';
             } else {
                 btn.className = 'btn btn-sm btn-primary';
-                btn.textContent = '⚡ Bật';
-                label.innerHTML = '⚙️ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+                btn.innerHTML = '<span class="dashicons dashicons-warning wp-admin-icon"></span> Bật';
+                label.innerHTML = '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
             }
         } else {
             toast(d.error || 'Failed to update WP Debug status.', 'error');
@@ -2764,41 +2764,49 @@ function renderSites(sites) {
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="lock-label-${i}">
                             ${s.locked 
-                                ? '🔒 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
-                                : '🔓 WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
+                                ? '<span class="dashicons dashicons-lock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '<span class="dashicons dashicons-unlock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                            ${s.locked ? '🔓 Tắt' : '🔒 Bật'}
+                            ${s.locked 
+                                ? '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt' 
+                                : '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="cron-label-${i}">
                             ${s.disable_wp_cron 
-                                ? '⚡ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
-                                : '⚙️ Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
+                                ? '<span class="dashicons dashicons-performance wp-admin-icon"></span> Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Disable WP Cron (Tắt Cron mặc định và dùng System Cron): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.disable_wp_cron ? 'btn-secondary' : 'btn-primary'}" id="btn-cron-${i}" onclick="toggleCron(${i})">
-                            ${s.disable_wp_cron ? '⚙️ Tắt' : '⚡ Bật'}
+                            ${s.disable_wp_cron 
+                                ? '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt' 
+                                : '<span class="dashicons dashicons-performance wp-admin-icon"></span> Bật'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="autoupdate-label-${i}">
                             ${s.disable_auto_update 
-                                ? '⚡ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
-                                : '⚙️ Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
+                                ? '<span class="dashicons dashicons-update-alt wp-admin-icon"></span> Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Disable Auto Check Update (Tắt tự động kiểm tra cập nhật): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.disable_auto_update ? 'btn-secondary' : 'btn-primary'}" id="btn-autoupdate-${i}" onclick="toggleAutoUpdate(${i})">
-                            ${s.disable_auto_update ? '⚙️ Tắt' : '⚡ Bật'}
+                            ${s.disable_auto_update 
+                                ? '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt' 
+                                : '<span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bật'}
                         </button>
                     </div>
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="debug-label-${i}">
                             ${s.wp_debug_enabled 
-                                ? '⚡ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
-                                : '⚙️ WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
+                                ? '<span class="dashicons dashicons-warning wp-admin-icon"></span> WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
+                                : '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> WP Debug (Ghi nhật ký lỗi phát triển): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
                         </div>
                         <button class="btn btn-sm ${s.wp_debug_enabled ? 'btn-secondary' : 'btn-primary'}" id="btn-debug-${i}" onclick="toggleDebug(${i})">
-                            ${s.wp_debug_enabled ? '⚙️ Tắt' : '⚡ Bật'}
+                            ${s.wp_debug_enabled 
+                                ? '<span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Tắt' 
+                                : '<span class="dashicons dashicons-warning wp-admin-icon"></span> Bật'}
                         </button>
                     </div>
                     <!-- Danger Zone / Delete Website -->
