@@ -2270,7 +2270,7 @@ function wp_manager_log($msg) {
     $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $home = getenv('HOME') ?: getenv('USERPROFILE') ?: "/home/{$username}";
     $log_file = $home . '/.ultimate_wp_manager_debug.log';
-    $timestamp = date('Y-m-d H:i:s');
+    $timestamp = (new DateTime("now", new DateTimeZone("Asia/Ho_Chi_Minh")))->format('Y-m-d H:i:s');
     @file_put_contents($log_file, "[{$timestamp}] {$msg}\n", FILE_APPEND);
 }
 
@@ -4503,12 +4503,25 @@ function run_api() {
                 
                 $log_type = $_POST['log_type'];
                 $filepath = '';
+                $logs_dir = $home . '/domains/' . $domain . '/logs';
                 if ($log_type === 'wp_debug') {
                     $filepath = $_POST['path'] . '/wp-content/debug.log';
                 } elseif ($log_type === 'access') {
-                    $filepath = $home . '/domains/' . $domain . '/logs/' . $domain . '.log';
+                    $filepath = $logs_dir . '/' . $domain . '.log';
+                    if (!file_exists($filepath)) {
+                        if (file_exists($logs_dir . '/access.log')) {
+                            $filepath = $logs_dir . '/access.log';
+                        } elseif (file_exists($logs_dir . '/' . $domain . '.access.log')) {
+                            $filepath = $logs_dir . '/' . $domain . '.access.log';
+                        }
+                    }
                 } elseif ($log_type === 'error') {
-                    $filepath = $home . '/domains/' . $domain . '/logs/' . $domain . '.error.log';
+                    $filepath = $logs_dir . '/' . $domain . '.error.log';
+                    if (!file_exists($filepath)) {
+                        if (file_exists($logs_dir . '/error.log')) {
+                            $filepath = $logs_dir . '/error.log';
+                        }
+                    }
                 } elseif ($log_type === 'php_error') {
                     $filepath = find_php_error_log_path($_POST['path'], $domain, $username);
                 }

@@ -21,7 +21,7 @@ USER_HOME=$(eval echo "~$USER")
 USER_LOGS_DIR="$USER_HOME/domains/$DOMAIN/logs"
 
 # Tự động tạo thư mục logs của user nếu chưa có
-if [ ! -d "$USER_LOGS_DIR" ]; then
+if [ ! -L "$USER_LOGS_DIR" ] && [ ! -d "$USER_LOGS_DIR" ]; then
     mkdir -p "$USER_LOGS_DIR"
     # Lấy group của user
     USER_GID=$(id -g "$USER")
@@ -29,18 +29,44 @@ if [ ! -d "$USER_LOGS_DIR" ]; then
     chmod 755 "$USER_LOGS_DIR"
 fi
 
+# Phân giải thư mục log thực sự (nếu logs là symlink có sẵn trên DirectAdmin)
+REAL_LOG_DIR="$USER_LOGS_DIR"
+if [ -L "$USER_LOGS_DIR" ]; then
+    REAL_LOG_DIR=$(readlink -f "$USER_LOGS_DIR")
+fi
+
 # 3. Detect Log Files based on Web Server
 SYSTEM_ACCESS_LOG=""
 SYSTEM_ERROR_LOG=""
 
-# Quét Nginx
-if [ -f "/var/log/nginx/domains/$DOMAIN.log" ]; then
-    SYSTEM_ACCESS_LOG="/var/log/nginx/domains/$DOMAIN.log"
-    SYSTEM_ERROR_LOG="/var/log/nginx/domains/$DOMAIN.error.log"
-# Quét Apache / OpenLiteSpeed
-elif [ -f "/var/log/httpd/domains/$DOMAIN.log" ]; then
-    SYSTEM_ACCESS_LOG="/var/log/httpd/domains/$DOMAIN.log"
-    SYSTEM_ERROR_LOG="/var/log/httpd/domains/$DOMAIN.error.log"
+# Nếu REAL_LOG_DIR khác với USER_LOGS_DIR (tức là logs có sẵn trỏ đi đâu đó, ví dụ /var/log/httpd/domains/domain/)
+if [ "$REAL_LOG_DIR" != "$USER_LOGS_DIR" ] && [ -d "$REAL_LOG_DIR" ]; then
+    for f in "$REAL_LOG_DIR/$DOMAIN.log" "$REAL_LOG_DIR/access.log" "$REAL_LOG_DIR/$DOMAIN.access.log"; do
+        if [ -f "$f" ]; then
+            SYSTEM_ACCESS_LOG="$f"
+            break
+        fi
+    done
+    
+    for f in "$REAL_LOG_DIR/$DOMAIN.error.log" "$REAL_LOG_DIR/error.log"; do
+        if [ -f "$f" ]; then
+            SYSTEM_ERROR_LOG="$f"
+            break
+        fi
+    done
+fi
+
+# Nếu chưa tìm thấy, quét ở các đường dẫn mặc định hệ thống
+if [ -z "$SYSTEM_ACCESS_LOG" ]; then
+    # Quét Nginx
+    if [ -f "/var/log/nginx/domains/$DOMAIN.log" ]; then
+        SYSTEM_ACCESS_LOG="/var/log/nginx/domains/$DOMAIN.log"
+        SYSTEM_ERROR_LOG="/var/log/nginx/domains/$DOMAIN.error.log"
+    # Quét Apache / OpenLiteSpeed
+    elif [ -f "/var/log/httpd/domains/$DOMAIN.log" ]; then
+        SYSTEM_ACCESS_LOG="/var/log/httpd/domains/$DOMAIN.log"
+        SYSTEM_ERROR_LOG="/var/log/httpd/domains/$DOMAIN.error.log"
+    fi
 fi
 
 # Nếu không quét thấy ở các đường dẫn mặc định trên, thử tìm file log bất kỳ trong /var/log/nginx/ hoặc /var/log/httpd/ chứa tên domain
@@ -74,11 +100,13 @@ if [ -n "$SYSTEM_ACCESS_LOG" ] && [ -f "$SYSTEM_ACCESS_LOG" ]; then
     # Cấp quyền đi xuyên qua các thư mục cha
     grant_parent_dirs_x "$SYSTEM_ACCESS_LOG" "$USER"
 
-    # Tạo symlink access log
-    USER_ACCESS_LINK="$USER_LOGS_DIR/$DOMAIN.log"
-    if [ ! -L "$USER_ACCESS_LINK" ] && [ ! -f "$USER_ACCESS_LINK" ]; then
-        ln -s "$SYSTEM_ACCESS_LOG" "$USER_ACCESS_LINK"
-        chown -h "$USER" "$USER_ACCESS_LINK"
+    # Chỉ tạo symlink con nếu USER_LOGS_DIR là thư mục thật của user (không phải symlink hệ thống sẵn có)
+    if [ "$REAL_LOG_DIR" = "$USER_LOGS_DIR" ]; then
+        USER_ACCESS_LINK="$USER_LOGS_DIR/$DOMAIN.log"
+        if [ ! -L "$USER_ACCESS_LINK" ] && [ ! -f "$USER_ACCESS_LINK" ]; then
+            ln -s "$SYSTEM_ACCESS_LOG" "$USER_ACCESS_LINK"
+            chown -h "$USER" "$USER_ACCESS_LINK"
+        fi
     fi
     
     # Phân quyền đọc cho user
@@ -93,11 +121,12 @@ if [ -n "$SYSTEM_ERROR_LOG" ] && [ -f "$SYSTEM_ERROR_LOG" ]; then
     # Cấp quyền đi xuyên qua các thư mục cha
     grant_parent_dirs_x "$SYSTEM_ERROR_LOG" "$USER"
 
-    # Tạo symlink error log
-    USER_ERROR_LINK="$USER_LOGS_DIR/$DOMAIN.error.log"
-    if [ ! -L "$USER_ERROR_LINK" ] && [ ! -f "$USER_ERROR_LINK" ]; then
-        ln -s "$SYSTEM_ERROR_LOG" "$USER_ERROR_LINK"
-        chown -h "$USER" "$USER_ERROR_LINK"
+    if [ "$REAL_LOG_DIR" = "$USER_LOGS_DIR" ]; then
+        USER_ERROR_LINK="$USER_LOGS_DIR/$DOMAIN.error.log"
+        if [ ! -L "$USER_ERROR_LINK" ] && [ ! -f "$USER_ERROR_LINK" ]; then
+            ln -s "$SYSTEM_ERROR_LOG" "$USER_ERROR_LINK"
+            chown -h "$USER" "$USER_ERROR_LINK"
+        fi
     fi
     
     # Phân quyền đọc cho user
