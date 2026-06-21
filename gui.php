@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.28';
+$plugin_version = '1.3.29';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1254,13 +1254,6 @@ function toggleCard(i) {
     if (isOpening) {
         openCardBody(body);
         chev.classList.add('open');
-        // Smoothly scroll the card to the top of the viewport to prevent jumpiness
-        setTimeout(() => {
-            const card = body.closest('.site-card');
-            if (card) {
-                card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }, 100);
     } else {
         closeCardBody(body);
         chev.classList.remove('open');
