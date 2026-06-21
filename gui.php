@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.23';
+$plugin_version = '1.3.24';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -101,14 +101,14 @@ div#iframe-container{
     font-size: 14px;
     display: flex;
     align-items: center;
-    gap: 8px;
 }
 .topbar .logo-icon {
-    width: 24px; height: 24px;
-    background: var(--blue);
-    border-radius: 4px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 900; color: #fff;
+    font-size: 20px;
+    color: var(--blue);
+    margin-right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .topbar .user { margin-left: auto; color: var(--text2); font-size: 12px; display: flex; align-items: center; gap: 8px; }
 
@@ -748,7 +748,7 @@ input:disabled + .slider {
 <!-- Top bar -->
 <div class="topbar">
     <div class="logo">
-        <div class="logo-icon">W</div>
+        <span class="dashicons dashicons-wordpress logo-icon"></span>
         Ultimate WordPress Manager
         <span style="font-size:10px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:2px;letter-spacing:.3px;">v<?php echo htmlspecialchars($plugin_version); ?></span>
     </div>
