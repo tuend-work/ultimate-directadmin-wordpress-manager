@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.17';
+$plugin_version = '1.3.18';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -475,6 +475,36 @@ div#iframe-container{
     padding: 16px;
 }
 .card-tab-content.active {
+    display: block;
+}
+.store-tabs {
+    display: flex;
+    gap: 6px;
+    margin: 18px 0 12px;
+    border-bottom: 1px solid var(--border);
+}
+.store-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 10px;
+    margin-bottom: -1px;
+}
+.store-tab-btn:hover {
+    color: var(--text);
+}
+.store-tab-btn.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+}
+.store-panel {
+    display: none;
+}
+.store-panel.active {
     display: block;
 }
 .tab-grid-details {
@@ -1166,20 +1196,17 @@ function switchTab(siteIdx, tabName, event) {
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load plugins')) {
             loadPlugins(siteIdx);
         }
+        loadPremiumItems(siteIdx, 'plugins', 'popular');
     } else if (tabName === 'themes') {
         const list = document.getElementById(`theme-list-${siteIdx}`);
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load themes')) {
             loadThemes(siteIdx);
         }
+        loadPremiumItems(siteIdx, 'themes', 'popular');
     } else if (tabName === 'security') {
         const list = document.getElementById(`security-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
             loadSecurity(siteIdx);
-        }
-    } else if (tabName === 'premium') {
-        const list = document.getElementById(`premium-list-container-${siteIdx}`);
-        if (list.innerHTML.includes('Clicking Premium tab') || list.innerHTML.includes('will load Premium')) {
-            loadPremium(siteIdx);
         }
     }
 }
@@ -2707,7 +2734,6 @@ function renderSites(sites) {
                     <button class="tab-btn" onclick="switchTab(${i}, 'security', event)">🛡️ Security & Protection</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'premium', event)">✨ Premium</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)">📋 Task & Logs</button>
                 </div>
 
@@ -2804,6 +2830,20 @@ function renderSites(sites) {
                             Clicking Plugins tab or Refresh will load plugins...
                         </div>
                     </div>
+                    <div class="store-tabs" onclick="event.stopPropagation()">
+                        <button class="store-tab-btn active" id="plugin-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'plugins', 'popular', event)">Popular Plugin</button>
+                        <button class="store-tab-btn" id="plugin-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'plugins', 'premium', event)">Premium Plugin</button>
+                    </div>
+                    <div class="store-panel active" id="plugin-store-panel-${i}-popular">
+                        <div id="plugin-popular-list-container-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Popular Plugin to load installable plugins...</div>
+                        </div>
+                    </div>
+                    <div class="store-panel" id="plugin-store-panel-${i}-premium">
+                        <div id="plugin-premium-list-container-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Premium Plugin to load premium plugins...</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab 3: Themes -->
@@ -2820,21 +2860,21 @@ function renderSites(sites) {
                             Clicking Themes tab or Refresh will load themes...
                         </div>
                     </div>
-                </div>
-
-                <!-- Tab 4: Premium -->
-                <div class="card-tab-content" id="tab-content-${i}-premium">
-                    <div class="card-sec-title">
-                        <span>✨ Premium Plugins & Themes</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadPremium(${i})">⟳ Tải lại</button>
+                    <div class="store-tabs" onclick="event.stopPropagation()">
+                        <button class="store-tab-btn active" id="theme-store-tab-${i}-popular" onclick="switchStoreTab(${i}, 'themes', 'popular', event)">Popular Theme</button>
+                        <button class="store-tab-btn" id="theme-store-tab-${i}-premium" onclick="switchStoreTab(${i}, 'themes', 'premium', event)">Premium Theme</button>
                     </div>
-                    <div id="premium-list-container-${i}">
-                        <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
-                            Clicking Premium tab or Refresh will load Premium resources...
+                    <div class="store-panel active" id="theme-store-panel-${i}-popular">
+                        <div id="theme-popular-list-container-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Popular Theme to load installable themes...</div>
+                        </div>
+                    </div>
+                    <div class="store-panel" id="theme-store-panel-${i}-premium">
+                        <div id="theme-premium-list-container-${i}">
+                            <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Click Premium Theme to load premium themes...</div>
                         </div>
                     </div>
                 </div>
-
                 <!-- Tab 5: Logs -->
                 <div class="card-tab-content" id="tab-content-${i}-logs">
                     <div class="card-sec-title">
@@ -2910,118 +2950,119 @@ function renderSites(sites) {
     }).join('');
 }
 
-/* ─── Premium Manager ─── */
-async function loadPremium(siteIdx) {
-    const s = allSites[siteIdx];
-    const container = document.getElementById('premium-list-container-' + siteIdx);
-    container.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">⏳ Đang tải danh sách Premium...</div>';
-    
+/* Premium/Popular install lists inside Plugins and Themes tabs */
+let premiumListCache = null;
+
+function premiumContainerId(itemType, group, siteIdx) {
+    const prefix = itemType === 'plugins' ? 'plugin' : 'theme';
+    return `${prefix}-${group}-list-container-${siteIdx}`;
+}
+
+function switchStoreTab(siteIdx, itemType, group, event) {
+    if (event) event.stopPropagation();
+    const prefix = itemType === 'plugins' ? 'plugin' : 'theme';
+    document.querySelectorAll(`#cb-${siteIdx} .store-tab-btn[id^="${prefix}-store-tab-"]`).forEach(el => el.classList.remove('active'));
+    document.querySelectorAll(`#cb-${siteIdx} .store-panel[id^="${prefix}-store-panel-"]`).forEach(el => el.classList.remove('active'));
+
+    const btn = document.getElementById(`${prefix}-store-tab-${siteIdx}-${group}`);
+    const panel = document.getElementById(`${prefix}-store-panel-${siteIdx}-${group}`);
+    if (btn) btn.classList.add('active');
+    if (panel) panel.classList.add('active');
+
+    loadPremiumItems(siteIdx, itemType, group);
+}
+
+async function fetchPremiumList() {
+    if (premiumListCache) return premiumListCache;
+    const r = await fetch(apiUrl('get_premium_list'));
+    const d = await r.json();
+    if (!d.success) {
+        throw new Error(d.error || 'Cannot load install list.');
+    }
+    premiumListCache = d;
+    return d;
+}
+
+async function loadPremiumItems(siteIdx, itemType, group) {
+    const container = document.getElementById(premiumContainerId(itemType, group, siteIdx));
+    if (!container) return;
+    if (container.dataset.loaded === '1') return;
+
+    const label = itemType === 'plugins'
+        ? (group === 'popular' ? 'Popular Plugin' : 'Premium Plugin')
+        : (group === 'popular' ? 'Popular Theme' : 'Premium Theme');
+    container.innerHTML = `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Loading ${label}...</div>`;
+
     try {
-        const r = await fetch(apiUrl('get_premium_list'));
-        const d = await r.json();
-        
-        if (d.success) {
-            renderPremiumTab(siteIdx, d);
-        } else {
-            container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
-        }
+        const data = await fetchPremiumList();
+        renderPremiumItems(siteIdx, itemType, group, data);
+        container.dataset.loaded = '1';
     } catch (err) {
-        container.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">Không thể tải danh sách Premium.</div>';
+        container.innerHTML = `<div style="color:var(--red);font-size:12px;padding:12px;text-align:center;">${esc(err.message || 'Cannot load install list.')}</div>`;
     }
 }
 
-function renderPremiumTab(siteIdx, data) {
-    const s = allSites[siteIdx];
-    const container = document.getElementById('premium-list-container-' + siteIdx);
-    
-    let html = '';
-    
-    html += `<div style="margin-top: 14px;"><h4 style="font-size: 13px; font-weight: 700; color: var(--text); border-left: 3px solid var(--blue); padding-left: 8px;">🔌 Popular Plugins</h4></div>`;
-    if (!data.plugins || !data.plugins.length) {
-        html += `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Chưa có plugin premium nào được cấu hình.</div>`;
-    } else {
-        html += `<div class="premium-grid">`;
-        data.plugins.forEach((p, idx) => {
-            const isWpOrg = p.type === 'wporg';
-            const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
-            const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
-            
-            let bannerHTML = '';
-            if (isWpOrg) {
-                bannerHTML = `<img src="https://ps.w.org/${p.slug}/assets/banner-772x250.png" onerror="this.src='https://ps.w.org/${p.slug}/assets/banner-772x250.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(p.name)}">
-                              <div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">🔌</div>`;
-            } else {
-                bannerHTML = `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
-            }
-            
-            html += `
-            <div class="premium-card">
-                <div class="premium-banner">
-                    ${bannerHTML}
-                    <span class="badge ${badgeClass} badge-source">${badgeText}</span>
-                </div>
-                <div class="premium-card-body">
-                    <div class="premium-card-title" title="${esc(p.name)}">${esc(p.name)}</div>
-                    <div class="premium-card-desc" title="${esc(p.description)}">${esc(p.description || 'Không có mô tả.')}</div>
-                </div>
-                <div class="premium-card-footer">
-                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(p.slug) : 'File: ' + esc(p.file)}</span>
-                    <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-plug-${idx}" onclick="installPremiumItem(${siteIdx}, 'plugins', '${p.type}', '${isWpOrg ? esc(p.slug) : esc(p.file)}', '${esc(p.name)}', this)">
-                        📥 Cài đặt
-                    </button>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
+function renderPremiumItems(siteIdx, itemType, group, data) {
+    const container = document.getElementById(premiumContainerId(itemType, group, siteIdx));
+    if (!container) return;
+
+    const allItems = data[itemType] || [];
+    const explicitKey = `${group}_${itemType}`;
+    const items = Array.isArray(data[explicitKey])
+        ? data[explicitKey]
+        : allItems.filter(item => group === 'popular' ? item.type === 'wporg' : item.type !== 'wporg');
+    const isPlugin = itemType === 'plugins';
+    const emptyText = isPlugin
+        ? (group === 'popular' ? 'No popular plugins configured.' : 'No premium plugins configured.')
+        : (group === 'popular' ? 'No popular themes configured.' : 'No premium themes configured.');
+
+    if (!items.length) {
+        container.innerHTML = `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">${emptyText}</div>`;
+        return;
     }
-    
-    html += `<div style="margin-top: 24px;"><h4 style="font-size: 13px; font-weight: 700; color: var(--text); border-left: 3px solid var(--green); padding-left: 8px;">🎨 Popular Themes</h4></div>`;
-    if (!data.themes || !data.themes.length) {
-        html += `<div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">Chưa có theme premium nào được cấu hình.</div>`;
-    } else {
-        html += `<div class="premium-grid">`;
-        data.themes.forEach((t, idx) => {
-            const isWpOrg = t.type === 'wporg';
-            const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
-            const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
-            
-            let bannerHTML = '';
-            if (isWpOrg) {
-                bannerHTML = `<img src="https://ts.w.org/wp-content/themes/${t.slug}/screenshot.png" onerror="this.onerror=null; this.src='https://ts.w.org/wp-content/themes/${t.slug}/screenshot.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(t.name)}">
-                              <div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">🎨</div>`;
-            } else {
-                bannerHTML = `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
-            }
-            
-            html += `
+
+    let html = '<div class="premium-grid">';
+    items.forEach((item, idx) => {
+        const isWpOrg = item.type === 'wporg';
+        const badgeClass = isWpOrg ? 'badge-blue' : 'badge-yellow';
+        const badgeText = isWpOrg ? 'WordPress.org' : 'Premium ZIP';
+        const slugOrFile = isWpOrg ? item.slug : item.file;
+        const icon = isPlugin ? '🔌' : '🎨';
+        const bannerHTML = isWpOrg
+            ? (isPlugin
+                ? `<img src="https://ps.w.org/${item.slug}/assets/banner-772x250.png" onerror="this.src='https://ps.w.org/${item.slug}/assets/banner-772x250.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(item.name)}"><div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">${icon}</div>`
+                : `<img src="https://ts.w.org/wp-content/themes/${item.slug}/screenshot.png" onerror="this.onerror=null; this.src='https://ts.w.org/wp-content/themes/${item.slug}/screenshot.jpg'; this.onerror=function(){this.style.display='none'; this.nextElementSibling.style.display='flex';}" alt="${esc(item.name)}"><div class="banner-icon-fallback" style="display:none; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3);">${icon}</div>`)
+            : `<div class="banner-icon-fallback" style="display:flex; width:100%; height:100%; align-items:center; justify-content:center; background:var(--bg3); font-weight:bold; font-size:24px; color:var(--yellow);">👑</div>`;
+        const activateTheme = !isPlugin ? `
+                        <label style="font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 2px; cursor: pointer;">
+                            <input type="checkbox" id="premium-activate-theme-${siteIdx}-${group}-${idx}" checked style="accent-color: var(--blue);"> Kích hoạt
+                        </label>` : '';
+        const themeIdxArg = isPlugin ? 'null' : `'${group}-${idx}'`;
+
+        html += `
             <div class="premium-card">
                 <div class="premium-banner">
                     ${bannerHTML}
                     <span class="badge ${badgeClass} badge-source">${badgeText}</span>
                 </div>
                 <div class="premium-card-body">
-                    <div class="premium-card-title" title="${esc(t.name)}">${esc(t.name)}</div>
-                    <div class="premium-card-desc" title="${esc(t.description)}">${esc(t.description || 'Không có mô tả.')}</div>
+                    <div class="premium-card-title" title="${esc(item.name)}">${esc(item.name)}</div>
+                    <div class="premium-card-desc" title="${esc(item.description)}">${esc(item.description || 'Không có mô tả.')}</div>
                 </div>
                 <div class="premium-card-footer">
-                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(t.slug) : 'File: ' + esc(t.file)}</span>
+                    <span style="font-size: 10px; color:var(--text3);">${isWpOrg ? 'Slug: ' + esc(item.slug) : 'File: ' + esc(item.file)}</span>
                     <div style="display: flex; gap: 4px; align-items: center;">
-                        <label style="font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 2px; cursor: pointer;">
-                            <input type="checkbox" id="premium-activate-theme-${siteIdx}-${idx}" checked style="accent-color: var(--blue);"> Kích hoạt
-                        </label>
-                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-theme-${idx}" onclick="installPremiumItem(${siteIdx}, 'themes', '${t.type}', '${isWpOrg ? esc(t.slug) : esc(t.file)}', '${esc(t.name)}', this, ${idx})">
+                        ${activateTheme}
+                        <button class="btn btn-sm btn-primary" id="btn-premium-inst-${siteIdx}-${isPlugin ? 'plug' : 'theme'}-${group}-${idx}" onclick="installPremiumItem(${siteIdx}, '${itemType}', '${item.type}', '${esc(slugOrFile)}', '${esc(item.name)}', this, ${themeIdxArg})">
                             📥 Cài đặt
                         </button>
                     </div>
                 </div>
             </div>`;
-        });
-        html += `</div>`;
-    }
-    
+    });
+    html += '</div>';
     container.innerHTML = html;
 }
-
 async function installPremiumItem(siteIdx, itemType, itemSource, idVal, itemName, btnEl, themeIdx = null) {
     const s = allSites[siteIdx];
     if (s.locked) {
