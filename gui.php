@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.30';
+$plugin_version = '1.3.31';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -259,17 +259,14 @@ div#iframe-container{
 
 /* ── Expanded card body ── */
 .card-body {
-    display: grid;
-    grid-template-rows: 0fr;
-    overflow: hidden;
-    transition: grid-template-rows 0.3s ease;
+    display: none;
+    border-top: 1px solid var(--border);
 }
 .card-body.open {
-    grid-template-rows: 1fr;
+    display: block;
 }
 .card-body-inner {
     min-height: 0;
-    border-top: 1px solid var(--border);
 }
 
 /* Screenshot full-width strip */
@@ -1181,13 +1178,8 @@ function toggleCard(i) {
         }
     });
 
-    if (isOpening) {
-        body.classList.add('open');
-        chev.classList.add('open');
-    } else {
-        body.classList.remove('open');
-        chev.classList.remove('open');
-    }
+    body.classList.toggle('open');
+    chev.classList.toggle('open');
 
     if (!isOpening) {
         stopLogPolling(i);
