@@ -3646,6 +3646,167 @@ function run_gui() {
 }
 
 /**
+ * Helper to read reverse lines from a file using PHP fallback
+ */
+function get_file_last_lines_php($filepath, $num_lines) {
+    if (!file_exists($filepath) || !is_readable($filepath)) {
+        return '';
+    }
+    $fp = fopen($filepath, 'rb');
+    if (!$fp) return '';
+    
+    $lines = [];
+    $buffer_size = 4096;
+    fseek($fp, 0, SEEK_END);
+    $pos = ftell($fp);
+    $chunk = '';
+    
+    while ($pos > 0 && count($lines) <= $num_lines) {
+        $read_size = min($pos, $buffer_size);
+        $pos -= $read_size;
+        fseek($fp, $pos, SEEK_SET);
+        $chunk = fread($fp, $read_size) . $chunk;
+        
+        $lines = explode("\n", $chunk);
+    }
+    fclose($fp);
+    
+    if (count($lines) > $num_lines) {
+        $lines = array_slice($lines, -$num_lines);
+    }
+    return implode("\n", $lines);
+}
+
+/**
+ * Helper to read N last lines of a file
+ */
+function get_file_last_lines($filepath, $num_lines) {
+    if (!file_exists($filepath) || !is_readable($filepath)) {
+        return '';
+    }
+    $num_lines = max(1, intval($num_lines));
+    
+    if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+        $cmd = 'tail -n ' . $num_lines . ' ' . escapeshellarg($filepath);
+        $output = [];
+        $retval = 0;
+        @exec($cmd, $output, $retval);
+        if ($retval === 0) {
+            return implode("\n", $output);
+        }
+    }
+    
+    return get_file_last_lines_php($filepath, $num_lines);
+}
+
+/**
+ * Parse time from log line
+ */
+function parse_log_line_time($line) {
+    // [21-Jun-2026 01:16:02 UTC] / [21-Jun-2026 01:16:02]
+    if (preg_match('/^\[(\d{1,2}-[a-zA-Z]{3}-\d{4} \d{2}:\d{2}:\d{2}(?:\s+[a-zA-Z0-9\/+-]+)?)\]/', $line, $matches)) {
+        $t = strtotime($matches[1]);
+        if ($t !== false) return $t;
+    }
+    
+    // Nginx access: [21/Jun/2026:01:13:00 +0000]
+    if (preg_match('/\[(\d{1,2}\/[a-zA-Z]{3}\/\d{4}:\d{2}:\d{2}:\d{2}\s+[+-]\d{4})\]/', $line, $matches)) {
+        $date_str = preg_replace('/^(\d{1,2}\/[a-zA-Z]{3}\/\d{4}):/', '$1 ', $matches[1]);
+        $t = strtotime(str_replace('/', '-', $date_str));
+        if ($t !== false) return $t;
+    }
+    
+    // Nginx error: 2026/06/21 01:13:00
+    if (preg_match('/^(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2})/', $line, $matches)) {
+        $t = strtotime(str_replace('/', '-', $matches[1]));
+        if ($t !== false) return $t;
+    }
+    
+    // [yyyy-mm-dd hh:mm:ss]
+    if (preg_match('/^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\]/', $line, $matches)) {
+        $t = strtotime($matches[1]);
+        if ($t !== false) return $t;
+    }
+    
+    return null;
+}
+
+/**
+ * Check if log line is within N seconds
+ */
+function log_line_matches_time($line, $seconds) {
+    if ($seconds <= 0) return true;
+    $line_time = parse_log_line_time($line);
+    if ($line_time === null) return true;
+    return (time() - $line_time) <= $seconds;
+}
+
+/**
+ * Check if log line extension is allowed
+ */
+function log_line_matches_file_types($line, $enabled_types) {
+    if (empty($enabled_types)) return true;
+    
+    if (preg_match('/"([A-Z]+)\s+([^\s?]+)(?:\?[^\s]*)?\s+HTTP/', $line, $matches)) {
+        $url_path = $matches[2];
+        $ext = strtolower(pathinfo($url_path, PATHINFO_EXTENSION));
+    } else {
+        return true;
+    }
+    
+    $type = 'other';
+    if ($ext === 'php') {
+        $type = 'php';
+    } elseif ($ext === 'html' || $ext === 'htm') {
+        $type = 'html';
+    } elseif ($ext === 'css') {
+        $type = 'css';
+    } elseif ($ext === 'js') {
+        $type = 'js';
+    } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico'])) {
+        $type = 'image';
+    } elseif (in_array($ext, ['woff', 'woff2', 'ttf', 'otf', 'eot'])) {
+        $type = 'font';
+    }
+    
+    return in_array($type, $enabled_types);
+}
+
+/**
+ * Helper to scan and find PHP error log path
+ */
+function find_php_error_log_path($site_path, $domain, $username) {
+    $home = "/home/{$username}";
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $home = 'C:/Users/local_user';
+    }
+    
+    $path = rtrim($site_path, '/') . '/error_log';
+    if (file_exists($path)) {
+        return $path;
+    }
+    
+    if ($domain) {
+        $path = $home . '/domains/' . $domain . '/logs/php_error.log';
+        if (file_exists($path)) return $path;
+        
+        $path = $home . '/domains/' . $domain . '/logs/error_log';
+        if (file_exists($path)) return $path;
+        
+        $path = $home . '/domains/' . $domain . '/public_html/error_log';
+        if (file_exists($path)) return $path;
+    }
+    
+    $path = $home . '/logs/php_error.log';
+    if (file_exists($path)) return $path;
+    
+    $path = $home . '/logs/error_log';
+    if (file_exists($path)) return $path;
+    
+    return rtrim($site_path, '/') . '/error_log';
+}
+
+/**
  * Handle API Endpoint actions
  */
 function run_api() {
@@ -4300,6 +4461,157 @@ function run_api() {
                 $log_file = $home . '/.ultimate_wp_manager_debug.log';
                 $log_content = file_exists($log_file) ? file_get_contents($log_file) : 'Chưa có nhật ký hoạt động nào.';
                 echo json_encode(['success' => true, 'logs' => $log_content]);
+                break;
+
+            case 'get_logs_data':
+                if (empty($_POST['path']) || empty($_POST['log_type'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                
+                $domain = '';
+                $domains_prefix = $home . '/domains/';
+                $site_path_real = realpath($_POST['path']) ?: $_POST['path'];
+                if (strpos($site_path_real, $domains_prefix) === 0) {
+                    $relative = substr($site_path_real, strlen($domains_prefix));
+                    $parts = explode('/', str_replace('\\', '/', $relative));
+                    if (count($parts) > 0) {
+                        $domain = $parts[0];
+                    }
+                }
+                if (empty($domain)) {
+                    throw new Exception("Không thể xác định tên miền từ thư mục cài đặt.");
+                }
+                
+                // Gọi wrapper SUID để tạo symlink và phân quyền log
+                $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
+                }
+                $wrapper = $plugin_dir . '/scripts/wrapper';
+                if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN' && file_exists($wrapper) && is_executable($wrapper)) {
+                    $cmd = escapeshellcmd($wrapper) . ' setup_logs ' . escapeshellarg($username) . ' ' . escapeshellarg($domain) . ' ' . escapeshellarg($_POST['path']);
+                    @exec($cmd . ' 2>&1');
+                }
+                
+                $log_type = $_POST['log_type'];
+                $filepath = '';
+                if ($log_type === 'wp_debug') {
+                    $filepath = $_POST['path'] . '/wp-content/debug.log';
+                } elseif ($log_type === 'access') {
+                    $filepath = $home . '/domains/' . $domain . '/logs/' . $domain . '.log';
+                } elseif ($log_type === 'error') {
+                    $filepath = $home . '/domains/' . $domain . '/logs/' . $domain . '.error.log';
+                } elseif ($log_type === 'php_error') {
+                    $filepath = find_php_error_log_path($_POST['path'], $domain, $username);
+                }
+                
+                if (empty($filepath) || !file_exists($filepath)) {
+                    echo json_encode([
+                        'success' => true,
+                        'filepath' => $filepath,
+                        'logs' => "[Hệ thống] Tệp tin log chưa tồn tại hoặc chưa có dữ liệu ghi nhận."
+                    ]);
+                    break;
+                }
+                
+                $lines_to_read = max(intval($_POST['lines'] ?? 100) * 5, 1000);
+                $log_content = get_file_last_lines($filepath, $lines_to_read);
+                
+                $lines_arr = explode("\n", $log_content);
+                $filtered_lines = [];
+                $search = $_POST['search'] ?? '';
+                $time_filter = intval($_POST['time_filter'] ?? 0);
+                
+                $file_types = [];
+                if (isset($_POST['file_types'])) {
+                    if (is_array($_POST['file_types'])) {
+                        $file_types = $_POST['file_types'];
+                    } else {
+                        $file_types = json_decode($_POST['file_types'], true) ?: [];
+                    }
+                }
+                
+                foreach ($lines_arr as $line) {
+                    $line_trimmed = trim($line);
+                    if ($line_trimmed === '') continue;
+                    
+                    if ($search !== '' && stripos($line, $search) === false) {
+                        continue;
+                    }
+                    
+                    if ($time_filter > 0 && !log_line_matches_time($line, $time_filter)) {
+                        continue;
+                    }
+                    
+                    if ($log_type === 'access' && !empty($file_types)) {
+                        if (!log_line_matches_file_types($line, $file_types)) {
+                            continue;
+                        }
+                    }
+                    
+                    $filtered_lines[] = $line;
+                }
+                
+                $target_lines_count = intval($_POST['lines'] ?? 100);
+                if (count($filtered_lines) > $target_lines_count) {
+                    $filtered_lines = array_slice($filtered_lines, -$target_lines_count);
+                }
+                
+                echo json_encode([
+                    'success' => true,
+                    'filepath' => $filepath,
+                    'logs' => implode("\n", $filtered_lines)
+                ]);
+                break;
+                
+            case 'clear_log_file':
+                if (empty($_POST['path']) || empty($_POST['log_type'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                
+                $log_type = $_POST['log_type'];
+                if ($log_type === 'access' || $log_type === 'error') {
+                    throw new Exception("Không được phép xóa file log hệ thống (Access/Error log) để tránh làm gián đoạn Web Server và ảnh hưởng đến thống kê của DirectAdmin.");
+                }
+                
+                $domain = '';
+                $domains_prefix = $home . '/domains/';
+                $site_path_real = realpath($_POST['path']) ?: $_POST['path'];
+                if (strpos($site_path_real, $domains_prefix) === 0) {
+                    $relative = substr($site_path_real, strlen($domains_prefix));
+                    $parts = explode('/', str_replace('\\', '/', $relative));
+                    if (count($parts) > 0) {
+                        $domain = $parts[0];
+                    }
+                }
+                
+                $filepath = '';
+                if ($log_type === 'wp_debug') {
+                    $filepath = $_POST['path'] . '/wp-content/debug.log';
+                } elseif ($log_type === 'php_error') {
+                    $filepath = find_php_error_log_path($_POST['path'], $domain, $username);
+                }
+                
+                if (empty($filepath) || !file_exists($filepath)) {
+                    throw new Exception("File log không tồn tại hoặc chưa được tạo.");
+                }
+                
+                if (!is_writable($filepath)) {
+                    throw new Exception("Không có quyền ghi vào file log: " . basename($filepath) . ". Vui lòng kiểm tra lại phân quyền file.");
+                }
+                
+                if (@file_put_contents($filepath, '') === false) {
+                    throw new Exception("Lỗi khi xóa rỗng nội dung file log.");
+                }
+                
+                wp_manager_log("Xóa rỗng file log " . basename($filepath) . " cho website: " . $_POST['path']);
+                echo json_encode(['success' => true, 'message' => 'Đã xóa rỗng dữ liệu log thành công.']);
                 break;
             default:
                 throw new Exception("Unknown action parameter: " . $action);

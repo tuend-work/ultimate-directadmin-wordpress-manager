@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     // 2. Check at least action arg is present
     if (argc < 2) {
-        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n", argv[0], argv[0]);
+        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n  %s setup_logs <username> <domain> <site_path>\n", argv[0], argv[0], argv[0]);
         return 1;
     }
 
@@ -131,8 +131,76 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    // Handle setup_logs subcommand
+    if (strcmp(action, "setup_logs") == 0) {
+        if (argc != 5) {
+            fprintf(stderr, "Usage: %s setup_logs <username> <domain> <site_path>\n", argv[0]);
+            return 1;
+        }
+        const char *target_user = argv[2];
+        const char *domain = argv[3];
+        const char *site_path = argv[4];
+        
+        // Security check: Only root and diradmin can trigger setup_logs for other users
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+            if (strcmp(target_user, pw->pw_name) != 0) {
+                fprintf(stderr, "Error: Access denied. You can only setup logs for your own domain.\n");
+                return 1;
+            }
+        }
+        
+        // Validate target_user to prevent command injection
+        for (const char *p = target_user; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+                fprintf(stderr, "Error: Invalid username characters.\n");
+                return 1;
+            }
+        }
+        
+        // Validate domain
+        for (const char *p = domain; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '.' || *p == '-')) {
+                fprintf(stderr, "Error: Invalid domain name characters.\n");
+                return 1;
+            }
+        }
+        
+        // Resolve target site path to absolute
+        char real_site_path[PATH_MAX];
+        if (realpath(site_path, real_site_path) == NULL) {
+            fprintf(stderr, "Error: Invalid or non-existent path: %s\n", site_path);
+            return 1;
+        }
+        
+        // Ensure path lies inside target user's home
+        struct passwd *tpw = getpwnam(target_user);
+        if (!tpw) {
+            fprintf(stderr, "Error: Target user %s not found.\n", target_user);
+            return 1;
+        }
+        size_t home_len = strlen(tpw->pw_dir);
+        if (strncmp(real_site_path, tpw->pw_dir, home_len) != 0 || 
+            (real_site_path[home_len] != '\0' && real_site_path[home_len] != '/')) {
+            fprintf(stderr, "Error: Access denied. Path must be inside home directory of %s.\n", target_user);
+            return 1;
+        }
+        
+        const char *setup_logs_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/setup_logs.sh";
+        if (access(setup_logs_sh, X_OK) != 0) {
+            setup_logs_sh = "./scripts/setup_logs.sh";
+            if (access(setup_logs_sh, X_OK) != 0) {
+                fprintf(stderr, "Error: setup_logs.sh not found or not executable.\n");
+                return 1;
+            }
+        }
+        
+        execl("/bin/bash", "bash", setup_logs_sh, target_user, domain, real_site_path, NULL);
+        perror("Error: execl failed");
+        return 1;
+    }
+
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
-        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', or 'get_domain_config'.\n");
+        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', or 'setup_logs'.\n");
         return 1;
     }
 

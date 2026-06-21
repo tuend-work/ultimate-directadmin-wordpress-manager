@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.1.3';
+$plugin_version = '1.3.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1109,10 +1109,14 @@ function toggleCard(i) {
     const chev = document.getElementById('cv-'+i);
     const isOpening = !body.classList.contains('open');
 
-    // Close all other cards first
+    // Close all other cards first and stop their log polling
     document.querySelectorAll('.card-body.open').forEach(el => {
         if (el.id !== 'cb-'+i) {
             el.classList.remove('open');
+            const idx = parseInt(el.id.replace('cb-', ''));
+            if (!isNaN(idx)) {
+                stopLogPolling(idx);
+            }
         }
     });
     document.querySelectorAll('.chevron.open').forEach(el => {
@@ -1123,6 +1127,17 @@ function toggleCard(i) {
 
     body.classList.toggle('open');
     chev.classList.toggle('open');
+    
+    // Stop polling if card is closed
+    if (!body.classList.contains('open')) {
+        stopLogPolling(i);
+    } else {
+        // Start polling if card is opened and logs tab is active
+        const activeTab = body.querySelector('.tab-btn.active');
+        if (activeTab && activeTab.getAttribute('onclick') && activeTab.getAttribute('onclick').includes("'logs'")) {
+            startLogPolling(i);
+        }
+    }
 }
 
 /* ─── Switch tab ─── */
@@ -1138,6 +1153,12 @@ function switchTab(siteIdx, tabName, event) {
     document.getElementById(`tab-content-${siteIdx}-${tabName}`).classList.add('active');
     if (event && event.currentTarget) {
         event.currentTarget.classList.add('active');
+    }
+    
+    if (tabName === 'logs') {
+        startLogPolling(siteIdx);
+    } else {
+        stopLogPolling(siteIdx);
     }
     
     if (tabName === 'plugins') {
@@ -1160,6 +1181,164 @@ function switchTab(siteIdx, tabName, event) {
         if (list.innerHTML.includes('Clicking Premium tab') || list.innerHTML.includes('will load Premium')) {
             loadPremium(siteIdx);
         }
+    }
+}
+
+/* ─── Logs Polling & Control ─── */
+let logPollStates = {};
+
+function startLogPolling(i) {
+    if (!logPollStates[i]) {
+        logPollStates[i] = {
+            paused: false,
+            timer: null,
+            lastData: ''
+        };
+    }
+    
+    if (logPollStates[i].timer) return;
+    
+    fetchLogData(i);
+    
+    logPollStates[i].timer = setInterval(() => {
+        if (!logPollStates[i].paused) {
+            fetchLogData(i);
+        }
+    }, 3000);
+}
+
+function stopLogPolling(i) {
+    if (logPollStates[i] && logPollStates[i].timer) {
+        clearInterval(logPollStates[i].timer);
+        logPollStates[i].timer = null;
+    }
+}
+
+function toggleLogPause(i) {
+    if (!logPollStates[i]) return;
+    logPollStates[i].paused = !logPollStates[i].paused;
+    const btn = document.getElementById(`btn-log-pause-${i}`);
+    if (logPollStates[i].paused) {
+        btn.textContent = '▶ Tiếp tục';
+        btn.className = 'btn btn-sm btn-blue';
+        toast('⏸ Đã tạm dừng cập nhật log.');
+    } else {
+        btn.textContent = '⏸ Tạm dừng';
+        btn.className = 'btn btn-sm btn-secondary';
+        toast('▶ Đang tải log thời gian thực...');
+        fetchLogData(i);
+    }
+}
+
+function onLogTypeChanged(i) {
+    const type = document.getElementById(`log-type-${i}`).value;
+    const filtersDiv = document.getElementById(`log-filetype-filters-${i}`);
+    
+    if (type === 'access') {
+        filtersDiv.style.display = 'flex';
+    } else {
+        filtersDiv.style.display = 'none';
+    }
+    
+    if (logPollStates[i]) {
+        logPollStates[i].lastData = '';
+    }
+    
+    const term = document.getElementById(`log-terminal-${i}`);
+    term.value = "[Hệ thống] Đang tải log mới...";
+    
+    fetchLogData(i);
+}
+
+function onLogFilterChanged(i) {
+    fetchLogData(i);
+}
+
+async function fetchLogData(i) {
+    const s = allSites[i];
+    if (!s) return;
+    
+    const type = document.getElementById(`log-type-${i}`).value;
+    const search = document.getElementById(`log-search-${i}`).value;
+    const lines = document.getElementById(`log-lines-${i}`).value;
+    const timeFilter = document.getElementById(`log-time-${i}`).value;
+    const term = document.getElementById(`log-terminal-${i}`);
+    
+    let fileTypes = [];
+    if (type === 'access') {
+        const checkboxes = document.querySelectorAll(`input[name="log-filetype-${i}"]:checked`);
+        checkboxes.forEach(cb => fileTypes.push(cb.value));
+    }
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('log_type', type);
+        fd.append('search', search);
+        fd.append('lines', lines);
+        fd.append('time_filter', timeFilter);
+        fd.append('file_types', JSON.stringify(fileTypes));
+        
+        const r = await fetch(apiUrl('get_logs_data'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            if (logPollStates[i] && logPollStates[i].lastData === d.logs) {
+                return;
+            }
+            
+            if (logPollStates[i]) {
+                logPollStates[i].lastData = d.logs;
+            }
+            
+            const isScrollAtBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 30;
+            
+            term.value = d.logs || "[Hệ thống] Tệp tin log rỗng hoặc không có dòng nào khớp với bộ lọc.";
+            
+            if (isScrollAtBottom || term.value.includes("[Hệ thống] Đang tải log")) {
+                term.scrollTop = term.scrollHeight;
+            }
+        } else {
+            term.value = `[Lỗi hệ thống] ${d.error || 'Không thể lấy dữ liệu log.'}`;
+        }
+    } catch (err) {
+        term.value = `[Lỗi kết nối] Không thể kết nối tới máy chủ.`;
+    }
+}
+
+async function clearLogFile(i) {
+    const s = allSites[i];
+    if (!s) return;
+    
+    const type = document.getElementById(`log-type-${i}`).value;
+    if (type === 'access' || type === 'error') {
+        toast('❌ Không được phép xóa file log hệ thống (Access/Error log) để tránh làm lỗi Web Server.', 'error');
+        return;
+    }
+    
+    if (!confirm('Bạn có chắc chắn muốn xóa rỗng nội dung file log này không? Thao tác này không thể hoàn tác.')) {
+        return;
+    }
+    
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('log_type', type);
+        
+        const r = await fetch(apiUrl('clear_log_file'), { method: 'POST', body: fd });
+        const d = await r.json();
+        
+        if (d.success) {
+            toast('✅ Đã xóa rỗng dữ liệu log thành công!', 'success');
+            const term = document.getElementById(`log-terminal-${i}`);
+            term.value = '';
+            if (logPollStates[i]) logPollStates[i].lastData = '';
+            fetchLogData(i);
+        } else {
+            toast('❌ Lỗi: ' + d.error, 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối máy chủ.', 'error');
     }
 }
 
@@ -2410,6 +2589,14 @@ function openPhpMyAdmin(i) {
 
 /* ─── Render ─── */
 function renderSites(sites) {
+    // Stop all active log pollings before rendering new lists
+    if (typeof logPollStates !== 'undefined') {
+        Object.keys(logPollStates).forEach(idx => {
+            stopLogPolling(parseInt(idx));
+        });
+        logPollStates = {};
+    }
+
     const cnt = document.getElementById('sites-container');
     document.getElementById('count-label').textContent =
         sites.length + ' installation' + (sites.length!==1?'s':'') + ' total';
@@ -2491,6 +2678,7 @@ function renderSites(sites) {
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)">🔌 Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)">🎨 Themes</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'premium', event)">✨ Premium</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)">📋 Task & Logs</button>
                 </div>
 
                 <!-- Tab 1: Overview Details -->
@@ -2614,6 +2802,61 @@ function renderSites(sites) {
                         <div style="color:var(--text3);font-size:12px;padding:12px;text-align:center;">
                             Clicking Premium tab or Refresh will load Premium resources...
                         </div>
+                    </div>
+                </div>
+
+                <!-- Tab 5: Logs -->
+                <div class="card-tab-content" id="tab-content-${i}-logs">
+                    <div class="card-sec-title">
+                        <span>📋 Trình xem nhật ký hoạt động (Logs Viewer)</span>
+                    </div>
+                    <div style="background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;" onclick="event.stopPropagation()">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <select id="log-type-${i}" class="form-control" style="width: 220px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogTypeChanged(${i})">
+                                <option value="wp_debug">WordPress Debug (wp-content/debug.log)</option>
+                                <option value="access">Access Log (Nginx/Apache)</option>
+                                <option value="error">Error Log (Nginx/Apache)</option>
+                                <option value="php_error">PHP Error Log</option>
+                            </select>
+                            
+                            <input type="text" id="log-search-${i}" placeholder="🔍 Tìm kiếm log..." class="toolbar-search" style="width: 160px; padding: 4px 8px; font-size: 11px;" oninput="onLogFilterChanged(${i})">
+                            
+                            <select id="log-lines-${i}" class="form-control" style="width: 95px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
+                                <option value="50">50 dòng</option>
+                                <option value="100" selected>100 dòng</option>
+                                <option value="200">200 dòng</option>
+                                <option value="500">500 dòng</option>
+                            </select>
+                            
+                            <select id="log-time-${i}" class="form-control" style="width: 110px; padding: 4px 8px; font-size: 11px; display: inline-block;" onchange="onLogFilterChanged(${i})">
+                                <option value="0" selected>Mọi lúc</option>
+                                <option value="300">5 phút qua</option>
+                                <option value="900">15 phút qua</option>
+                                <option value="1800">30 phút qua</option>
+                                <option value="3600">1 giờ qua</option>
+                                <option value="14400">4 giờ qua</option>
+                                <option value="43200">12 giờ qua</option>
+                                <option value="86400">24 giờ qua</option>
+                            </select>
+                            
+                            <button class="btn btn-sm btn-secondary" id="btn-log-pause-${i}" onclick="toggleLogPause(${i})" style="padding: 4px 10px; font-size: 11px;">⏸ Tạm dừng</button>
+                            <button class="btn btn-sm btn-danger" id="btn-log-clear-${i}" onclick="clearLogFile(${i})" style="padding: 4px 10px; font-size: 11px;">🗑 Xóa log</button>
+                        </div>
+                        
+                        <div id="log-filetype-filters-${i}" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text2); border-top: 1px dashed var(--border); padding-top: 8px;">
+                            <span style="font-weight: bold;">Lọc loại file:</span>
+                            <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="php" checked onchange="onLogFilterChanged(${i})"> PHP</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="html" checked onchange="onLogFilterChanged(${i})"> HTML</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="css" checked onchange="onLogFilterChanged(${i})"> CSS</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="js" checked onchange="onLogFilterChanged(${i})"> JS</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="image" checked onchange="onLogFilterChanged(${i})"> Image</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="font" checked onchange="onLogFilterChanged(${i})"> Font</label>
+                            <label style="display: inline-flex; align-items: center; gap: 2px; cursor: pointer;"><input type="checkbox" name="log-filetype-${i}" value="other" checked onchange="onLogFilterChanged(${i})"> Khác</label>
+                        </div>
+                    </div>
+                    
+                    <div style="position: relative;" onclick="event.stopPropagation()">
+                        <textarea id="log-terminal-${i}" readonly style="width:100%; height:420px; background:#05070a; border:1px solid var(--border); border-radius:6px; color:#39ff14; font-family:Consolas, 'Fira Code', Monaco, 'Courier New', monospace; font-size:11.5px; padding:12px; margin-top:10px; resize:vertical; outline:none; line-height:1.4; white-space: pre; overflow-wrap: normal; overflow-x: auto;" placeholder="[Hệ thống] Nhật ký đang được tải..."></textarea>
                     </div>
                 </div>
 
