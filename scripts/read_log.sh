@@ -1,5 +1,9 @@
 #!/bin/bash
 # read_log.sh - Chạy dưới quyền root để đọc trực tiếp file log hệ thống và in ra stdout
+# Hỗ trợ cả domain chính và subdomain theo định dạng DirectAdmin:
+#   - Domain chính:  /var/log/nginx/domains/{domain}.log
+#   - Subdomain:     /var/log/nginx/domains/{parent}.{sub}.log
+#                    (ví dụ: sub.domain.com → domain.com.sub.log)
 
 USER=$1
 DOMAIN=$2
@@ -13,48 +17,78 @@ fi
 
 LOG_FILE=""
 
-# 1. Quét thư mục log riêng của domain do DirectAdmin cấu hình (Apache/OLS/Nginx)
-if [ -d "/var/log/httpd/domains/$DOMAIN" ]; then
-    if [ "$LOG_TYPE" = "access" ]; then
-        for f in "/var/log/httpd/domains/$DOMAIN/access.log" "/var/log/httpd/domains/$DOMAIN/$DOMAIN.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
-        done
-    else
-        for f in "/var/log/httpd/domains/$DOMAIN/error.log" "/var/log/httpd/domains/$DOMAIN/$DOMAIN.error.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
-        done
-    fi
-elif [ -d "/var/log/nginx/domains/$DOMAIN" ]; then
-    if [ "$LOG_TYPE" = "access" ]; then
-        for f in "/var/log/nginx/domains/$DOMAIN/access.log" "/var/log/nginx/domains/$DOMAIN/$DOMAIN.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
-        done
-    else
-        for f in "/var/log/nginx/domains/$DOMAIN/error.log" "/var/log/nginx/domains/$DOMAIN/$DOMAIN.error.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
-        done
-    fi
+# Tính toán tên file log theo định dạng DirectAdmin subdomain:
+# sub.domain.com → FIRST_PART=sub, PARENT_DOMAIN=domain.com
+FIRST_PART="${DOMAIN%%.*}"
+PARENT_DOMAIN="${DOMAIN#*.}"
+# Chỉ áp dụng nếu đây thực sự là subdomain (FIRST_PART != PARENT_DOMAIN)
+if [ "$FIRST_PART" = "$PARENT_DOMAIN" ]; then
+    PARENT_DOMAIN=""
 fi
 
-# 2. Quét file log trực tiếp trong domains/
-if [ -z "$LOG_FILE" ]; then
+try_find_log() {
+    local base_domain="$1"
+    local log_dirs="/var/log/nginx/domains /var/log/httpd/domains /var/log/openlitespeed/domains"
+
     if [ "$LOG_TYPE" = "access" ]; then
-        for f in "/var/log/nginx/domains/$DOMAIN.log" "/var/log/httpd/domains/$DOMAIN.log" "/var/log/nginx/domains/$DOMAIN.access.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
+        for dir in $log_dirs; do
+            # Thư mục riêng của domain (ví dụ: /var/log/nginx/domains/{domain}/)
+            for f in "$dir/$base_domain/access.log" "$dir/$base_domain/$base_domain.log"; do
+                if [ -f "$f" ]; then echo "$f"; return; fi
+            done
+            # File log phẳng nằm thẳng trong thư mục domains/
+            for f in "$dir/$base_domain.log" "$dir/$base_domain.access.log"; do
+                if [ -f "$f" ]; then echo "$f"; return; fi
+            done
         done
     else
-        for f in "/var/log/nginx/domains/$DOMAIN.error.log" "/var/log/httpd/domains/$DOMAIN.error.log"; do
-            if [ -f "$f" ]; then LOG_FILE="$f"; break; fi
+        for dir in $log_dirs; do
+            for f in "$dir/$base_domain/error.log" "$dir/$base_domain/$base_domain.error.log"; do
+                if [ -f "$f" ]; then echo "$f"; return; fi
+            done
+            for f in "$dir/$base_domain.error.log"; do
+                if [ -f "$f" ]; then echo "$f"; return; fi
+            done
         done
     fi
+}
+
+# 1. Thử với tên domain như truyền vào (domain chính hoặc full subdomain)
+LOG_FILE=$(try_find_log "$DOMAIN")
+
+# 2. Nếu là subdomain, thử định dạng DirectAdmin đảo ngược: {parent}.{sub}.log
+#    ví dụ: sub.domain.com → /var/log/nginx/domains/domain.com.sub.log
+if [ -z "$LOG_FILE" ] && [ -n "$PARENT_DOMAIN" ]; then
+    DA_SUBDOMAIN_NAME="${PARENT_DOMAIN}.${FIRST_PART}"
+    LOG_FILE=$(try_find_log "$DA_SUBDOMAIN_NAME")
 fi
 
-# 3. Quét rộng hơn bằng find
+# 3. Fallback: quét rộng bằng find (phòng trường hợp log format lạ)
 if [ -z "$LOG_FILE" ]; then
+    LOG_DIRS="/var/log/nginx/domains /var/log/httpd/domains"
     if [ "$LOG_TYPE" = "access" ]; then
-        LOG_FILE=$(find /var/log/nginx /var/log/httpd -name "$DOMAIN.log" -o -name "$DOMAIN.access.log" -o -name "access.log" -path "*/$DOMAIN/*" 2>/dev/null | head -n 1)
+        LOG_FILE=$(find $LOG_DIRS \
+            \( -name "${DOMAIN}.log" \
+            -o -name "${DOMAIN}.access.log" \
+            -o -name "access.log" -path "*/${DOMAIN}/*" \) \
+            2>/dev/null | head -n 1)
+        # Thêm tìm kiếm theo định dạng subdomain đảo ngược
+        if [ -z "$LOG_FILE" ] && [ -n "$PARENT_DOMAIN" ]; then
+            LOG_FILE=$(find $LOG_DIRS \
+                \( -name "${PARENT_DOMAIN}.${FIRST_PART}.log" \
+                -o -name "${PARENT_DOMAIN}.${FIRST_PART}.access.log" \) \
+                2>/dev/null | head -n 1)
+        fi
     else
-        LOG_FILE=$(find /var/log/nginx /var/log/httpd -name "$DOMAIN.error.log" -o -name "error.log" -path "*/$DOMAIN/*" 2>/dev/null | head -n 1)
+        LOG_FILE=$(find $LOG_DIRS \
+            \( -name "${DOMAIN}.error.log" \
+            -o -name "error.log" -path "*/${DOMAIN}/*" \) \
+            2>/dev/null | head -n 1)
+        if [ -z "$LOG_FILE" ] && [ -n "$PARENT_DOMAIN" ]; then
+            LOG_FILE=$(find $LOG_DIRS \
+                -name "${PARENT_DOMAIN}.${FIRST_PART}.error.log" \
+                2>/dev/null | head -n 1)
+        fi
     fi
 fi
 
