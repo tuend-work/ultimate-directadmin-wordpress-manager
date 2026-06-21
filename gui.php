@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.26';
+$plugin_version = '1.3.27';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -260,17 +260,17 @@ div#iframe-container{
 /* ── Expanded card body ── */
 .card-body {
     display: block;
-    max-height: 0;
+    height: 0;
     opacity: 0;
     overflow: hidden;
     border-top: 1px solid transparent;
     transform: translateY(-6px);
     transition:
-        max-height .42s cubic-bezier(.22, 1, .36, 1),
+        height .36s cubic-bezier(.22, 1, .36, 1),
         opacity .24s ease,
-        transform .32s cubic-bezier(.22, 1, .36, 1),
+        transform .28s cubic-bezier(.22, 1, .36, 1),
         border-color .24s ease;
-    will-change: max-height, opacity, transform;
+    will-change: height, opacity, transform;
 }
 .card-body.open {
     opacity: 1;
@@ -1172,32 +1172,63 @@ function copyNginxConfig(i) {
 }
 
 /* ─── Toggle card ─── */
+function cancelCardAnimation(body) {
+    if (body._cardAnimationFrame) {
+        cancelAnimationFrame(body._cardAnimationFrame);
+        body._cardAnimationFrame = null;
+    }
+    if (body._cardTransitionEnd) {
+        body.removeEventListener('transitionend', body._cardTransitionEnd);
+        body._cardTransitionEnd = null;
+    }
+    if (body._cardAnimationTimer) {
+        clearTimeout(body._cardAnimationTimer);
+        body._cardAnimationTimer = null;
+    }
+}
+
 function finishCardAnimation(body, shouldOpen) {
-    const done = (event) => {
-        if (event.target !== body || event.propertyName !== 'max-height') return;
-        body.removeEventListener('transitionend', done);
+    const done = () => {
+        body.removeEventListener('transitionend', body._cardTransitionEnd);
+        body._cardTransitionEnd = null;
+        body._cardAnimationFrame = null;
+        clearTimeout(body._cardAnimationTimer);
+        body._cardAnimationTimer = null;
+
         if (shouldOpen && body.classList.contains('open')) {
-            body.style.maxHeight = 'none';
+            body.style.height = 'auto';
         }
     };
-    body.addEventListener('transitionend', done);
+
+    body._cardTransitionEnd = (event) => {
+        if (event.target !== body || event.propertyName !== 'height') return;
+        done();
+    };
+    body.addEventListener('transitionend', body._cardTransitionEnd);
+    body._cardAnimationTimer = setTimeout(done, 460);
 }
 
 function openCardBody(body) {
+    cancelCardAnimation(body);
     body.classList.add('open');
-    body.style.maxHeight = '0px';
-    body.offsetHeight;
-    body.style.maxHeight = body.scrollHeight + 'px';
+    body.style.height = '0px';
     finishCardAnimation(body, true);
+
+    body._cardAnimationFrame = requestAnimationFrame(() => {
+        body.style.height = body.scrollHeight + 'px';
+    });
 }
 
 function closeCardBody(body) {
     if (!body.classList.contains('open')) return;
-    body.style.maxHeight = body.scrollHeight + 'px';
-    body.offsetHeight;
-    body.classList.remove('open');
-    body.style.maxHeight = '0px';
+    cancelCardAnimation(body);
+    body.style.height = body.scrollHeight + 'px';
     finishCardAnimation(body, false);
+
+    body._cardAnimationFrame = requestAnimationFrame(() => {
+        body.classList.remove('open');
+        body.style.height = '0px';
+    });
 }
 
 function toggleCard(i) {
