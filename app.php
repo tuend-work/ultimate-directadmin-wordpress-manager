@@ -4320,55 +4320,87 @@ function run_api() {
                 }
                 
                 $activated = false;
-                if ($item_type === 'plugins') {
-                    $main_file = find_plugin_main_file($target_dir, $folder_name);
-                    if ($main_file) {
-                        $buffer_level = ob_get_level();
-                        ob_start();
-                        try {
-                            wp_manager_bootstrap_wordpress($site_path);
-                            require_once ABSPATH . 'wp-admin/includes/plugin.php';
-                            
-                            $res_act = activate_plugin($main_file);
-                            
-                            if (function_exists('wp_cache_delete')) {
-                                wp_cache_delete('alloptions', 'options');
-                                wp_cache_delete('active_plugins', 'options');
+                
+                // Tạm ẩn object-cache.php và advanced-cache.php để tránh lỗi Cannot redeclare wp_cache_supports()
+                $object_cache_file = $site_path . '/wp-content/object-cache.php';
+                $object_cache_bak = $site_path . '/wp-content/object-cache.php.bak';
+                $has_object_cache = false;
+                if (file_exists($object_cache_file)) {
+                    if (@rename($object_cache_file, $object_cache_bak)) {
+                        $has_object_cache = true;
+                    }
+                }
+                
+                $adv_cache_file = $site_path . '/wp-content/advanced-cache.php';
+                $adv_cache_bak = $site_path . '/wp-content/advanced-cache.php.bak';
+                $has_adv_cache = false;
+                if (file_exists($adv_cache_file)) {
+                    if (@rename($adv_cache_file, $adv_cache_bak)) {
+                        $has_adv_cache = true;
+                    }
+                }
+                
+                try {
+                    if ($item_type === 'plugins') {
+                        $main_file = find_plugin_main_file($target_dir, $folder_name);
+                        if ($main_file) {
+                            $buffer_level = ob_get_level();
+                            ob_start();
+                            try {
+                                wp_manager_bootstrap_wordpress($site_path);
+                                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+                                
+                                $res_act = activate_plugin($main_file);
+                                
+                                if (function_exists('wp_cache_delete')) {
+                                    wp_cache_delete('alloptions', 'options');
+                                    wp_cache_delete('active_plugins', 'options');
+                                }
+                                if (function_exists('wp_cache_flush')) {
+                                    wp_cache_flush();
+                                }
+                                $activated = true;
+                            } catch (Throwable $e) {
+                                wp_manager_log("Kích hoạt plugin thất bại: " . $e->getMessage());
+                            } finally {
+                                while (ob_get_level() > $buffer_level) {
+                                    ob_end_clean();
+                                }
                             }
-                            if (function_exists('wp_cache_flush')) {
-                                wp_cache_flush();
-                            }
-                            $activated = true;
-                        } catch (Throwable $e) {
-                        } finally {
-                            while (ob_get_level() > $buffer_level) {
-                                ob_end_clean();
+                        }
+                    } else {
+                        if (isset($_POST['activate']) && ($_POST['activate'] === 'true' || $_POST['activate'] === '1')) {
+                            $buffer_level = ob_get_level();
+                            ob_start();
+                            try {
+                                wp_manager_bootstrap_wordpress($site_path);
+                                require_once ABSPATH . 'wp-admin/includes/theme.php';
+                                switch_theme($folder_name);
+                                if (function_exists('wp_cache_delete')) {
+                                    wp_cache_delete('alloptions', 'options');
+                                    wp_cache_delete('template', 'options');
+                                    wp_cache_delete('stylesheet', 'options');
+                                }
+                                if (function_exists('wp_cache_flush')) {
+                                    wp_cache_flush();
+                                }
+                                $activated = true;
+                            } catch (Throwable $e) {
+                                wp_manager_log("Kích hoạt theme thất bại: " . $e->getMessage());
+                            } finally {
+                                while (ob_get_level() > $buffer_level) {
+                                    ob_end_clean();
+                                }
                             }
                         }
                     }
-                } else {
-                    if (isset($_POST['activate']) && ($_POST['activate'] === 'true' || $_POST['activate'] === '1')) {
-                        $buffer_level = ob_get_level();
-                        ob_start();
-                        try {
-                            wp_manager_bootstrap_wordpress($site_path);
-                            require_once ABSPATH . 'wp-admin/includes/theme.php';
-                            switch_theme($folder_name);
-                            if (function_exists('wp_cache_delete')) {
-                                wp_cache_delete('alloptions', 'options');
-                                wp_cache_delete('template', 'options');
-                                wp_cache_delete('stylesheet', 'options');
-                            }
-                            if (function_exists('wp_cache_flush')) {
-                                wp_cache_flush();
-                            }
-                            $activated = true;
-                        } catch (Throwable $e) {
-                        } finally {
-                            while (ob_get_level() > $buffer_level) {
-                                ob_end_clean();
-                            }
-                        }
+                } finally {
+                    // Khôi phục lại các file cache drop-in sau khi chạy xong
+                    if ($has_object_cache && file_exists($object_cache_bak)) {
+                        @rename($object_cache_bak, $object_cache_file);
+                    }
+                    if ($has_adv_cache && file_exists($adv_cache_bak)) {
+                        @rename($adv_cache_bak, $adv_cache_file);
                     }
                 }
                 
