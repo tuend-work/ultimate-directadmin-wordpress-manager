@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     // 2. Check at least action arg is present
     if (argc < 2) {
-        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n  %s setup_logs <username> <domain> <site_path>\n", argv[0], argv[0], argv[0]);
+        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n  %s read_log <username> <domain> <access|error> <lines>\n", argv[0], argv[0], argv[0]);
         return 1;
     }
 
@@ -131,28 +131,29 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    // Handle setup_logs subcommand
-    if (strcmp(action, "setup_logs") == 0) {
-        if (argc != 5) {
-            fprintf(stderr, "Usage: %s setup_logs <username> <domain> <site_path>\n", argv[0]);
+    // Handle read_log subcommand
+    if (strcmp(action, "read_log") == 0) {
+        if (argc != 6) {
+            fprintf(stderr, "Usage: %s read_log <username> <domain> <access|error> <lines>\n", argv[0]);
             return 1;
         }
         const char *target_user = argv[2];
         const char *domain = argv[3];
-        const char *site_path = argv[4];
+        const char *log_type = argv[4];
+        const char *lines_str = argv[5];
         
-        // Security check: Only root and diradmin can trigger setup_logs for other users
+        // Security check: Only root and diradmin can read logs of other users
         if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
             if (strcmp(target_user, pw->pw_name) != 0) {
-                fprintf(stderr, "Error: Access denied. You can only setup logs for your own domain.\n");
+                fprintf(stderr, "Error: Access denied. You can only read logs for your own domain.\n");
                 return 1;
             }
         }
         
-        // Validate target_user to prevent command injection
+        // Validate target_user
         for (const char *p = target_user; *p; p++) {
             if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
-                fprintf(stderr, "Error: Invalid username characters.\n");
+                fprintf(stderr, "Error: Invalid username.\n");
                 return 1;
             }
         }
@@ -160,47 +161,40 @@ int main(int argc, char *argv[]) {
         // Validate domain
         for (const char *p = domain; *p; p++) {
             if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '.' || *p == '-')) {
-                fprintf(stderr, "Error: Invalid domain name characters.\n");
+                fprintf(stderr, "Error: Invalid domain.\n");
                 return 1;
             }
         }
         
-        // Resolve target site path to absolute
-        char real_site_path[PATH_MAX];
-        if (realpath(site_path, real_site_path) == NULL) {
-            fprintf(stderr, "Error: Invalid or non-existent path: %s\n", site_path);
+        // Validate log_type
+        if (strcmp(log_type, "access") != 0 && strcmp(log_type, "error") != 0) {
+            fprintf(stderr, "Error: Invalid log type. Use 'access' or 'error'.\n");
             return 1;
         }
         
-        // Ensure path lies inside target user's home
-        struct passwd *tpw = getpwnam(target_user);
-        if (!tpw) {
-            fprintf(stderr, "Error: Target user %s not found.\n", target_user);
-            return 1;
-        }
-        size_t home_len = strlen(tpw->pw_dir);
-        if (strncmp(real_site_path, tpw->pw_dir, home_len) != 0 || 
-            (real_site_path[home_len] != '\0' && real_site_path[home_len] != '/')) {
-            fprintf(stderr, "Error: Access denied. Path must be inside home directory of %s.\n", target_user);
+        // Validate lines
+        int lines = atoi(lines_str);
+        if (lines <= 0 || lines > 5000) {
+            fprintf(stderr, "Error: Invalid line count. Must be between 1 and 5000.\n");
             return 1;
         }
         
-        const char *setup_logs_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/setup_logs.sh";
-        if (access(setup_logs_sh, X_OK) != 0) {
-            setup_logs_sh = "./scripts/setup_logs.sh";
-            if (access(setup_logs_sh, X_OK) != 0) {
-                fprintf(stderr, "Error: setup_logs.sh not found or not executable.\n");
+        const char *read_log_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/read_log.sh";
+        if (access(read_log_sh, X_OK) != 0) {
+            read_log_sh = "./scripts/read_log.sh";
+            if (access(read_log_sh, X_OK) != 0) {
+                fprintf(stderr, "Error: read_log.sh not found or not executable.\n");
                 return 1;
             }
         }
         
-        execl("/bin/bash", "bash", "-p", setup_logs_sh, target_user, domain, real_site_path, NULL);
+        execl("/bin/bash", "bash", "-p", read_log_sh, target_user, domain, log_type, lines_str, NULL);
         perror("Error: execl failed");
         return 1;
     }
 
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
-        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', or 'setup_logs'.\n");
+        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', or 'read_log'.\n");
         return 1;
     }
 

@@ -4485,58 +4485,47 @@ function run_api() {
                     throw new Exception("Không thể xác định tên miền từ thư mục cài đặt.");
                 }
                 
-                // Gọi wrapper SUID để tạo symlink và phân quyền log
-                $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-                    $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
-                }
-                $wrapper = $plugin_dir . '/scripts/wrapper';
-                if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN' && file_exists($wrapper) && is_executable($wrapper)) {
-                    $cmd = escapeshellcmd($wrapper) . ' setup_logs ' . escapeshellarg($username) . ' ' . escapeshellarg($domain) . ' ' . escapeshellarg($_POST['path']);
-                    $output = [];
-                    $retval = 0;
-                    @exec($cmd . ' 2>&1', $output, $retval);
-                    if ($retval !== 0) {
-                        wp_manager_log("Lỗi khi chạy wrapper setup_logs. Command: {$cmd} | Exit code: {$retval} | Output: " . implode("\n", $output));
-                    }
-                }
-                
                 $log_type = $_POST['log_type'];
-                $filepath = '';
-                $logs_dir = $home . '/domains/' . $domain . '/logs';
-                if ($log_type === 'wp_debug') {
-                    $filepath = $_POST['path'] . '/wp-content/debug.log';
-                } elseif ($log_type === 'access') {
-                    $filepath = $logs_dir . '/' . $domain . '.log';
-                    if (!file_exists($filepath)) {
-                        if (file_exists($logs_dir . '/access.log')) {
-                            $filepath = $logs_dir . '/access.log';
-                        } elseif (file_exists($logs_dir . '/' . $domain . '.access.log')) {
-                            $filepath = $logs_dir . '/' . $domain . '.access.log';
-                        }
-                    }
-                } elseif ($log_type === 'error') {
-                    $filepath = $logs_dir . '/' . $domain . '.error.log';
-                    if (!file_exists($filepath)) {
-                        if (file_exists($logs_dir . '/error.log')) {
-                            $filepath = $logs_dir . '/error.log';
-                        }
-                    }
-                } elseif ($log_type === 'php_error') {
-                    $filepath = find_php_error_log_path($_POST['path'], $domain, $username);
-                }
-                
-                if (empty($filepath) || !file_exists($filepath)) {
-                    echo json_encode([
-                        'success' => true,
-                        'filepath' => $filepath,
-                        'logs' => "[Hệ thống] Tệp tin log chưa tồn tại hoặc chưa có dữ liệu ghi nhận."
-                    ]);
-                    break;
-                }
-                
                 $lines_to_read = max(intval($_POST['lines'] ?? 100) * 5, 1000);
-                $log_content = get_file_last_lines($filepath, $lines_to_read);
+                
+                $log_content = '';
+                $filepath = '';
+                
+                if ($log_type === 'access' || $log_type === 'error') {
+                    // Đọc log trực tiếp hệ thống qua wrapper SUID root
+                    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+                    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
+                    }
+                    $wrapper = $plugin_dir . '/scripts/wrapper';
+                    
+                    if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN' && file_exists($wrapper) && is_executable($wrapper)) {
+                        $cmd = escapeshellcmd($wrapper) . ' read_log ' . escapeshellarg($username) . ' ' . escapeshellarg($domain) . ' ' . escapeshellarg($log_type) . ' ' . escapeshellarg($lines_to_read);
+                        $output = [];
+                        $retval = 0;
+                        @exec($cmd . ' 2>&1', $output, $retval);
+                        if ($retval !== 0) {
+                            wp_manager_log("Lỗi khi chạy wrapper read_log. Command: {$cmd} | Exit code: {$retval} | Output: " . implode("\n", $output));
+                        }
+                        $log_content = implode("\n", $output);
+                    } else {
+                        $log_content = "[Hệ thống] Trình xem log trực tiếp không khả dụng trên môi trường Windows phát triển.";
+                    }
+                    $filepath = "System $log_type log";
+                } else {
+                    // wp_debug hoặc php_error: đọc bình thường dưới quyền user
+                    if ($log_type === 'wp_debug') {
+                        $filepath = $_POST['path'] . '/wp-content/debug.log';
+                    } elseif ($log_type === 'php_error') {
+                        $filepath = find_php_error_log_path($_POST['path'], $domain, $username);
+                    }
+                    
+                    if (empty($filepath) || !file_exists($filepath)) {
+                        $log_content = "[Hệ thống] Tệp tin log chưa tồn tại hoặc chưa có dữ liệu ghi nhận.";
+                    } else {
+                        $log_content = get_file_last_lines($filepath, $lines_to_read);
+                    }
+                }
                 
                 $lines_arr = explode("\n", $log_content);
                 $filtered_lines = [];
@@ -4555,6 +4544,12 @@ function run_api() {
                 foreach ($lines_arr as $line) {
                     $line_trimmed = trim($line);
                     if ($line_trimmed === '') continue;
+                    
+                    // Giữ nguyên các dòng thông báo hệ thống/lỗi của wrapper
+                    if (strpos($line, '[Hệ thống]') !== false || strpos($line, 'Error:') === 0) {
+                        $filtered_lines[] = $line;
+                        continue;
+                    }
                     
                     if ($search !== '' && stripos($line, $search) === false) {
                         continue;
