@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.29';
+$plugin_version = '1.3.30';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -259,29 +259,17 @@ div#iframe-container{
 
 /* ── Expanded card body ── */
 .card-body {
-    display: block;
-    height: 0;
-    opacity: 0;
+    display: grid;
+    grid-template-rows: 0fr;
     overflow: hidden;
-    border-top: 1px solid transparent;
-    transform: translateY(-6px);
-    transition:
-        height .36s cubic-bezier(.22, 1, .36, 1),
-        opacity .24s ease,
-        transform .28s cubic-bezier(.22, 1, .36, 1),
-        border-color .24s ease;
-    will-change: height, opacity, transform;
+    transition: grid-template-rows 0.3s ease;
 }
 .card-body.open {
-    opacity: 1;
-    border-top-color: var(--border);
-    transform: translateY(0);
+    grid-template-rows: 1fr;
 }
-@media (prefers-reduced-motion: reduce) {
-    .card-body {
-        transition: none;
-        transform: none;
-    }
+.card-body-inner {
+    min-height: 0;
+    border-top: 1px solid var(--border);
 }
 
 /* Screenshot full-width strip */
@@ -1172,73 +1160,15 @@ function copyNginxConfig(i) {
 }
 
 /* ─── Toggle card ─── */
-function cancelCardAnimation(body) {
-    if (body._cardAnimationFrame) {
-        cancelAnimationFrame(body._cardAnimationFrame);
-        body._cardAnimationFrame = null;
-    }
-    if (body._cardTransitionEnd) {
-        body.removeEventListener('transitionend', body._cardTransitionEnd);
-        body._cardTransitionEnd = null;
-    }
-    if (body._cardAnimationTimer) {
-        clearTimeout(body._cardAnimationTimer);
-        body._cardAnimationTimer = null;
-    }
-}
-
-function finishCardAnimation(body, shouldOpen) {
-    const done = () => {
-        body.removeEventListener('transitionend', body._cardTransitionEnd);
-        body._cardTransitionEnd = null;
-        body._cardAnimationFrame = null;
-        clearTimeout(body._cardAnimationTimer);
-        body._cardAnimationTimer = null;
-
-        if (shouldOpen && body.classList.contains('open')) {
-            body.style.height = 'auto';
-        }
-    };
-
-    body._cardTransitionEnd = (event) => {
-        if (event.target !== body || event.propertyName !== 'height') return;
-        done();
-    };
-    body.addEventListener('transitionend', body._cardTransitionEnd);
-    body._cardAnimationTimer = setTimeout(done, 460);
-}
-
-function openCardBody(body) {
-    cancelCardAnimation(body);
-    body.classList.add('open');
-    body.style.height = '0px';
-    finishCardAnimation(body, true);
-
-    body._cardAnimationFrame = requestAnimationFrame(() => {
-        body.style.height = body.scrollHeight + 'px';
-    });
-}
-
-function closeCardBody(body) {
-    if (!body.classList.contains('open')) return;
-    cancelCardAnimation(body);
-    body.style.height = body.scrollHeight + 'px';
-    finishCardAnimation(body, false);
-
-    body._cardAnimationFrame = requestAnimationFrame(() => {
-        body.classList.remove('open');
-        body.style.height = '0px';
-    });
-}
-
 function toggleCard(i) {
     const body = document.getElementById('cb-'+i);
     const chev = document.getElementById('cv-'+i);
     const isOpening = !body.classList.contains('open');
 
+    // Close all other cards first and stop their log polling
     document.querySelectorAll('.card-body.open').forEach(el => {
         if (el.id !== 'cb-'+i) {
-            closeCardBody(el);
+            el.classList.remove('open');
             const idx = parseInt(el.id.replace('cb-', ''));
             if (!isNaN(idx)) {
                 stopLogPolling(idx);
@@ -1252,10 +1182,10 @@ function toggleCard(i) {
     });
 
     if (isOpening) {
-        openCardBody(body);
+        body.classList.add('open');
         chev.classList.add('open');
     } else {
-        closeCardBody(body);
+        body.classList.remove('open');
         chev.classList.remove('open');
     }
 
@@ -2801,6 +2731,7 @@ function renderSites(sites) {
 
             <!-- Card body (expanded) -->
             <div class="card-body" id="cb-${i}">
+                <div class="card-body-inner" onclick="event.stopPropagation()">
                 <!-- Big screenshot strip -->
                 <div style="display:none;" class="card-screenshot-bar">
                     <img id="shot-big-${i}" src="${esc(shotSrc)}"
@@ -3009,6 +2940,7 @@ function renderSites(sites) {
                     <div style="position: relative;" onclick="event.stopPropagation()">
                         <textarea id="log-terminal-${i}" readonly style="width:100%; height:420px; background:#05070a; border:1px solid var(--border); border-radius:6px; color:#39ff14; font-family:Consolas, 'Fira Code', Monaco, 'Courier New', monospace; font-size:15px; padding:12px; margin-top:10px; resize:vertical; outline:none; line-height:1.4; white-space: pre; overflow-wrap: normal; overflow-x: auto;" placeholder="[Hệ thống] Nhật ký đang được tải..."></textarea>
                     </div>
+                </div>
                 </div>
 
             </div>
