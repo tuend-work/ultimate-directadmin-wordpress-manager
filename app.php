@@ -2211,6 +2211,8 @@ function wp_manager_get_site_weight_stats($site_path, $pdo = null, $db_prefix = 
         ],
         'content' => [
             'posts' => 0,
+            'products' => 0,
+            'product_variations' => 0,
             'pages' => 0,
             'attachments' => 0,
             'revisions' => 0,
@@ -2250,6 +2252,10 @@ function wp_manager_get_site_weight_stats($site_path, $pdo = null, $db_prefix = 
             $total = (int)$row['total'];
             if ($type === 'post') {
                 $stats['content']['posts'] = $total;
+            } elseif ($type === 'product') {
+                $stats['content']['products'] = $total;
+            } elseif ($type === 'product_variation') {
+                $stats['content']['product_variations'] = $total;
             } elseif ($type === 'page') {
                 $stats['content']['pages'] = $total;
             } elseif ($type === 'attachment') {

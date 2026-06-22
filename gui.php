@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.5.0';
+$plugin_version = '1.5.1';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -303,18 +303,26 @@ div#iframe-container{
     padding: 0;
     margin-top: 12px;
 }
+.detail-item {
+    display: grid;
+    grid-template-columns: minmax(95px, .9fr) minmax(0, 1.1fr);
+    align-items: start;
+    gap: 10px;
+}
 .detail-item label {
-    display: block;
     font-size: 13px; font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .6px;
     color: var(--text3);
-    margin-bottom: 3px;
+    margin-bottom: 0;
+    min-width: 0;
 }
 .detail-item .val {
     font-size: 16px; color: var(--text2);
     font-family: ui-monospace, "SFMono-Regular", monospace;
     word-break: break-all;
+    text-align: right;
+    min-width: 0;
 }
 .detail-group-title {
     margin-top: 18px;
@@ -328,6 +336,15 @@ div#iframe-container{
 .detail-item .val.small {
     font-size: 14px;
     line-height: 1.45;
+}
+@media (max-width: 560px) {
+    .detail-item {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+    .detail-item .val {
+        text-align: left;
+    }
 }
 
 .card-action-row {
@@ -1203,6 +1220,8 @@ function renderWeightStats(s) {
         <div class="detail-group-title"><span class="dashicons dashicons-admin-post wp-admin-icon"></span> Content</div>
         <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
             ${detailItem('Posts', fmtNum(content.posts))}
+            ${detailItem('Products', fmtNum(content.products))}
+            ${detailItem('Product Variations', fmtNum(content.product_variations))}
             ${detailItem('Pages', fmtNum(content.pages))}
             ${detailItem('Attachments', fmtNum(content.attachments))}
             ${detailItem('Revisions', fmtNum(content.revisions))}
