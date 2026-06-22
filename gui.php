@@ -2626,6 +2626,11 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
 }
 
 /* ─── File Lock Protection ─── */
+async function toggleLockFromSecurity(i) {
+    // Reuse the existing toggleLock logic (button is placed inside Security tab)
+    return toggleLock(i);
+}
+
 async function toggleLock(i) {
     const s = allSites[i];
     const isLocked = s.locked;
@@ -3108,6 +3113,20 @@ function renderSites(sites) {
                         <span><span class="dashicons dashicons-shield wp-admin-icon"></span> Security Hardening Status</span>
                         <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan & Refresh</button>
                     </div>
+
+                    <!-- WordPress Lockdown quick toggle (only button, no badge needed) -->
+                    <div class="lock-section" style="margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
+                        <div class="lock-status-label">
+                            <span class="dashicons dashicons-wordpress wp-admin-icon"></span>
+                            WordPress Lockdown (Khoá thư mục và tập tin)
+                        </div>
+                        <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-sec-${i}" onclick="toggleLockFromSecurity(${i})">
+                            ${s.locked
+                                ? '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt'
+                                : '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật'}
+                        </button>
+                    </div>
+
                     <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
                         <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Clicking Security tab or Scan & Refresh will load status...
