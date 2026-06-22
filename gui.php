@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.5.3';
+$plugin_version = '1.5.4';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3088,18 +3088,7 @@ function renderSites(sites) {
                         </div>
                         <button class="btn btn-primary btn-sm" id="btn-core-update-${i}" onclick="updateCore(${i})"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update Core</button>
                     </div>
-                    <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
-                        <div class="lock-status-label" id="lock-label-${i}">
-                            ${s.locked 
-                                ? '<span class="dashicons dashicons-lock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>' 
-                                : '<span class="dashicons dashicons-unlock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>'}
-                        </div>
-                        <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-${i}" onclick="toggleLock(${i})">
-                            ${s.locked 
-                                ? '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt' 
-                                : '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật'}
-                        </button>
-                    </div>
+
                     <div class="lock-section" style="margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
                         <div class="lock-status-label" id="cron-label-${i}">
                             ${s.disable_wp_cron 
