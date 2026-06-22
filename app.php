@@ -2132,6 +2132,190 @@ function wordpress_user_exists($site_path, $user_id) {
 }
 
 /**
+ * Format bytes for compact UI display.
+ */
+function wp_manager_format_bytes($bytes) {
+    $bytes = max(0, (float)$bytes);
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $power = $bytes > 0 ? min((int)floor(log($bytes, 1024)), count($units) - 1) : 0;
+    $value = $bytes / pow(1024, $power);
+    return ($power === 0 ? (string)(int)$value : number_format($value, 2)) . ' ' . $units[$power];
+}
+
+/**
+ * Count files, directories and bytes under a path.
+ */
+function wp_manager_path_stats($path) {
+    $stats = ['bytes' => 0, 'files' => 0, 'dirs' => 0, 'human' => '0 B'];
+    if (!is_dir($path)) {
+        return $stats;
+    }
+
+    try {
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            $pathname = $item->getPathname();
+            if (strpos($pathname, DIRECTORY_SEPARATOR . '.git' . DIRECTORY_SEPARATOR) !== false) {
+                continue;
+            }
+            if ($item->isLink()) {
+                continue;
+            }
+            if ($item->isDir()) {
+                $stats['dirs']++;
+            } elseif ($item->isFile()) {
+                $stats['files']++;
+                $stats['bytes'] += (int)$item->getSize();
+            }
+        }
+    } catch (Exception $e) {
+        wp_manager_log("Unable to calculate path stats for {$path}: " . $e->getMessage());
+    }
+
+    $stats['human'] = wp_manager_format_bytes($stats['bytes']);
+    return $stats;
+}
+
+/**
+ * Build site weight/content statistics for the Installation Details tab.
+ */
+function wp_manager_get_site_weight_stats($site_path, $pdo = null, $db_prefix = '', $db_name = '') {
+    $stats = [
+        'storage' => [
+            'site_size' => wp_manager_path_stats($site_path),
+            'wp_content_size' => wp_manager_path_stats($site_path . '/wp-content'),
+            'uploads_size' => wp_manager_path_stats($site_path . '/wp-content/uploads'),
+            'plugins_size' => wp_manager_path_stats($site_path . '/wp-content/plugins'),
+            'themes_size' => wp_manager_path_stats($site_path . '/wp-content/themes'),
+        ],
+        'counts' => [
+            'plugins' => is_dir($site_path . '/wp-content/plugins') ? count(list_plugins($site_path)) : 0,
+            'themes' => is_dir($site_path . '/wp-content/themes') ? count(list_themes($site_path)) : 0,
+        ],
+        'db' => [
+            'tables' => 0,
+            'size_bytes' => 0,
+            'size_human' => '0 B',
+            'options_rows' => 0,
+            'autoload_options' => 0,
+            'autoload_size_bytes' => 0,
+            'autoload_size_human' => '0 B',
+            'transients' => 0,
+            'postmeta_rows' => 0,
+            'commentmeta_rows' => 0,
+            'usermeta_rows' => 0,
+        ],
+        'content' => [
+            'posts' => 0,
+            'pages' => 0,
+            'attachments' => 0,
+            'revisions' => 0,
+            'nav_menu_items' => 0,
+            'custom_post_total' => 0,
+            'custom_post_types' => [],
+            'post_statuses' => [],
+            'comments_total' => 0,
+            'comments_approved' => 0,
+            'comments_pending' => 0,
+            'comments_spam' => 0,
+            'comments_trash' => 0,
+            'users' => 0,
+            'terms' => 0,
+        ],
+    ];
+
+    if (!$pdo || !$db_prefix || !$db_name) {
+        return $stats;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) AS tables_count, COALESCE(SUM(data_length + index_length), 0) AS db_size
+            FROM information_schema.TABLES
+            WHERE table_schema = ? AND table_name LIKE ?
+        ");
+        $stmt->execute([$db_name, $db_prefix . '%']);
+        $db_row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stats['db']['tables'] = (int)($db_row['tables_count'] ?? 0);
+        $stats['db']['size_bytes'] = (int)($db_row['db_size'] ?? 0);
+        $stats['db']['size_human'] = wp_manager_format_bytes($stats['db']['size_bytes']);
+
+        $stmt = $pdo->query("SELECT post_type, COUNT(*) AS total FROM `{$db_prefix}posts` GROUP BY post_type");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $type = $row['post_type'];
+            $total = (int)$row['total'];
+            if ($type === 'post') {
+                $stats['content']['posts'] = $total;
+            } elseif ($type === 'page') {
+                $stats['content']['pages'] = $total;
+            } elseif ($type === 'attachment') {
+                $stats['content']['attachments'] = $total;
+            } elseif ($type === 'revision') {
+                $stats['content']['revisions'] = $total;
+            } elseif ($type === 'nav_menu_item') {
+                $stats['content']['nav_menu_items'] = $total;
+            } else {
+                $stats['content']['custom_post_types'][$type] = $total;
+                $stats['content']['custom_post_total'] += $total;
+            }
+        }
+
+        $stmt = $pdo->query("SELECT post_status, COUNT(*) AS total FROM `{$db_prefix}posts` GROUP BY post_status");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $stats['content']['post_statuses'][$row['post_status']] = (int)$row['total'];
+        }
+
+        $stmt = $pdo->query("SELECT comment_approved, COUNT(*) AS total FROM `{$db_prefix}comments` GROUP BY comment_approved");
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $status = (string)$row['comment_approved'];
+            $total = (int)$row['total'];
+            $stats['content']['comments_total'] += $total;
+            if ($status === '1') {
+                $stats['content']['comments_approved'] = $total;
+            } elseif ($status === '0') {
+                $stats['content']['comments_pending'] = $total;
+            } elseif ($status === 'spam') {
+                $stats['content']['comments_spam'] = $total;
+            } elseif ($status === 'trash') {
+                $stats['content']['comments_trash'] = $total;
+            }
+        }
+
+        $simple_counts = [
+            'users' => "SELECT COUNT(*) FROM `{$db_prefix}users`",
+            'terms' => "SELECT COUNT(*) FROM `{$db_prefix}terms`",
+            'options_rows' => "SELECT COUNT(*) FROM `{$db_prefix}options`",
+            'autoload_options' => "SELECT COUNT(*) FROM `{$db_prefix}options` WHERE autoload IN ('yes', 'on', 'auto-on', 'auto')",
+            'autoload_size_bytes' => "SELECT COALESCE(SUM(LENGTH(option_value)), 0) FROM `{$db_prefix}options` WHERE autoload IN ('yes', 'on', 'auto-on', 'auto')",
+            'transients' => "SELECT COUNT(*) FROM `{$db_prefix}options` WHERE option_name LIKE '_transient_%' OR option_name LIKE '_site_transient_%'",
+            'postmeta_rows' => "SELECT COUNT(*) FROM `{$db_prefix}postmeta`",
+            'commentmeta_rows' => "SELECT COUNT(*) FROM `{$db_prefix}commentmeta`",
+            'usermeta_rows' => "SELECT COUNT(*) FROM `{$db_prefix}usermeta`",
+        ];
+
+        foreach ($simple_counts as $key => $sql) {
+            $value = (int)$pdo->query($sql)->fetchColumn();
+            if (isset($stats['content'][$key])) {
+                $stats['content'][$key] = $value;
+            } else {
+                $stats['db'][$key] = $value;
+            }
+        }
+        $stats['db']['autoload_size_human'] = wp_manager_format_bytes($stats['db']['autoload_size_bytes']);
+    } catch (Exception $e) {
+        wp_manager_log("Unable to collect site weight stats for {$site_path}: " . $e->getMessage());
+    }
+
+    ksort($stats['content']['custom_post_types']);
+    ksort($stats['content']['post_statuses']);
+    return $stats;
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -2230,6 +2414,7 @@ function parse_wp_config($wp_config_path) {
     $siteurl = '';
     $blogname = '';
     $status = 'active';
+    $pdo = null;
     
     try {
         $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
@@ -2304,6 +2489,8 @@ function parse_wp_config($wp_config_path) {
     if (preg_match("/define\s*\(\s*['\"]WP_DEBUG['\"]\s*,\s*true\s*\)/i", $content)) {
         $wp_debug_enabled = true;
     }
+
+    $weight_stats = wp_manager_get_site_weight_stats(dirname($wp_config_path), $pdo, $db_prefix, $db_name);
     
     return [
         'path' => dirname($wp_config_path),
@@ -2320,7 +2507,8 @@ function parse_wp_config($wp_config_path) {
         'locked' => is_wordpress_locked(dirname($wp_config_path)),
         'disable_wp_cron' => $disable_wp_cron,
         'disable_auto_update' => $disable_auto_update,
-        'wp_debug_enabled' => $wp_debug_enabled
+        'wp_debug_enabled' => $wp_debug_enabled,
+        'weight_stats' => $weight_stats
     ];
 }
 

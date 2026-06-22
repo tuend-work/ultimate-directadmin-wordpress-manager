@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.4.0';
+$plugin_version = '1.5.0';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -315,6 +315,19 @@ div#iframe-container{
     font-size: 16px; color: var(--text2);
     font-family: ui-monospace, "SFMono-Regular", monospace;
     word-break: break-all;
+}
+.detail-group-title {
+    margin-top: 18px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.detail-item .val.small {
+    font-size: 14px;
+    line-height: 1.45;
 }
 
 .card-action-row {
@@ -1144,6 +1157,77 @@ function esc(s) {
 }
 function escJsArg(s) {
     return esc(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
+/* ─── Stats render helpers ─── */
+function fmtNum(n) {
+    const value = Number(n || 0);
+    return Number.isFinite(value) ? value.toLocaleString('en-US') : '0';
+}
+
+function fmtMap(obj, emptyText = 'None') {
+    if (!obj || typeof obj !== 'object' || !Object.keys(obj).length) return emptyText;
+    return Object.keys(obj)
+        .sort((a, b) => a.localeCompare(b))
+        .map(key => `${esc(key)}: ${fmtNum(obj[key])}`)
+        .join('<br>');
+}
+
+function detailItem(label, value, small = false) {
+    return `<div class="detail-item"><label>${esc(label)}</label><div class="val${small ? ' small' : ''}">${value}</div></div>`;
+}
+
+function renderWeightStats(s) {
+    const w = s.weight_stats || {};
+    const storage = w.storage || {};
+    const counts = w.counts || {};
+    const db = w.db || {};
+    const content = w.content || {};
+    const siteSize = storage.site_size || {};
+    const wpContentSize = storage.wp_content_size || {};
+    const uploadsSize = storage.uploads_size || {};
+    const pluginsSize = storage.plugins_size || {};
+    const themesSize = storage.themes_size || {};
+
+    return `
+        <div class="detail-group-title"><span class="dashicons dashicons-chart-bar wp-admin-icon"></span> Website Weight</div>
+        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
+            ${detailItem('Total Size', esc(siteSize.human || '0 B'))}
+            ${detailItem('DB Size', esc(db.size_human || '0 B'))}
+            ${detailItem('Files / Folders', `${fmtNum(siteSize.files)} / ${fmtNum(siteSize.dirs)}`)}
+            ${detailItem('Plugins / Themes', `${fmtNum(counts.plugins)} / ${fmtNum(counts.themes)}`)}
+            ${detailItem('Users', fmtNum(content.users))}
+            ${detailItem('Comments', fmtNum(content.comments_total))}
+        </div>
+
+        <div class="detail-group-title"><span class="dashicons dashicons-admin-post wp-admin-icon"></span> Content</div>
+        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
+            ${detailItem('Posts', fmtNum(content.posts))}
+            ${detailItem('Pages', fmtNum(content.pages))}
+            ${detailItem('Attachments', fmtNum(content.attachments))}
+            ${detailItem('Revisions', fmtNum(content.revisions))}
+            ${detailItem('Terms', fmtNum(content.terms))}
+            ${detailItem('Menus', fmtNum(content.nav_menu_items))}
+            ${detailItem('Custom Post Types', `${fmtNum(content.custom_post_total)}<br>${fmtMap(content.custom_post_types)}`, true)}
+            ${detailItem('Post Statuses', fmtMap(content.post_statuses), true)}
+        </div>
+
+        <div class="detail-group-title"><span class="dashicons dashicons-database wp-admin-icon"></span> Storage & Database</div>
+        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
+            ${detailItem('wp-content', esc(wpContentSize.human || '0 B'))}
+            ${detailItem('Uploads', esc(uploadsSize.human || '0 B'))}
+            ${detailItem('Plugins Folder', esc(pluginsSize.human || '0 B'))}
+            ${detailItem('Themes Folder', esc(themesSize.human || '0 B'))}
+            ${detailItem('Tables', fmtNum(db.tables))}
+            ${detailItem('Options Rows', fmtNum(db.options_rows))}
+            ${detailItem('Autoload Options', `${fmtNum(db.autoload_options)}<br>${esc(db.autoload_size_human || '0 B')}`, true)}
+            ${detailItem('Transients', fmtNum(db.transients))}
+            ${detailItem('Postmeta Rows', fmtNum(db.postmeta_rows))}
+            ${detailItem('Commentmeta Rows', fmtNum(db.commentmeta_rows))}
+            ${detailItem('Usermeta Rows', fmtNum(db.usermeta_rows))}
+            ${detailItem('Comments Status', `Approved: ${fmtNum(content.comments_approved)}<br>Pending: ${fmtNum(content.comments_pending)}<br>Spam: ${fmtNum(content.comments_spam)}<br>Trash: ${fmtNum(content.comments_trash)}`, true)}
+        </div>
+    `;
 }
 
 /* ─── Copy Nginx Config ─── */
@@ -2878,6 +2962,7 @@ function renderSites(sites) {
                         <div class="detail-item"><label>DB Prefix</label><div class="val">${esc(s.db_prefix)}</div></div>
                         <div class="detail-item"><label>WP Version</label><div class="val">${esc(s.version)}</div></div>
                     </div>
+                    ${renderWeightStats(s)}
                     <div class="lock-section" onclick="event.stopPropagation()">
                         <div class="lock-status-label"><span class="dashicons dashicons-wordpress wp-admin-icon"></span> WordPress Core (Phiên bản WordPress hiện tại: <strong>v${esc(s.version)}</strong>)
                         </div>
