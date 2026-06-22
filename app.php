@@ -321,6 +321,9 @@ function get_wordpress_security_status($site_path) {
         } catch (Exception $e) {}
     }
     
+    // 19. wordpress_lockdown
+    $status['wordpress_lockdown'] = is_wordpress_locked($site_path);
+    
     // Detect Nginx using cURL HEAD request
     $is_nginx = false;
     $siteurl = '';
@@ -416,6 +419,14 @@ function toggle_wordpress_security_measure($site_path, $measure, $enable, $param
 
     
     switch ($measure) {
+        case 'wordpress_lockdown':
+            if ($enable) {
+                lock_wordpress_instance($site_path);
+            } else {
+                unlock_wordpress_instance($site_path);
+            }
+            break;
+
         case 'restrict_files':
             if ($enable) {
                 @chmod($wp_config_path, 0400);

@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.5.2';
+$plugin_version = '1.5.3';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -2339,6 +2339,7 @@ async function loadSecurity(i) {
                 { key: 'security_keys', title: 'Khóa bảo mật Salt Keys', desc: 'Thay đổi hoặc tạo mới các chuỗi Salt Keys ngẫu nhiên trong tệp wp-config.php để bảo mật mã hóa cookie và phiên đăng nhập của người dùng.', icon: 'dashicons-shield' },
                 { key: 'db_prefix', title: 'Thay đổi tiền tố Database', desc: 'Đổi tên toàn bộ các bảng dữ liệu WordPress trong cơ sở dữ liệu MySQL và cập nhật tiền tố cấu hình $table_prefix trong tệp cấu hình wp-config.php.', icon: 'dashicons-database', promptInput: true },
                 { key: 'rename_admin_user', title: 'Đổi tên tài khoản "admin"', desc: 'Thay đổi trực tiếp tên đăng nhập (user_login) của tài khoản quản trị từ mặc định "admin" sang tên mới trong bảng dữ liệu mysql wp_users.', icon: 'dashicons-admin-users', promptInput: true },
+                { key: 'wordpress_lockdown', title: 'WordPress Lockdown (Khoá thư mục và tập tin)', desc: 'Khóa toàn bộ thư mục và các tệp tin cốt lõi của WordPress ở chế độ chỉ đọc (immutable) để ngăn chặn bất kỳ mã độc nào tự động ghi đè hoặc chỉnh sửa mã nguồn.', icon: 'dashicons-lock' },
                 { key: 'block_wp_config', title: 'Khóa truy cập wp-config.php', desc: 'Thêm cấu hình chặn truy cập trực tiếp tệp wp-config.php từ trình duyệt bên ngoài vào tệp cấu hình máy chủ .htaccess.', icon: 'dashicons-hidden' },
                 { key: 'block_htaccess', title: 'Khóa truy cập .htaccess', desc: 'Thêm cấu hình chặn hoàn toàn việc đọc và ghi đè trực tiếp tệp cấu hình máy chủ .htaccess và tệp mật khẩu .htpasswd từ trình duyệt thông qua luật trong tệp .htaccess.', icon: 'dashicons-lock' },
                 { key: 'block_xmlrpc', title: 'Chặn truy cập XML-RPC', desc: 'Thêm cấu hình từ chối và vô hiệu hóa quyền truy cập tệp xmlrpc.php vào tệp cấu hình .htaccess để chống các cuộc tấn công đoán mật khẩu hàng loạt và DDoS qua API XML-RPC.', icon: 'dashicons-dismiss' },
@@ -2503,6 +2504,35 @@ async function toggleSecurityMeasure(siteIdx, measureKey, currentSecure) {
         }
         // Cập nhật lại onchange với giá trị currentSecure mới
         checkbox.setAttribute('onchange', `toggleSecurityMeasure(${siteIdx}, '${measureKey}', ${nextSecure})`);
+        
+        if (measureKey === 'wordpress_lockdown') {
+            s.locked = nextSecure;
+            
+            // Update Overview tab lock button & label if they exist
+            const overBtn = document.getElementById('btn-lock-' + siteIdx);
+            const overLabel = document.getElementById('lock-label-' + siteIdx);
+            if (overBtn) {
+                overBtn.className = nextSecure ? 'btn btn-sm btn-secondary' : 'btn-primary btn-sm';
+                overBtn.innerHTML = nextSecure
+                    ? '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt'
+                    : '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật';
+            }
+            if (overLabel) {
+                overLabel.innerHTML = nextSecure
+                    ? '<span class="dashicons dashicons-lock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--green);font-weight:bold;">Bật</span>'
+                    : '<span class="dashicons dashicons-unlock wp-admin-icon"></span> WordPress Lockdown (Khoá thư mục và tập tin): đang <span style="color:var(--text3);font-weight:bold;">Tắt</span>';
+            }
+            
+            // Update card header badge
+            const hBadge = document.getElementById('hb-lock-' + siteIdx);
+            if (hBadge) {
+                hBadge.className = nextSecure ? 'badge badge-yellow' : 'badge badge-gray';
+                hBadge.innerHTML = nextSecure
+                    ? '<span class="dashicons dashicons-lock wp-admin-icon"></span> Lockdown'
+                    : '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Unlocked';
+            }
+        }
+
         checkbox.disabled = false;
         toast(`${nextSecure ? '✅ Đã bật' : '⛔ Đã tắt'} tính năng bảo mật thành công!`, 'success');
     } else {
@@ -2625,11 +2655,6 @@ async function handleSpecialSecurityMeasure(siteIdx, measureKey, currentSecure) 
     }
 }
 
-/* ─── File Lock Protection ─── */
-async function toggleLockFromSecurity(i) {
-    // Reuse the existing toggleLock logic (button is placed inside Security tab)
-    return toggleLock(i);
-}
 
 async function toggleLock(i) {
     const s = allSites[i];
@@ -2669,6 +2694,18 @@ async function toggleLock(i) {
                 if (hBadge) {
                     hBadge.className = 'badge badge-gray';
                     hBadge.innerHTML = '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Unlocked';
+                }
+            }
+
+            // Sync with Security tab checklist if it exists
+            const secCheckbox = document.getElementById(`sec-switch-${i}-wordpress_lockdown`);
+            if (secCheckbox) {
+                secCheckbox.checked = s.locked;
+                secCheckbox.setAttribute('onchange', `toggleSecurityMeasure(${i}, 'wordpress_lockdown', ${s.locked})`);
+                const secBadge = secCheckbox.closest('.plugin-item')?.querySelector('.badge');
+                if (secBadge) {
+                    secBadge.className = `badge ${s.locked ? 'badge-green' : 'badge-red'}`;
+                    secBadge.textContent = s.locked ? 'Đã bảo vệ' : 'Chưa bảo vệ';
                 }
             }
         } else {
@@ -3114,18 +3151,7 @@ function renderSites(sites) {
                         <button class="btn btn-secondary btn-sm" onclick="loadSecurity(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan & Refresh</button>
                     </div>
 
-                    <!-- WordPress Lockdown quick toggle (only button, no badge needed) -->
-                    <div class="lock-section" style="margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px;" onclick="event.stopPropagation()">
-                        <div class="lock-status-label">
-                            <span class="dashicons dashicons-wordpress wp-admin-icon"></span>
-                            WordPress Lockdown (Khoá thư mục và tập tin)
-                        </div>
-                        <button class="btn btn-sm ${s.locked ? 'btn-secondary' : 'btn-primary'}" id="btn-lock-sec-${i}" onclick="toggleLockFromSecurity(${i})">
-                            ${s.locked
-                                ? '<span class="dashicons dashicons-unlock wp-admin-icon"></span> Tắt'
-                                : '<span class="dashicons dashicons-lock wp-admin-icon"></span> Bật'}
-                        </button>
-                    </div>
+
 
                     <div class="plugin-list" id="security-list-${i}" style="margin-top: 12px;">
                         <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
