@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.3.32';
+$plugin_version = '1.4.0';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1222,6 +1222,11 @@ function switchTab(siteIdx, tabName, event) {
         if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load themes')) {
             loadThemes(siteIdx);
         }
+    } else if (tabName === 'users') {
+        const list = document.getElementById(`user-list-${siteIdx}`);
+        if (list.innerHTML.includes('Expanding card will load') || list.innerHTML.includes('will load users')) {
+            loadUsers(siteIdx);
+        }
     } else if (tabName === 'security') {
         const list = document.getElementById(`security-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
@@ -2036,6 +2041,122 @@ async function deleteTheme(siteIdx, themeIdx, folder) {
 }
 
 
+/* ─── User Manager ─── */
+async function loadUsers(i) {
+    const s = allSites[i];
+    const container = document.getElementById('user-list-' + i);
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">Loading users...</div>';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('list_users'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            if (!d.users.length) {
+                container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">No users found.</div>';
+                return;
+            }
+            container.innerHTML = d.users.map((u, idx) => {
+                const displayName = u.display_name || u.user_login;
+                const roles = Array.isArray(u.roles) && u.roles.length ? u.roles.join(', ') : 'No role';
+                const email = u.user_email || 'No email';
+                return `
+                <div class="plugin-item">
+                    <div class="plugin-info">
+                        <div class="plugin-name" title="${esc(displayName)}">${esc(displayName)}</div>
+                        <div class="plugin-desc" title="${esc(email)}">${esc(email)}</div>
+                        <div class="plugin-meta">Login: ${esc(u.user_login)} | Roles: ${esc(roles)} | Registered: ${esc(u.user_registered || 'Unknown')}</div>
+                    </div>
+                    <div class="plugin-toggle">
+                        <button class="btn btn-sm btn-secondary" id="btn-user-pass-${i}-${idx}" onclick="changeUserPassword(${i}, ${idx}, ${parseInt(u.ID, 10)}, '${escJsArg(displayName)}')"><span class="dashicons dashicons-admin-network wp-admin-icon"></span> Change Password</button>
+                        <button class="btn btn-sm btn-primary" id="btn-user-login-${i}-${idx}" onclick="loginAsUser(${i}, ${idx}, ${parseInt(u.ID, 10)})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Login As User</button>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Cannot load users.</div>';
+    }
+}
+
+async function changeUserPassword(siteIdx, userIdx, userId, displayName) {
+    const s = allSites[siteIdx];
+    const password = prompt(`Enter new password for ${displayName}:`);
+    if (password === null) return;
+    if (password.length < 8) {
+        toast('Password must be at least 8 characters.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById(`btn-user-pass-${siteIdx}-${userIdx}`);
+    const originalText = btn ? btn.textContent : 'Change Password';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Changing...';
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('user_id', userId);
+        fd.append('password', password);
+
+        const r = await fetch(apiUrl('change_user_password'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'Password changed successfully.', 'success');
+        } else {
+            toast(d.error || 'Failed to change password.', 'error');
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+}
+
+async function loginAsUser(siteIdx, userIdx, userId) {
+    const s = allSites[siteIdx];
+    const btn = document.getElementById(`btn-user-login-${siteIdx}-${userIdx}`);
+    const originalText = btn ? btn.textContent : 'Login As User';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Opening...';
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('user_id', userId);
+
+        const r = await fetch(apiUrl('login_as_user'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success && d.login_url) {
+            window.open(d.login_url, '_blank');
+            toast('Opening WordPress admin as selected user...', 'success');
+        } else {
+            toast(d.error || 'Login As User failed.', 'error');
+        }
+    } catch (err) {
+        toast('Connection error.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    }
+}
+
+
 /* ─── Security Manager ─── */
 async function loadSecurity(i) {
     const s = allSites[i];
@@ -2742,6 +2863,7 @@ function renderSites(sites) {
                     <button class="tab-btn" onclick="switchTab(${i}, 'security', event)"><span class="dashicons dashicons-shield wp-admin-icon"></span> Security & Protection</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'users', event)"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)"><span class="dashicons dashicons-list-view wp-admin-icon"></span> Task & Logs</button>
                 </div>
 
@@ -2869,6 +2991,18 @@ function renderSites(sites) {
                     <div class="plugin-list" id="theme-list-${i}">
                         <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Clicking Themes tab or Refresh will load themes...
+                        </div>
+                    </div>
+                </div>
+                <!-- Tab 4: Users -->
+                <div class="card-tab-content" id="tab-content-${i}-users">
+                    <div class="card-sec-title">
+                        <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadUsers(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                    </div>
+                    <div class="plugin-list" id="user-list-${i}">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
+                            Clicking Users tab or Refresh will load users...
                         </div>
                     </div>
                 </div>

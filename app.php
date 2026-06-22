@@ -198,6 +198,36 @@ function wp_manager_get_db_conn($wp_config_path) {
 }
 
 /**
+ * Bootstrap WordPress auth helpers without running update checks.
+ */
+function wp_manager_bootstrap_auth($site_path) {
+    static $bootstrapped_path = null;
+
+    $wp_load = rtrim($site_path, '/') . '/wp-load.php';
+    if (!file_exists($wp_load)) {
+        throw new Exception("wp-load.php not found. This does not look like a complete WordPress installation.");
+    }
+
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $_SERVER['SERVER_NAME'] = $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'];
+    $_SERVER['REQUEST_URI'] = $_SERVER['REQUEST_URI'] ?? '/wp-admin/';
+    $_SERVER['SERVER_PROTOCOL'] = $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.1';
+    $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+    chdir($site_path);
+    $real_site_path = realpath($site_path) ?: $site_path;
+    if ($bootstrapped_path !== null && $bootstrapped_path !== $real_site_path) {
+        throw new Exception("Cannot bootstrap multiple WordPress installations in the same request.");
+    }
+    if ($bootstrapped_path === null) {
+        require_once $wp_load;
+        $bootstrapped_path = $real_site_path;
+    }
+    require_once ABSPATH . 'wp-includes/pluggable.php';
+}
+
+/**
  * Get security status of 18 measures for a site
  */
 function get_wordpress_security_status($site_path) {
@@ -2017,6 +2047,91 @@ function delete_wordpress_theme($site_path, $theme_folder) {
 }
 
 /**
+ * List WordPress users.
+ */
+function list_wordpress_users($site_path) {
+    $wp_config_path = $site_path . '/wp-config.php';
+    $db = wp_manager_get_db_conn($wp_config_path);
+    if (!$db) {
+        throw new Exception("Unable to connect to database.");
+    }
+
+    $prefix = $db['prefix'];
+    $stmt = $db['pdo']->prepare("
+        SELECT ID, user_login, user_email, user_registered, display_name
+        FROM `{$prefix}users`
+        ORDER BY COALESCE(NULLIF(display_name, ''), user_login) ASC
+    ");
+    $stmt->execute();
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($users as &$user) {
+        $cap_stmt = $db['pdo']->prepare("SELECT meta_value FROM `{$prefix}usermeta` WHERE user_id = ? AND meta_key = ?");
+        $cap_stmt->execute([$user['ID'], $prefix . 'capabilities']);
+        $caps = @unserialize($cap_stmt->fetchColumn() ?: '');
+        $roles = [];
+        if (is_array($caps)) {
+            foreach ($caps as $role => $enabled) {
+                if ($enabled) {
+                    $roles[] = $role;
+                }
+            }
+        }
+        $user['roles'] = $roles;
+    }
+    unset($user);
+
+    usort($users, function($a, $b) {
+        $name_a = $a['display_name'] ?: $a['user_login'];
+        $name_b = $b['display_name'] ?: $b['user_login'];
+        return strcasecmp($name_a, $name_b);
+    });
+
+    return $users;
+}
+
+/**
+ * Change a WordPress user's password.
+ */
+function change_wordpress_user_password($site_path, $user_id, $new_password) {
+    $user_id = (int)$user_id;
+    if ($user_id <= 0) {
+        throw new Exception("Invalid user ID.");
+    }
+    if (strlen($new_password) < 8) {
+        throw new Exception("Password must be at least 8 characters.");
+    }
+    if (!wordpress_user_exists($site_path, $user_id)) {
+        throw new Exception("User not found.");
+    }
+
+    wp_manager_bootstrap_auth($site_path);
+    if (!function_exists('wp_set_password')) {
+        throw new Exception("WordPress password helper is unavailable.");
+    }
+
+    wp_set_password($new_password, $user_id);
+    return ['success' => true, 'message' => 'User password changed successfully.'];
+}
+
+/**
+ * Ensure a WordPress user exists in the target installation.
+ */
+function wordpress_user_exists($site_path, $user_id) {
+    $user_id = (int)$user_id;
+    if ($user_id <= 0) {
+        return false;
+    }
+    $db = wp_manager_get_db_conn($site_path . '/wp-config.php');
+    if (!$db) {
+        throw new Exception("Unable to connect to database.");
+    }
+    $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$db['prefix']}users` WHERE ID = ?");
+    $stmt->execute([$user_id]);
+    return ((int)$stmt->fetchColumn()) > 0;
+}
+
+/**
  * Parse wp-config.php and extract metadata
  */
 function parse_wp_config($wp_config_path) {
@@ -3144,7 +3259,7 @@ function install_wordpress_instance($params, $home) {
 /**
  * Generate Magic Login temporary mu-plugin
  */
-function generate_magic_login($site_path, $home) {
+function generate_magic_login($site_path, $home, $user_id = null) {
     if (strpos(realpath($site_path) ?: $site_path, $home) !== 0) {
         throw new Exception("Invalid directory path constraints.");
     }
@@ -3160,6 +3275,7 @@ function generate_magic_login($site_path, $home) {
     }
     
     $token = bin2hex(random_bytes(16));
+    $target_user_id = $user_id !== null ? (int)$user_id : 0;
     
     $mu_code = <<<'PHP'
 <?php
@@ -3175,10 +3291,13 @@ add_action('init', function() {
         @unlink(__FILE__);
         
         require_once ABSPATH . 'wp-includes/pluggable.php';
-        // Auto-detect and fetch the first administrative user
-        $users = get_users(['role' => 'administrator', 'number' => 1]);
-        if (!empty($users)) {
-            $user = $users[0];
+        $target_user_id = {{USER_ID}};
+        $user = $target_user_id > 0 ? get_user_by('id', $target_user_id) : null;
+        if (!$user && $target_user_id <= 0) {
+            $users = get_users(['role' => 'administrator', 'number' => 1]);
+            $user = !empty($users) ? $users[0] : null;
+        }
+        if ($user) {
             wp_clear_auth_cookie();
             wp_set_current_user($user->ID, $user->user_login);
             wp_set_auth_cookie($user->ID, true);
@@ -3193,6 +3312,7 @@ add_action('init', function() {
 PHP;
 
     $mu_code = str_replace('{{TOKEN}}', $token, $mu_code);
+    $mu_code = str_replace('{{USER_ID}}', (string)$target_user_id, $mu_code);
     $mu_plugin_file = $mu_dir . '/magic-login-' . $token . '.php';
     file_put_contents($mu_plugin_file, $mu_code);
     @chmod($mu_plugin_file, 0644);
@@ -4129,6 +4249,9 @@ function run_api() {
                     $details['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_plugins[] = $details;
                 }
+                usort($response_plugins, function($a, $b) {
+                    return strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+                });
                 echo json_encode(['success' => true, 'plugins' => $response_plugins]);
                 break;
 
@@ -4253,6 +4376,9 @@ function run_api() {
                     $theme['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_themes[] = $theme;
                 }
+                usort($response_themes, function($a, $b) {
+                    return strcasecmp($a['name'] ?? '', $b['name'] ?? '');
+                });
                 echo json_encode(['success' => true, 'themes' => $response_themes]);
                 break;
 
@@ -4354,6 +4480,45 @@ function run_api() {
                 } else {
                     wp_manager_log("Xóa theme thất bại | Lỗi: " . ($res['error'] ?? 'Không rõ lý do'));
                 }
+                echo json_encode($res);
+                break;
+
+            case 'list_users':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $users = list_wordpress_users($_POST['path']);
+                echo json_encode(['success' => true, 'users' => $users]);
+                break;
+
+            case 'change_user_password':
+                if (empty($_POST['path']) || empty($_POST['user_id']) || !isset($_POST['password'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                wp_manager_log("Thay đổi mật khẩu user ID '" . $_POST['user_id'] . "' cho website: " . $_POST['path']);
+                $res = change_wordpress_user_password($_POST['path'], $_POST['user_id'], $_POST['password']);
+                wp_manager_log("Thay đổi mật khẩu user thành công.");
+                echo json_encode($res);
+                break;
+
+            case 'login_as_user':
+                if (empty($_POST['path']) || empty($_POST['user_id'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                if (!wordpress_user_exists($_POST['path'], $_POST['user_id'])) {
+                    throw new Exception("User not found.");
+                }
+                wp_manager_log("Tạo Login As User cho user ID '" . $_POST['user_id'] . "' tại website: " . $_POST['path']);
+                $res = generate_magic_login($_POST['path'], $home, (int)$_POST['user_id']);
                 echo json_encode($res);
                 break;
                 
