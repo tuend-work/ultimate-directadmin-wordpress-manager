@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.5.1';
+$plugin_version = '1.5.2';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -298,16 +298,16 @@ div#iframe-container{
 
 .card-details {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 8px 28px;
     padding: 0;
     margin-top: 12px;
 }
 .detail-item {
     display: grid;
-    grid-template-columns: minmax(95px, .9fr) minmax(0, 1.1fr);
+    grid-template-columns: 120px minmax(0, 1fr);
     align-items: start;
-    gap: 10px;
+    gap: 12px;
 }
 .detail-item label {
     font-size: 13px; font-weight: 700;
@@ -321,7 +321,7 @@ div#iframe-container{
     font-size: 16px; color: var(--text2);
     font-family: ui-monospace, "SFMono-Regular", monospace;
     word-break: break-all;
-    text-align: right;
+    text-align: left;
     min-width: 0;
 }
 .detail-group-title {
@@ -337,13 +337,65 @@ div#iframe-container{
     font-size: 14px;
     line-height: 1.45;
 }
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 18px 28px;
+    margin-top: 12px;
+}
+.stats-section {
+    border-top: 1px solid var(--border2);
+    padding-top: 10px;
+}
+.stats-section-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.stats-row {
+    display: grid;
+    grid-template-columns: minmax(150px, .9fr) minmax(0, 1.1fr);
+    gap: 18px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(139,148,158,.12);
+}
+.stats-row:last-child {
+    border-bottom: 0;
+}
+.stats-label {
+    color: var(--text3);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+}
+.stats-value {
+    color: var(--text2);
+    font-family: ui-monospace, "SFMono-Regular", monospace;
+    font-size: 15px;
+    line-height: 1.45;
+    text-align: right;
+    word-break: break-word;
+}
 @media (max-width: 560px) {
     .detail-item {
         grid-template-columns: 1fr;
         gap: 3px;
     }
-    .detail-item .val {
+    .detail-item .val,
+    .stats-value {
         text-align: left;
+    }
+    .stats-grid,
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+    .stats-row {
+        gap: 2px;
     }
 }
 
@@ -1194,6 +1246,19 @@ function detailItem(label, value, small = false) {
     return `<div class="detail-item"><label>${esc(label)}</label><div class="val${small ? ' small' : ''}">${value}</div></div>`;
 }
 
+function statRow(label, value) {
+    return `<div class="stats-row"><div class="stats-label">${esc(label)}</div><div class="stats-value">${value}</div></div>`;
+}
+
+function statSection(icon, title, rows) {
+    return `
+        <div class="stats-section">
+            <div class="stats-section-title"><span class="dashicons ${esc(icon)} wp-admin-icon"></span> ${esc(title)}</div>
+            ${rows.join('')}
+        </div>
+    `;
+}
+
 function renderWeightStats(s) {
     const w = s.weight_stats || {};
     const storage = w.storage || {};
@@ -1207,44 +1272,38 @@ function renderWeightStats(s) {
     const themesSize = storage.themes_size || {};
 
     return `
-        <div class="detail-group-title"><span class="dashicons dashicons-chart-bar wp-admin-icon"></span> Website Weight</div>
-        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
-            ${detailItem('Total Size', esc(siteSize.human || '0 B'))}
-            ${detailItem('DB Size', esc(db.size_human || '0 B'))}
-            ${detailItem('Files / Folders', `${fmtNum(siteSize.files)} / ${fmtNum(siteSize.dirs)}`)}
-            ${detailItem('Plugins / Themes', `${fmtNum(counts.plugins)} / ${fmtNum(counts.themes)}`)}
-            ${detailItem('Users', fmtNum(content.users))}
-            ${detailItem('Comments', fmtNum(content.comments_total))}
-        </div>
-
-        <div class="detail-group-title"><span class="dashicons dashicons-admin-post wp-admin-icon"></span> Content</div>
-        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
-            ${detailItem('Posts', fmtNum(content.posts))}
-            ${detailItem('Products', fmtNum(content.products))}
-            ${detailItem('Product Variations', fmtNum(content.product_variations))}
-            ${detailItem('Pages', fmtNum(content.pages))}
-            ${detailItem('Attachments', fmtNum(content.attachments))}
-            ${detailItem('Revisions', fmtNum(content.revisions))}
-            ${detailItem('Terms', fmtNum(content.terms))}
-            ${detailItem('Menus', fmtNum(content.nav_menu_items))}
-            ${detailItem('Custom Post Types', `${fmtNum(content.custom_post_total)}<br>${fmtMap(content.custom_post_types)}`, true)}
-            ${detailItem('Post Statuses', fmtMap(content.post_statuses), true)}
-        </div>
-
-        <div class="detail-group-title"><span class="dashicons dashicons-database wp-admin-icon"></span> Storage & Database</div>
-        <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));">
-            ${detailItem('wp-content', esc(wpContentSize.human || '0 B'))}
-            ${detailItem('Uploads', esc(uploadsSize.human || '0 B'))}
-            ${detailItem('Plugins Folder', esc(pluginsSize.human || '0 B'))}
-            ${detailItem('Themes Folder', esc(themesSize.human || '0 B'))}
-            ${detailItem('Tables', fmtNum(db.tables))}
-            ${detailItem('Options Rows', fmtNum(db.options_rows))}
-            ${detailItem('Autoload Options', `${fmtNum(db.autoload_options)}<br>${esc(db.autoload_size_human || '0 B')}`, true)}
-            ${detailItem('Transients', fmtNum(db.transients))}
-            ${detailItem('Postmeta Rows', fmtNum(db.postmeta_rows))}
-            ${detailItem('Commentmeta Rows', fmtNum(db.commentmeta_rows))}
-            ${detailItem('Usermeta Rows', fmtNum(db.usermeta_rows))}
-            ${detailItem('Comments Status', `Approved: ${fmtNum(content.comments_approved)}<br>Pending: ${fmtNum(content.comments_pending)}<br>Spam: ${fmtNum(content.comments_spam)}<br>Trash: ${fmtNum(content.comments_trash)}`, true)}
+        <div class="stats-grid">
+            ${statSection('dashicons-chart-bar', 'Website Weight', [
+                statRow('Total Size', esc(siteSize.human || '0 B')),
+                statRow('Database Size', esc(db.size_human || '0 B')),
+                statRow('Files / Folders', `${fmtNum(siteSize.files)} / ${fmtNum(siteSize.dirs)}`),
+                statRow('Plugins / Themes', `${fmtNum(counts.plugins)} / ${fmtNum(counts.themes)}`),
+                statRow('Users', fmtNum(content.users)),
+                statRow('Comments', fmtNum(content.comments_total)),
+            ])}
+            ${statSection('dashicons-admin-post', 'Content', [
+                statRow('Posts', fmtNum(content.posts)),
+                statRow('Products', fmtNum(content.products)),
+                statRow('Product Variations', fmtNum(content.product_variations)),
+                statRow('Pages', fmtNum(content.pages)),
+                statRow('Attachments', fmtNum(content.attachments)),
+                statRow('Revisions', fmtNum(content.revisions)),
+                statRow('Terms / Menus', `${fmtNum(content.terms)} / ${fmtNum(content.nav_menu_items)}`),
+                statRow('Custom Post Types', `${fmtNum(content.custom_post_total)}<br>${fmtMap(content.custom_post_types)}`),
+                statRow('Post Statuses', fmtMap(content.post_statuses)),
+            ])}
+            ${statSection('dashicons-database', 'Storage & Database', [
+                statRow('wp-content', esc(wpContentSize.human || '0 B')),
+                statRow('Uploads', esc(uploadsSize.human || '0 B')),
+                statRow('Plugins Folder', esc(pluginsSize.human || '0 B')),
+                statRow('Themes Folder', esc(themesSize.human || '0 B')),
+                statRow('Tables', fmtNum(db.tables)),
+                statRow('Options Rows', fmtNum(db.options_rows)),
+                statRow('Autoload Options', `${fmtNum(db.autoload_options)} / ${esc(db.autoload_size_human || '0 B')}`),
+                statRow('Transients', fmtNum(db.transients)),
+                statRow('Meta Rows', `Post: ${fmtNum(db.postmeta_rows)}<br>Comment: ${fmtNum(db.commentmeta_rows)}<br>User: ${fmtNum(db.usermeta_rows)}`),
+                statRow('Comments Status', `Approved: ${fmtNum(content.comments_approved)}<br>Pending: ${fmtNum(content.comments_pending)}<br>Spam: ${fmtNum(content.comments_spam)}<br>Trash: ${fmtNum(content.comments_trash)}`),
+            ])}
         </div>
     `;
 }
@@ -2973,7 +3032,7 @@ function renderSites(sites) {
                 <!-- Tab 1: Overview Details -->
                 <div class="card-tab-content active" id="tab-content-${i}-details">
                     <div class="card-sec-title"><span><span class="dashicons dashicons-info wp-admin-icon"></span> Installation Details</span></div>
-                    <div class="card-details" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                    <div class="card-details">
                         <div class="detail-item"><label>Domain</label><div class="val">${esc(s.domain)}</div></div>
                         <div class="detail-item"><label>Sub-path</label><div class="val">${esc(s.subdir||'(root)')}</div></div>
                         <div class="detail-item"><label>Database</label><div class="val">${esc(s.db_name)}</div></div>
