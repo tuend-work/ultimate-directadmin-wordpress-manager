@@ -945,6 +945,7 @@ $list_data = get_store_list();
                                                 <td style="text-align: center; padding-right: 20px;">
                                                     <div style="display: inline-flex; gap: 6px; justify-content: center;">
                                                         <?php if ($p['type'] === 'zip'): ?>
+                                                            <a href="?action=download&file=<?php echo urlencode($p['file']); ?>" target="_blank" class="btn btn-sm btn-primary" style="background-color: var(--success); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-download wp-admin-icon"></span> Tải về</a>
                                                             <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('plugins', <?php echo $idx; ?>, '<?php echo addslashes($p['name']); ?>')"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật</button>
                                                         <?php endif; ?>
                                                         <a href="?action=delete&type=plugins&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa</a>
@@ -999,6 +1000,7 @@ $list_data = get_store_list();
                                                 <td style="text-align: center; padding-right: 20px;">
                                                     <div style="display: inline-flex; gap: 6px; justify-content: center;">
                                                         <?php if ($t['type'] === 'zip'): ?>
+                                                            <a href="?action=download&file=<?php echo urlencode($t['file']); ?>" target="_blank" class="btn btn-sm btn-primary" style="background-color: var(--success); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;"><span class="dashicons dashicons-download wp-admin-icon"></span> Tải về</a>
                                                             <button type="button" class="btn btn-sm btn-primary" style="background-color: var(--warning); border-color: transparent; color: white; padding: 4px 10px; font-size: 11px;" onclick="openUpdateModal('themes', <?php echo $idx; ?>, '<?php echo addslashes($t['name']); ?>')"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật</button>
                                                         <?php endif; ?>
                                                         <a href="?action=delete&type=themes&index=<?php echo $idx; ?>" class="btn btn-sm btn-danger" style="padding: 4px 10px; font-size: 11px;" onclick="return confirm('Bạn có chắc chắn muốn xóa mục này khỏi Store?')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa</a>
