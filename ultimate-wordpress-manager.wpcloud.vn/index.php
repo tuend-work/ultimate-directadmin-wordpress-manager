@@ -127,17 +127,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
                 fclose($fp);
                 
                 if ($http_code === 200 && filesize($temp_file) >= 100) {
-                    if (file_exists($file_path)) {
-                        @unlink($file_path);
+                    while (ob_get_level() > 0) {
+                        ob_end_clean();
                     }
-                    rename($temp_file, $file_path);
-                    @chmod($file_path, 0644);
+                    header('Content-Type: application/zip');
+                    header('Content-Disposition: attachment; filename="' . $file . '"');
+                    header('Content-Length: ' . filesize($temp_file));
+                    header('Pragma: no-cache');
+                    header('Expires: 0');
+                    readfile($temp_file);
+                    @unlink($temp_file);
+                    exit;
                 } else {
                     @unlink($temp_file);
+                    http_response_code(500);
+                    echo "Tải từ GitHub thất bại (HTTP Code {$http_code}). Vui lòng kiểm tra cấu hình token hoặc link dự án.";
+                    exit;
                 }
             }
         } catch (Exception $e) {
-            // Fallback to existing file if download fails
+            http_response_code(500);
+            echo "Lỗi: " . $e->getMessage();
+            exit;
         }
     }
     
