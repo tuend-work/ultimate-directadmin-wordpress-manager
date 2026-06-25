@@ -196,110 +196,108 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
                 throw new Exception("Vui lòng nhập Slug của WordPress.org.");
             }
             $new_item['slug'] = $slug;
-        } elseif ($type === 'github') {
+        } else {
+            // ZIP File or GitHub URL
             $github_url = trim($_POST['github_url'] ?? '');
             $github_token = trim($_POST['github_token'] ?? '');
             
-            if (!$github_url) {
-                throw new Exception("Vui lòng nhập link GitHub.");
-            }
-            
-            $path = parse_url($github_url, PHP_URL_PATH);
-            $path = trim($path, '/');
-            $parts = explode('/', $path);
-            
-            if (count($parts) < 2) {
-                throw new Exception("Link GitHub không hợp lệ. Định dạng yêu cầu: https://github.com/owner/repo");
-            }
-            
-            $owner = $parts[0];
-            $repo = $parts[1];
-            if (str_ends_with($repo, '.git')) {
-                $repo = substr($repo, 0, -4);
-            }
-            
-            $ref = '';
-            if (count($parts) >= 4 && $parts[2] === 'tree') {
-                $ref = implode('/', array_slice($parts, 3));
-            }
-            
-            $api_url = "https://api.github.com/repos/{$owner}/{$repo}/zipball" . ($ref ? "/{$ref}" : "");
-            
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $api_url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Ultimate-WordPress-Manager-Store');
-            curl_setopt($ch, CURLOPT_TIMEOUT, 300);
-            
-            $headers = [
-                'Accept: application/vnd.github+json',
-                'X-GitHub-Api-Version: 2022-11-28'
-            ];
-            
-            if ($github_token) {
-                $headers[] = 'Authorization: Bearer ' . $github_token;
-            }
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            
-            $temp_file = tempnam(sys_get_temp_dir(), 'gh_zip');
-            $fp = fopen($temp_file, 'w+');
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            
-            curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            fclose($fp);
-            
-            if ($http_code !== 200) {
-                @unlink($temp_file);
-                throw new Exception("Tải từ GitHub thất bại. HTTP Code: " . $http_code . ". Vui lòng kiểm tra lại link hoặc Token.");
-            }
-            
-            if (filesize($temp_file) < 100) {
-                @unlink($temp_file);
-                throw new Exception("Tệp tải về không hợp lệ hoặc quá nhỏ.");
-            }
-            
-            $filename = $repo . '-' . ($ref ? preg_replace('/[^a-zA-Z0-9_\-]/', '_', $ref) : 'main') . '.zip';
-            $filename = time() . '_' . $filename;
-            $dest = UPLOAD_DIR . '/' . $filename;
-            
-            if (rename($temp_file, $dest)) {
-                @chmod($dest, 0644);
-                $new_item['file'] = $filename;
-                $new_item['type'] = 'zip'; // Register as zip type
-                $new_item['github_url'] = $github_url;
+            if ($github_url) {
+                $path = parse_url($github_url, PHP_URL_PATH);
+                $path = trim($path, '/');
+                $parts = explode('/', $path);
+                
+                if (count($parts) < 2) {
+                    throw new Exception("Link GitHub không hợp lệ. Định dạng yêu cầu: https://github.com/owner/repo");
+                }
+                
+                $owner = $parts[0];
+                $repo = $parts[1];
+                if (str_ends_with($repo, '.git')) {
+                    $repo = substr($repo, 0, -4);
+                }
+                
+                $ref = '';
+                if (count($parts) >= 4 && $parts[2] === 'tree') {
+                    $ref = implode('/', array_slice($parts, 3));
+                }
+                
+                $api_url = "https://api.github.com/repos/{$owner}/{$repo}/zipball" . ($ref ? "/{$ref}" : "");
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $api_url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Ultimate-WordPress-Manager-Store');
+                curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+                
+                $headers = [
+                    'Accept: application/vnd.github+json',
+                    'X-GitHub-Api-Version: 2022-11-28'
+                ];
+                
                 if ($github_token) {
-                    $new_item['github_token'] = $github_token;
+                    $headers[] = 'Authorization: Bearer ' . $github_token;
+                }
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                
+                $temp_file = tempnam(sys_get_temp_dir(), 'gh_zip');
+                $fp = fopen($temp_file, 'w+');
+                curl_setopt($ch, CURLOPT_FILE, $fp);
+                
+                curl_exec($ch);
+                $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                fclose($fp);
+                
+                if ($http_code !== 200) {
+                    @unlink($temp_file);
+                    throw new Exception("Tải từ GitHub thất bại. HTTP Code: " . $http_code . ". Vui lòng kiểm tra lại link hoặc Token.");
+                }
+                
+                if (filesize($temp_file) < 100) {
+                    @unlink($temp_file);
+                    throw new Exception("Tệp tải về không hợp lệ hoặc quá nhỏ.");
+                }
+                
+                $filename = $repo . '-' . ($ref ? preg_replace('/[^a-zA-Z0-9_\-]/', '_', $ref) : 'main') . '.zip';
+                $filename = time() . '_' . $filename;
+                $dest = UPLOAD_DIR . '/' . $filename;
+                
+                if (rename($temp_file, $dest)) {
+                    @chmod($dest, 0644);
+                    $new_item['file'] = $filename;
+                    $new_item['github_url'] = $github_url;
+                    if ($github_token) {
+                        $new_item['github_token'] = $github_token;
+                    }
+                } else {
+                    @unlink($temp_file);
+                    throw new Exception("Không thể lưu trữ tệp ZIP vào thư mục store.");
                 }
             } else {
-                @unlink($temp_file);
-                throw new Exception("Không thể lưu trữ tệp ZIP vào thư mục store.");
-            }
-        } else {
-            // ZIP File Upload
-            if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception("Vui lòng chọn tệp ZIP hợp lệ.");
-            }
-            
-            $file = $_FILES['zip_file'];
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if ($ext !== 'zip') {
-                throw new Exception("Chỉ chấp nhận định dạng tệp .zip.");
-            }
-            
-            $filename = basename($file['name']);
-            $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
-            // Thêm timestamp tránh trùng file
-            $filename = time() . '_' . $filename;
-            $dest = UPLOAD_DIR . '/' . $filename;
-            
-            if (move_uploaded_file($file['tmp_name'], $dest)) {
-                @chmod($dest, 0644);
-                $new_item['file'] = $filename;
-            } else {
-                throw new Exception("Không thể lưu trữ tệp tin tải lên máy chủ.");
+                // ZIP File Upload
+                if (empty($_FILES['zip_file']) || $_FILES['zip_file']['error'] !== UPLOAD_ERR_OK) {
+                    throw new Exception("Vui lòng chọn tệp ZIP từ máy tính hoặc nhập link GitHub.");
+                }
+                
+                $file = $_FILES['zip_file'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if ($ext !== 'zip') {
+                    throw new Exception("Chỉ chấp nhận định dạng tệp .zip.");
+                }
+                
+                $filename = basename($file['name']);
+                $filename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '', $filename);
+                // Thêm timestamp tránh trùng file
+                $filename = time() . '_' . $filename;
+                $dest = UPLOAD_DIR . '/' . $filename;
+                
+                if (move_uploaded_file($file['tmp_name'], $dest)) {
+                    @chmod($dest, 0644);
+                    $new_item['file'] = $filename;
+                } else {
+                    throw new Exception("Không thể lưu trữ tệp tin tải lên máy chủ.");
+                }
             }
         }
         
@@ -856,41 +854,40 @@ $list_data = get_store_list();
                                     <option value="plugins">🔌 Plugin</option>
                                     <option value="themes">🎨 Theme</option>
                                 </select>
-                            </div>
-
-                             <div class="form-group">
-                                <label for="type">Nguồn cài đặt</label>
-                                <select name="type" id="type" class="form-control" onchange="toggleFormFields()">
-                                    <option value="wporg">WordPress.org (Slug)</option>
-                                    <option value="zip">Tải lên file ZIP</option>
-                                    <option value="github">Tải từ GitHub</option>
-                                </select>
                              </div>
 
                              <div class="form-group">
-                                <label for="name">Tên hiển thị</label>
-                                <input type="text" name="name" id="name" class="form-control" required placeholder="Ví dụ: WooCommerce">
-                             </div>
+                                 <label for="type">Nguồn cài đặt</label>
+                                 <select name="type" id="type" class="form-control" onchange="toggleFormFields()">
+                                     <option value="wporg">WordPress.org (Slug)</option>
+                                     <option value="zip">Tài nguyên Premium (File ZIP hoặc GitHub)</option>
+                                 </select>
+                              </div>
 
-                             <div class="form-group" id="slug_field">
-                                <label for="slug">Slug từ WordPress.org</label>
-                                <input type="text" name="slug" id="slug" class="form-control" placeholder="Ví dụ: woocommerce">
-                             </div>
+                              <div class="form-group">
+                                 <label for="name">Tên hiển thị</label>
+                                 <input type="text" name="name" id="name" class="form-control" required placeholder="Ví dụ: WooCommerce">
+                              </div>
 
-                             <div class="form-group" id="zip_field" style="display: none;">
-                                <label for="zip_file">Chọn tệp ZIP từ máy tính</label>
-                                <input type="file" name="zip_file" id="zip_file" class="form-control" accept=".zip">
-                             </div>
+                              <div class="form-group" id="slug_field">
+                                 <label for="slug">Slug từ WordPress.org</label>
+                                 <input type="text" name="slug" id="slug" class="form-control" placeholder="Ví dụ: woocommerce">
+                              </div>
 
-                             <div class="form-group" id="github_url_field" style="display: none;">
-                                <label for="github_url">Đường dẫn GitHub Repository</label>
-                                <input type="url" name="github_url" id="github_url" class="form-control" placeholder="Ví dụ: https://github.com/owner/repo">
-                             </div>
-
-                             <div class="form-group" id="github_token_field" style="display: none;">
-                                <label for="github_token">Personal Access Token (Tuỳ chọn cho repo riêng tư)</label>
-                                <input type="password" name="github_token" id="github_token" class="form-control" placeholder="Nhập GitHub token nếu có...">
-                             </div>
+                              <div class="form-group" id="zip_field" style="display: none;">
+                                 <div style="margin-bottom: 15px;">
+                                     <label for="zip_file">Chọn tệp ZIP từ máy tính</label>
+                                     <input type="file" name="zip_file" id="zip_file" class="form-control" accept=".zip">
+                                 </div>
+                                 <div style="margin-bottom: 15px;">
+                                     <label for="github_url">Hoặc Đường dẫn GitHub Repository</label>
+                                     <input type="url" name="github_url" id="github_url" class="form-control" placeholder="Ví dụ: https://github.com/owner/repo">
+                                 </div>
+                                 <div>
+                                     <label for="github_token">Personal Access Token (Tuỳ chọn cho repo riêng tư)</label>
+                                     <input type="password" name="github_token" id="github_token" class="form-control" placeholder="Nhập GitHub token nếu có...">
+                                 </div>
+                              </div>
 
                             <div class="form-group">
                                 <label for="description">Mô tả ngắn</label>
@@ -1022,32 +1019,18 @@ $list_data = get_store_list();
                 const type = document.getElementById('type').value;
                 const slugField = document.getElementById('slug_field');
                 const zipField = document.getElementById('zip_field');
-                const githubUrlField = document.getElementById('github_url_field');
-                const githubTokenField = document.getElementById('github_token_field');
                 
                 const slugInput = document.getElementById('slug');
-                const zipInput = document.getElementById('zip_file');
-                const githubUrlInput = document.getElementById('github_url');
                 
                 slugField.style.display = 'none';
                 zipField.style.display = 'none';
-                githubUrlField.style.display = 'none';
-                githubTokenField.style.display = 'none';
-                
                 slugInput.required = false;
-                zipInput.required = false;
-                githubUrlInput.required = false;
                 
                 if (type === 'wporg') {
                     slugField.style.display = 'block';
                     slugInput.required = true;
                 } else if (type === 'zip') {
                     zipField.style.display = 'block';
-                    zipInput.required = true;
-                } else if (type === 'github') {
-                    githubUrlField.style.display = 'block';
-                    githubTokenField.style.display = 'block';
-                    githubUrlInput.required = true;
                 }
             }
             
