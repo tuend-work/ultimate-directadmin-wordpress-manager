@@ -62,6 +62,85 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
     $file = $_GET['file'] ?? '';
     $file = basename($file);
     $file_path = UPLOAD_DIR . '/' . $file;
+    
+    // Check if this file belongs to a GitHub item to redownload the latest version first
+    $list = get_store_list();
+    $gh_item = null;
+    foreach (['plugins', 'themes'] as $item_type) {
+        if (!empty($list[$item_type])) {
+            foreach ($list[$item_type] as $item) {
+                if (isset($item['file']) && $item['file'] === $file && isset($item['github_url'])) {
+                    $gh_item = $item;
+                    break 2;
+                }
+            }
+        }
+    }
+    
+    if ($gh_item) {
+        try {
+            $github_url = $gh_item['github_url'];
+            $github_token = $gh_item['github_token'] ?? '';
+            
+            $path = parse_url($github_url, PHP_URL_PATH);
+            $path = trim($path, '/');
+            $parts = explode('/', $path);
+            
+            if (count($parts) >= 2) {
+                $owner = $parts[0];
+                $repo = $parts[1];
+                if (str_ends_with($repo, '.git')) {
+                    $repo = substr($repo, 0, -4);
+                }
+                
+                $ref = '';
+                if (count($parts) >= 4 && $parts[2] === 'tree') {
+                    $ref = implode('/', array_slice($parts, 3));
+                }
+                
+                $api_url = "https://api.github.com/repos/{$owner}/{$repo}/zipball" . ($ref ? "/{$ref}" : "");
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $api_url);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Ultimate-WordPress-Manager-Store');
+                curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+                
+                $headers = [
+                    'Accept: application/vnd.github+json',
+                    'X-GitHub-Api-Version: 2022-11-28'
+                ];
+                
+                if ($github_token) {
+                    $headers[] = 'Authorization: Bearer ' . $github_token;
+                }
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+                
+                $temp_file = tempnam(sys_get_temp_dir(), 'gh_zip_dl');
+                $fp = fopen($temp_file, 'w+');
+                curl_setopt($ch, CURLOPT_FILE, $fp);
+                
+                curl_exec($ch);
+                $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                fclose($fp);
+                
+                if ($http_code === 200 && filesize($temp_file) >= 100) {
+                    if (file_exists($file_path)) {
+                        @unlink($file_path);
+                    }
+                    rename($temp_file, $file_path);
+                    @chmod($file_path, 0644);
+                } else {
+                    @unlink($temp_file);
+                }
+            }
+        } catch (Exception $e) {
+            // Fallback to existing file if download fails
+        }
+    }
+    
     if ($file && file_exists($file_path)) {
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -190,6 +269,10 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['act
                 @chmod($dest, 0644);
                 $new_item['file'] = $filename;
                 $new_item['type'] = 'zip'; // Register as zip type
+                $new_item['github_url'] = $github_url;
+                if ($github_token) {
+                    $new_item['github_token'] = $github_token;
+                }
             } else {
                 @unlink($temp_file);
                 throw new Exception("Không thể lưu trữ tệp ZIP vào thư mục store.");
