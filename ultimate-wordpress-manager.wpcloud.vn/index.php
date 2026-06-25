@@ -856,7 +856,7 @@ $list_data = get_store_list();
                                     <option value="plugins">🔌 Plugin</option>
                                     <option value="themes">🎨 Theme</option>
                                 </select>
-                             </div>
+                            </div>
 
                              <div class="form-group">
                                 <label for="type">Nguồn cài đặt</label>
