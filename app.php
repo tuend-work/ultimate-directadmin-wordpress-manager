@@ -4910,6 +4910,23 @@ function run_api() {
                     if ($cleanup_zip) {
                         @unlink($temp_zip);
                     }
+
+                    // Rename GitHub's username-repo-commit folder style to the expected slug folder name
+                    if ($item_source !== 'wporg') {
+                        $expected_folder_name = basename($_POST['file'], '.zip');
+                        if (!empty($expected_folder_name) && $folder_name !== $expected_folder_name) {
+                            $old_path = $target_dir . '/' . $folder_name;
+                            $new_path = $target_dir . '/' . $expected_folder_name;
+                            if (is_dir($old_path)) {
+                                if (is_dir($new_path)) {
+                                    rmdir_recursive($new_path);
+                                }
+                                if (@rename($old_path, $new_path)) {
+                                    $folder_name = $expected_folder_name;
+                                }
+                            }
+                        }
+                    }
                 } else {
                     if ($cleanup_zip) {
                         @unlink($temp_zip);
