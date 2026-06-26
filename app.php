@@ -4913,7 +4913,22 @@ function run_api() {
 
                     // Rename GitHub's username-repo-commit folder style to the expected slug folder name
                     if ($item_source !== 'wporg') {
-                        $expected_folder_name = basename($_POST['file'], '.zip');
+                        $expected_folder_name = '';
+                        if ($item_type === 'plugins') {
+                            $main_file = find_plugin_main_file($target_dir, $folder_name);
+                            if ($main_file) {
+                                $expected_folder_name = basename($main_file, '.php');
+                            }
+                        }
+                        
+                        if (empty($expected_folder_name)) {
+                            // Fallback / Theme logic: clean the folder name from prefixes and suffixes
+                            $expected_folder_name = $folder_name;
+                            $expected_folder_name = preg_replace('/^\d+_/', '', $expected_folder_name);
+                            $expected_folder_name = preg_replace('/-(main|master|heads|dev)$/i', '', $expected_folder_name);
+                            $expected_folder_name = preg_replace('/-[a-f0-9]{7,40}$/i', '', $expected_folder_name);
+                        }
+
                         if (!empty($expected_folder_name) && $folder_name !== $expected_folder_name) {
                             $old_path = $target_dir . '/' . $folder_name;
                             $new_path = $target_dir . '/' . $expected_folder_name;
