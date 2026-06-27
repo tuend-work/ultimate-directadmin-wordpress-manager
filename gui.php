@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.5.7';
+$plugin_version = '1.5.8';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -847,9 +847,14 @@ input:disabled + .slider {
         <a href="/" class="btn btn-sm btn-secondary" style="font-size:13px;padding:2px 8px;border-radius:4px;height:22px;display:inline-flex;align-items:center;gap:4px;border-color:var(--border);"><span class="dashicons dashicons-arrow-left-alt2 wp-admin-icon"></span> Back to DirectAdmin</a>
     </span>
     <div class="user">
-        <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> <?php echo htmlspecialchars($username); ?></span>
+        <span class="dashicons dashicons-admin-users wp-admin-icon"></span>
         <?php if ($isAdmin): ?>
-        <span class="badge badge-yellow" style="font-size:13px;">Admin</span>
+        <select id="active-user-select" class="form-control" style="width: auto; height: 28px; padding: 2px 6px; font-size: 14px; background: var(--bg3); border-color: var(--border); color: var(--text); border-radius: 4px; outline: none; margin-right: 6px;" onchange="onActiveUserChange()">
+            <option value="<?php echo htmlspecialchars($username); ?>"><?php echo htmlspecialchars($username); ?> (Current)</option>
+        </select>
+        <span class="badge badge-yellow" style="font-size:13px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px;">Admin</span>
+        <?php else: ?>
+        <span><?php echo htmlspecialchars($username); ?></span>
         <?php endif; ?>
     </div>
 </div>
@@ -941,14 +946,14 @@ input:disabled + .slider {
                 <div class="form-group">
                     <label>DB Name</label>
                     <div class="input-group">
-                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <span class="input-prefix" id="inst-dbname-prefix"><?php echo htmlspecialchars($username); ?>_</span>
                         <input type="text" id="inst-dbname" class="form-control" placeholder="wp1" required maxlength="16">
                     </div>
                 </div>
                 <div class="form-group">
                     <label>DB User</label>
                     <div class="input-group">
-                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <span class="input-prefix" id="inst-dbuser-prefix"><?php echo htmlspecialchars($username); ?>_</span>
                         <input type="text" id="inst-dbuser" class="form-control" placeholder="wpuser" required maxlength="16">
                     </div>
                 </div>
@@ -1016,6 +1021,14 @@ input:disabled + .slider {
 
         <div class="form-section">
             <div class="form-section-title">Target Website Location</div>
+            <?php if ($isAdmin): ?>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Target User (Admin only)</label>
+                <select id="clone-target-user" class="form-control" onchange="onCloneTargetUserChange()">
+                    <!-- Will be populated dynamically with users -->
+                </select>
+            </div>
+            <?php endif; ?>
             <div style="display: grid; grid-template-columns: 1.2fr 3fr 2fr; gap: 12px;">
                 <div class="form-group">
                     <label>Protocol</label>
@@ -1043,14 +1056,14 @@ input:disabled + .slider {
                 <div class="form-group">
                     <label>DB Name</label>
                     <div class="input-group">
-                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <span class="input-prefix" id="clone-dbname-prefix"><?php echo htmlspecialchars($username); ?>_</span>
                         <input type="text" id="clone-dbname" class="form-control" placeholder="wpclone" required maxlength="16">
                     </div>
                 </div>
                 <div class="form-group">
                     <label>DB User</label>
                     <div class="input-group">
-                        <span class="input-prefix"><?php echo htmlspecialchars($username); ?>_</span>
+                        <span class="input-prefix" id="clone-dbuser-prefix"><?php echo htmlspecialchars($username); ?>_</span>
                         <input type="text" id="clone-dbuser" class="form-control" placeholder="wpcloneuser" required maxlength="16">
                     </div>
                 </div>
@@ -1139,6 +1152,7 @@ input:disabled + .slider {
 <script>
 const DA_USER = '<?php echo $username; ?>';
 const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+let activeUser = isAdmin ? DA_USER : '';
 let allSites = [];
 let deletePath = '', deleteDb = '';
 
@@ -1152,7 +1166,11 @@ const apiUrl = (action='') => {
     let b = window.location.pathname.split('?')[0];
     if (b.endsWith('.html') || b.endsWith('.raw')) b = b.substring(0, b.lastIndexOf('/')+1);
     else if (!b.endsWith('/')) b += '/';
-    return b + 'index.raw' + (action ? '?action='+action : '');
+    let url = b + 'index.raw' + (action ? '?action='+action : '');
+    if (isAdmin && activeUser) {
+        url += (action ? '&' : '?') + 'target_user=' + encodeURIComponent(activeUser);
+    }
+    return url;
 };
 
 /* ─── Toast ─── */
@@ -3520,9 +3538,13 @@ async function loadDomains() {
     } catch { toast('Failed to load domains.', 'error'); }
 }
 
-async function fetchSubdomains(domain) {
+async function fetchSubdomains(domain, targetUser = '') {
     try {
-        const r = await fetch('/CMD_API_SUBDOMAINS?json=yes&domain='+encodeURIComponent(domain));
+        let url = '/CMD_API_SUBDOMAINS?json=yes&domain='+encodeURIComponent(domain);
+        if (isAdmin && targetUser) {
+            url += '&user=' + encodeURIComponent(targetUser);
+        }
+        const r = await fetch(url);
         const ct = r.headers.get('content-type')||'';
         if (ct.includes('application/json')) {
             const d = await r.json();
@@ -3593,13 +3615,18 @@ function openInstallModal() {
 }
 
 /* ─── Install: create DB + install WP ─── */
-async function createDB(name, user, pass) {
-    const p = new URLSearchParams({action:'create',name,user,passwd:pass,passwd2:pass});
+async function createDB(name, user, pass, targetUser = '') {
+    const params = {action:'create',name,user,passwd:pass,passwd2:pass};
+    if (isAdmin && targetUser) {
+        params.user = targetUser;
+    }
+    const p = new URLSearchParams(params);
     const r = await fetch('/CMD_API_DATABASES',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
     const text = await r.text();
     const q = new URLSearchParams(text);
     if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
-    return { db_name: q.get('db')||(DA_USER+'_'+name), db_user: q.get('user')||(DA_USER+'_'+user) };
+    const prefix = targetUser || DA_USER;
+    return { db_name: q.get('db')||(prefix+'_'+name), db_user: q.get('user')||(prefix+'_'+user) };
 }
 
 async function executeInstall(e) {
@@ -3665,18 +3692,24 @@ async function executeInstall(e) {
 }
 
 /* ─── Clone Website Handlers ─── */
-async function loadCloneDomains() {
+async function loadCloneDomains(targetUser = '') {
     const sel = document.getElementById('clone-domain');
     sel.innerHTML = '<option value="" disabled selected>Loading…</option>';
     try {
-        const r = await fetch(apiUrl('get_domains'));
+        let url = apiUrl('get_domains');
+        if (isAdmin && targetUser) {
+            const u = new URL(url, window.location.href);
+            u.searchParams.set('target_user', targetUser);
+            url = u.pathname + u.search + u.hash;
+        }
+        const r = await fetch(url);
         const d = await r.json();
         sel.innerHTML = '<option value="" disabled selected>Select domain…</option>';
         if (d.success && d.domains.length) {
             for (const dom of d.domains) {
                 const o = document.createElement('option'); o.value=dom; o.textContent=dom;
                 sel.appendChild(o);
-                const subs = await fetchSubdomains(dom);
+                const subs = await fetchSubdomains(dom, targetUser);
                 subs.forEach(sub => {
                     const s = document.createElement('option');
                     const full = sub+'.'+dom;
@@ -3693,7 +3726,19 @@ function openCloneModal(i) {
     document.getElementById('clone-src-path').value = s.path;
     document.getElementById('clone-src-display').textContent = s.path;
     openModal('modal-clone');
-    loadCloneDomains();
+    
+    // Reset clone target user dropdown to activeUser
+    const cloneSelectEl = document.getElementById('clone-target-user');
+    if (cloneSelectEl) {
+        cloneSelectEl.value = activeUser;
+    }
+    
+    // Update db prefix display
+    const dbPrefix = activeUser + '_';
+    document.getElementById('clone-dbname-prefix').textContent = dbPrefix;
+    document.getElementById('clone-dbuser-prefix').textContent = dbPrefix;
+    
+    loadCloneDomains(activeUser);
     genPass('clone-dbpass');
     
     // Suggest target database details
@@ -3707,10 +3752,12 @@ async function executeClone(e) {
     const btn = document.getElementById('btn-clone-submit');
     btn.disabled = true; btn.textContent = 'Creating database…';
     try {
+        const targetUser = isAdmin && document.getElementById('clone-target-user') ? document.getElementById('clone-target-user').value : '';
         const db = await createDB(
             document.getElementById('clone-dbname').value,
             document.getElementById('clone-dbuser').value,
-            document.getElementById('clone-dbpass').value
+            document.getElementById('clone-dbpass').value,
+            targetUser
         );
         toast('1/2 Target Database created.', 'success');
         
@@ -3725,8 +3772,19 @@ async function executeClone(e) {
         fd.append('db_user', db.db_user);
         fd.append('db_pass', document.getElementById('clone-dbpass').value);
         fd.append('protocol', document.getElementById('clone-protocol').value);
+        if (targetUser) {
+            fd.append('target_user', targetUser);
+        }
         
-        const r = await fetch(apiUrl(), {
+        // Append target_user to API URL too
+        let url = apiUrl();
+        if (isAdmin && targetUser) {
+            const u = new URL(url, window.location.href);
+            u.searchParams.set('target_user', targetUser);
+            url = u.pathname + u.search + u.hash;
+        }
+        
+        const r = await fetch(url, {
             method: 'POST',
             body: fd
         });
@@ -3852,9 +3910,64 @@ async function refreshLogs() {
     txt.scrollTop = txt.scrollHeight;
 }
 
+/* ─── Admin Users Switching ─── */
+function onActiveUserChange() {
+    activeUser = document.getElementById('active-user-select').value;
+    const instDbnamePrefix = document.getElementById('inst-dbname-prefix');
+    if (instDbnamePrefix) instDbnamePrefix.textContent = activeUser + '_';
+    const instDbuserPrefix = document.getElementById('inst-dbuser-prefix');
+    if (instDbuserPrefix) instDbuserPrefix.textContent = activeUser + '_';
+    fetchSites(false);
+}
+
+function onCloneTargetUserChange() {
+    const targetUser = document.getElementById('clone-target-user').value;
+    document.getElementById('clone-dbname-prefix').textContent = targetUser + '_';
+    document.getElementById('clone-dbuser-prefix').textContent = targetUser + '_';
+    loadCloneDomains(targetUser);
+}
+
+async function loadAdminUsers() {
+    try {
+        const r = await fetch(apiUrl('get_users'));
+        const d = await r.json();
+        if (d.success && d.users.length) {
+            const selectEl = document.getElementById('active-user-select');
+            const cloneSelectEl = document.getElementById('clone-target-user');
+            
+            selectEl.innerHTML = '';
+            if (cloneSelectEl) cloneSelectEl.innerHTML = '';
+            
+            d.users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u;
+                opt.textContent = u === DA_USER ? u + ' (Current)' : u;
+                selectEl.appendChild(opt);
+                
+                if (cloneSelectEl) {
+                    const optClone = document.createElement('option');
+                    optClone.value = u;
+                    optClone.textContent = u;
+                    cloneSelectEl.appendChild(optClone);
+                }
+            });
+            
+            selectEl.value = activeUser;
+            if (cloneSelectEl) {
+                cloneSelectEl.value = activeUser;
+            }
+        }
+    } catch (err) {
+        console.error('Failed to load users', err);
+    }
+}
+
 /* ─── Init ─── */
 window.addEventListener('DOMContentLoaded', () => {
     fetchSites(false);
+    if (isAdmin) {
+        loadAdminUsers();
+    }
     // Hide DirectAdmin's injected plugin header (same-origin iframe)
     try {
         const hdr = window.parent.document.getElementById('plugin-host-header');

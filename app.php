@@ -40,6 +40,38 @@ function is_admin_user() {
 }
 
 /**
+ * Get all DirectAdmin users on the server
+ */
+function get_all_directadmin_users() {
+    $users = [];
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        return ['local_user', 'userA', 'userB'];
+    }
+    // Try to list /usr/local/directadmin/data/users/
+    $da_users_dir = '/usr/local/directadmin/data/users';
+    if (is_dir($da_users_dir)) {
+        $dirs = array_diff(scandir($da_users_dir), ['.', '..']);
+        foreach ($dirs as $d) {
+            if (is_dir($da_users_dir . '/' . $d)) {
+                $users[] = $d;
+            }
+        }
+    }
+    // Fallback: list directories in /home
+    if (empty($users) && is_dir('/home')) {
+        $dirs = array_diff(scandir('/home'), ['.', '..']);
+        foreach ($dirs as $d) {
+            if (is_dir('/home/' . $d . '/domains')) {
+                $users[] = $d;
+            }
+        }
+    }
+    sort($users);
+    return $users;
+}
+
+
+/**
  * Recursively remove directories and files
  */
 function rmdir_recursive($dir, $keep_root = false) {
@@ -3171,6 +3203,13 @@ function clone_wordpress_instance($params, $home) {
         wp_manager_log("Search and replace failed: " . $e->getMessage());
     }
     
+    // If running as root (or if is_admin_user() is true), fix ownership of target directory to target user
+    if (is_admin_user() || (function_exists('getmyuid') && getmyuid() === 0)) {
+        $tgt_user = basename($home);
+        $chown_cmd = sprintf('chown -R %s:%s %s', escapeshellarg($tgt_user), escapeshellarg($tgt_user), escapeshellarg($target_dir));
+        @exec($chown_cmd);
+    }
+    
     return [
         'success' => true,
         'siteurl' => $new_siteurl,
@@ -4278,10 +4317,28 @@ function run_api() {
         $home = 'C:/Users/local_user';
     }
     
+    // Override target user if executing user is administrator
+    $target_user_input = $_GET['target_user'] ?? $_POST['target_user'] ?? '';
+    if (is_admin_user() && !empty($target_user_input)) {
+        $username = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
+        $home = "/home/{$username}";
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $home = 'C:/Users/' . $username;
+        }
+    }
+    
     $action = $_GET['action'] ?? $_POST['action'] ?? '';
     
     try {
         switch ($action) {
+            case 'get_users':
+                if (!is_admin_user()) {
+                    throw new Exception("Forbidden: Access restricted to Administrators.");
+                }
+                $users = get_all_directadmin_users();
+                echo json_encode(['success' => true, 'users' => $users]);
+                break;
+                
             case 'get_domains':
                 $domains_dir = $home . '/domains';
                 $domains = [];
@@ -4345,8 +4402,16 @@ function run_api() {
                         throw new Exception("Required parameter missing: {$field}");
                     }
                 }
-                if (strpos(realpath($_POST['src_path']) ?: $_POST['src_path'], $home) !== 0) {
-                    throw new Exception("Invalid source directory access.");
+                $src_real = realpath($_POST['src_path']) ?: $_POST['src_path'];
+                if (is_admin_user()) {
+                    $allowed_root = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'C:/Users' : '/home';
+                    if (strpos($src_real, $allowed_root) !== 0) {
+                        throw new Exception("Invalid source directory access.");
+                    }
+                } else {
+                    if (strpos($src_real, $home) !== 0) {
+                        throw new Exception("Invalid source directory access.");
+                    }
                 }
                 wp_manager_log("Bắt đầu clone WordPress từ " . $_POST['src_path'] . " sang tên miền: " . $_POST['domain']);
                 $res = clone_wordpress_instance($_POST, $home);
