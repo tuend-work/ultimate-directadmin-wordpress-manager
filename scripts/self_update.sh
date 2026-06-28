@@ -86,7 +86,7 @@ if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
 
     COMPILED=0
     if [ -n "$GCC_BIN" ]; then
-        if cd "$PLUGIN_DIR/scripts" && "$GCC_BIN" -O2 wrapper.c -o wrapper.update.tmp 2>/dev/null; then
+        if cd "$PLUGIN_DIR/scripts" && "$GCC_BIN" -O2 wrapper.c -o wrapper.update.tmp; then
             chown root:diradmin "$PLUGIN_DIR/scripts/wrapper.update.tmp"
             chmod 4755 "$PLUGIN_DIR/scripts/wrapper.update.tmp"
             mv -f "$PLUGIN_DIR/scripts/wrapper.update.tmp" "$PLUGIN_DIR/scripts/wrapper"
