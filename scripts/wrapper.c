@@ -46,14 +46,13 @@ int main(int argc, char *argv[]) {
 
     const char *action = argv[1];
 
-    // 3. Handle 'update' early — only needs 1 arg (the action itself)
     if (strcmp(action, "update") == 0) {
         const char *update_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/self_update.sh";
         if (access(update_sh, X_OK) != 0) {
             fprintf(stderr, "Error: self_update.sh not found or not executable at %s\n", update_sh);
             return 1;
         }
-        execl("/bin/bash", "bash", update_sh, NULL);
+        execl("/bin/bash", "bash", "-p", update_sh, NULL);
         perror("Error: execl failed");
         return 1;
     }
