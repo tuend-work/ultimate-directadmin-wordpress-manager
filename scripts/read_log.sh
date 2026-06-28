@@ -28,6 +28,22 @@ if [[ "$DOMAIN" == run-as.* ]]; then
     exit 0
 fi
 
+# Intercept root delegation requests (e.g. for cloning)
+if [[ "$DOMAIN" == run-as-root.* ]]; then
+    TARGET_USER="$USER"
+    TARGET_SCRIPT="/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw"
+    
+    # Run the php script directly as root without dropping privileges
+    export USERNAME="$TARGET_USER"
+    export USER="$TARGET_USER"
+    export HOME="/home/$TARGET_USER"
+    export QUERY_STRING="$QUERY_STRING"
+    export POST="$POST"
+    
+    /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini "$TARGET_SCRIPT"
+    exit 0
+fi
+
 if [ -z "$USER" ] || [ -z "$DOMAIN" ] || [ -z "$LOG_TYPE" ] || [ -z "$LINES" ]; then
     echo "Error: Missing arguments."
     exit 1

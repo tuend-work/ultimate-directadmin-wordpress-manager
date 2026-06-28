@@ -4336,7 +4336,7 @@ function run_api() {
     // Delegation logic for admin impersonation
     $current_exec_user = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
-    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin' && $action !== 'clone') {
+    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin') {
         $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
         $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
         if (!file_exists($wrapper)) {
@@ -4355,8 +4355,9 @@ function run_api() {
             );
             
             // Execute the user panel raw entry point as the target user using SUID read_log bypass.
-            // We pass "run-as.{$target_user_clean}" as the domain parameter to pass strict C wrapper validations.
-            $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("run-as.{$target_user_clean}") . " access 100 2>&1";
+            // If action is clone, we run as root (run-as-root) to bypass cross-user file read boundaries.
+            $prefix = ($action === 'clone') ? 'run-as-root' : 'run-as';
+            $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("{$prefix}.{$target_user_clean}") . " access 100 2>&1";
             
             $output = [];
             $retval = null;
@@ -4456,7 +4457,8 @@ function run_api() {
                     }
                 }
                 $src_real = realpath($_POST['src_path']) ?: $_POST['src_path'];
-                if (is_admin_user()) {
+                $is_root = (function_exists('posix_getuid') && posix_getuid() === 0) || (getenv('USER') === 'root') || (getenv('USERNAME') === 'root');
+                if (is_admin_user() || $is_root) {
                     $allowed_root = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'C:/Users' : '/home';
                     if (strpos($src_real, $allowed_root) !== 0) {
                         throw new Exception("Invalid source directory access.");
