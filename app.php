@@ -5480,82 +5480,88 @@ function find_plugin_main_file($plugins_dir, $folder_name) {
 }
 
 function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
-    $api_url_output = '';
-    $out1 = [];
-    $code1 = 0;
-    @exec('/usr/local/bin/da api-url 2>&1', $out1, $code1);
-    if ($code1 === 0 && !empty($out1)) {
-        $api_url_output = trim($out1[0]);
-    } else {
-        $out2 = [];
-        $code2 = 0;
-        @exec('/usr/local/directadmin/directadmin api-url 2>&1', $out2, $code2);
-        if ($code2 === 0 && !empty($out2)) {
-            $api_url_output = trim($out2[0]);
+    // Step 1: Read MySQL admin credentials from DirectAdmin config
+    $mysql_conf = '/usr/local/directadmin/conf/mysql.conf';
+    if (!file_exists($mysql_conf) || !is_readable($mysql_conf)) {
+        throw new Exception("Cannot read DirectAdmin MySQL config: $mysql_conf");
+    }
+    
+    $mysql_creds = [];
+    foreach (file($mysql_conf, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (strpos($line, '=') !== false) {
+            [$k, $v] = explode('=', $line, 2);
+            $mysql_creds[trim($k)] = trim($v);
         }
     }
     
-    if (empty($api_url_output)) {
-        throw new Exception("Failed to generate DirectAdmin API URL locally.");
+    $mysql_host = $mysql_creds['host'] ?? '127.0.0.1';
+    $mysql_admin = $mysql_creds['user'] ?? 'da_admin';
+    $mysql_admin_pass = $mysql_creds['passwd'] ?? '';
+    
+    if (empty($mysql_admin_pass)) {
+        throw new Exception("Empty MySQL admin password in DirectAdmin config.");
     }
     
-    $admin_user = 'key';
-    $login_key = '';
+    // Step 2: Build full prefixed names (DA always prefixes with username)
+    $full_db   = $targetUser . '_' . $dbname;
+    $full_user = $targetUser . '_' . $dbuser;
     
-    $parsed = parse_url($api_url_output);
-    if ($parsed) {
-        if (!empty($parsed['user']) && !empty($parsed['pass'])) {
-            $admin_user = $parsed['user'];
-            $login_key = $parsed['pass'];
-        } elseif (!empty($parsed['query'])) {
-            parse_str($parsed['query'], $query_params);
-            if (!empty($query_params['key'])) {
-                $admin_user = 'key';
-                $login_key = $query_params['key'];
+    // Escape for shell — passwords may contain special chars
+    $esc_admin_pass = escapeshellarg($mysql_admin_pass);
+    $esc_db         = escapeshellarg($full_db);
+    $esc_user       = escapeshellarg($full_user);
+    $esc_pass       = escapeshellarg($dbpass);
+    $esc_host       = escapeshellarg($mysql_host);
+    $mysql_bin      = file_exists('/usr/bin/mariadb') ? '/usr/bin/mariadb' : 'mysql';
+    $mysql_cmd      = "$mysql_bin -h $esc_host -u " . escapeshellarg($mysql_admin) . " -p$esc_admin_pass";
+    
+    // Step 3: Create database
+    $sql_create_db = "CREATE DATABASE IF NOT EXISTS \`{$full_db}\`;";
+    exec("$mysql_cmd -e " . escapeshellarg($sql_create_db) . " 2>&1", $out_db, $code_db);
+    if ($code_db !== 0) {
+        throw new Exception("Failed to create database '{$full_db}': " . implode(' ', $out_db));
+    }
+    
+    // Step 4: Create MySQL user and grant privileges
+    $sql_create_user = "CREATE USER IF NOT EXISTS '{$full_user}'@'localhost' IDENTIFIED BY '{$dbpass}';";
+    $sql_grant       = "GRANT ALL PRIVILEGES ON \`{$full_db}\`.* TO '{$full_user}'@'localhost';";
+    $sql_flush       = "FLUSH PRIVILEGES;";
+    exec("$mysql_cmd -e " . escapeshellarg($sql_create_user . ' ' . $sql_grant . ' ' . $sql_flush) . " 2>&1", $out_user, $code_user);
+    if ($code_user !== 0) {
+        throw new Exception("Failed to create MySQL user '{$full_user}': " . implode(' ', $out_user));
+    }
+    
+    // Step 5: Register database with DirectAdmin by updating user's config files
+    $da_user_dir  = "/usr/local/directadmin/data/users/{$targetUser}";
+    $db_list_file = "{$da_user_dir}/databases.list";
+    $db_conf_file = "{$da_user_dir}/databases.conf";
+    
+    if (is_dir($da_user_dir)) {
+        // Append to databases.list (one db per line)
+        if (file_exists($db_list_file)) {
+            $existing = file($db_list_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (!in_array($full_db, $existing)) {
+                file_put_contents($db_list_file, $full_db . "\n", FILE_APPEND | LOCK_EX);
             }
-        }
-    }
-    
-    if (empty($login_key)) {
-        if (preg_match('/key=([a-zA-Z0-9_-]+)/', $api_url_output, $matches)) {
-            $admin_user = 'key';
-            $login_key = $matches[1];
         } else {
-            throw new Exception("Failed to parse temporary API credentials from: " . $api_url_output);
+            file_put_contents($db_list_file, $full_db . "\n", LOCK_EX);
+        }
+        
+        // Append to databases.conf (format: db_name=db_user)
+        if (file_exists($db_conf_file)) {
+            $existing_conf = file_get_contents($db_conf_file);
+            if (strpos($existing_conf, $full_db . '=') === false) {
+                file_put_contents($db_conf_file, "{$full_db}={$full_user}\n", FILE_APPEND | LOCK_EX);
+            }
+        } else {
+            file_put_contents($db_conf_file, "{$full_db}={$full_user}\n", LOCK_EX);
         }
     }
     
-    $auth_user = $admin_user . '|' . $targetUser;
-    
-    $ch = curl_init();
-    $post_fields = [
-        'action' => 'create',
-        'name' => $dbname,
-        'user' => $dbuser,
-        'passwd' => $dbpass,
-        'passwd2' => $dbpass
+    return [
+        'db'   => $full_db,
+        'user' => $full_user,
     ];
-    
-    curl_setopt($ch, CURLOPT_URL, "http://127.0.0.1:2222/CMD_API_DATABASES");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_fields));
-    curl_setopt($ch, CURLOPT_USERPWD, "$auth_user:$login_key");
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($http_code !== 200) {
-        throw new Exception("DirectAdmin API database creation failed (HTTP {$http_code}): " . $response);
-    }
-    
-    parse_str($response, $result);
-    if (isset($result['error']) && $result['error'] === '1') {
-        throw new Exception("DirectAdmin API Error: " . urldecode($result['details']));
-    }
-    
-    return $result;
 }
+
 
