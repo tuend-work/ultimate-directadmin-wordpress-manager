@@ -5535,21 +5535,36 @@ function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
         $mysql_cmd = "$mysql_bin -h " . escapeshellarg($mysql_host) . " $mysql_user_arg -p$esc_admin_pass";
     }
     
-    // Step 3: Create database
-    $sql_create_db = "CREATE DATABASE IF NOT EXISTS \`{$full_db}\`;";
-    exec("$mysql_cmd -e " . escapeshellarg($sql_create_db) . " 2>&1", $out_db, $code_db);
-    if ($code_db !== 0) {
-        throw new Exception("Failed to create database '{$full_db}': " . implode(' ', $out_db));
-    }
+    // Helper: run SQL via stdin pipe — avoids ALL shell-escaping issues
+    $run_sql = function(string $sql) use ($mysql_cmd): void {
+        $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($mysql_cmd, $desc, $pipes);
+        if (!is_resource($proc)) {
+            throw new Exception("Failed to open MySQL process.");
+        }
+        fwrite($pipes[0], $sql);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        if ($code !== 0) {
+            throw new Exception(trim($stderr ?: $stdout));
+        }
+    };
+    
+    // Step 3: Create database (no backtick needed — name is safe alphanumeric+underscore)
+    $run_sql("CREATE DATABASE IF NOT EXISTS {$full_db};");
     
     // Step 4: Create MySQL user and grant privileges
-    $sql_create_user = "CREATE USER IF NOT EXISTS '{$full_user}'@'localhost' IDENTIFIED BY '{$dbpass}';";
-    $sql_grant       = "GRANT ALL PRIVILEGES ON \`{$full_db}\`.* TO '{$full_user}'@'localhost';";
-    $sql_flush       = "FLUSH PRIVILEGES;";
-    exec("$mysql_cmd -e " . escapeshellarg($sql_create_user . ' ' . $sql_grant . ' ' . $sql_flush) . " 2>&1", $out_user, $code_user);
-    if ($code_user !== 0) {
-        throw new Exception("Failed to create MySQL user '{$full_user}': " . implode(' ', $out_user));
-    }
+    // Escape password value for SQL (not shell) — replace ' with \'
+    $sql_safe_pass = str_replace("'", "\\'", $dbpass);
+    $run_sql(
+        "CREATE USER IF NOT EXISTS '{$full_user}'@'localhost' IDENTIFIED BY '{$sql_safe_pass}';" .
+        " GRANT ALL PRIVILEGES ON {$full_db}.* TO '{$full_user}'@'localhost';" .
+        " FLUSH PRIVILEGES;"
+    );
     
     // Step 5: Register database with DirectAdmin by updating user's config files
     $da_user_dir  = "/usr/local/directadmin/data/users/{$targetUser}";
