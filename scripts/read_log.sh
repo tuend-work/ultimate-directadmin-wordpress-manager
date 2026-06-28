@@ -10,12 +10,6 @@ DOMAIN=$2
 LOG_TYPE=$3  # access hoặc error
 LINES=$4
 
-# Forward delegation bypass requests to delegate.sh
-if [[ "$DOMAIN" == run-as.* ]] || [[ "$DOMAIN" == run-as-root.* ]]; then
-    /bin/bash /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/delegate.sh "$@"
-    exit 0
-fi
-
 if [ -z "$USER" ] || [ -z "$DOMAIN" ] || [ -z "$LOG_TYPE" ] || [ -z "$LINES" ]; then
     echo "Error: Missing arguments."
     exit 1
