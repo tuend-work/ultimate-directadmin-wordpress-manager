@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.7.6';
+$plugin_version = '1.7.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3619,10 +3619,11 @@ async function createDB(name, user, pass, targetUser = '') {
     const params = {action:'create',name,user,passwd:pass,passwd2:pass};
     const p = new URLSearchParams(params);
     let url = '/CMD_API_DATABASES';
+    const headers = {'Content-Type':'application/x-www-form-urlencoded'};
     if (isAdmin && targetUser) {
-        url += '?user=' + encodeURIComponent(targetUser);
+        headers['X-DirectAdmin-User'] = targetUser;
     }
-    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
+    const r = await fetch(url,{method:'POST',headers:headers,body:p.toString()});
     const text = await r.text();
     const q = new URLSearchParams(text);
     if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
