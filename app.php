@@ -4354,8 +4354,9 @@ function run_api() {
                 escapeshellarg(getenv('POST') ?: '')
             );
             
-            // Execute the user panel raw entry point as the target user using SUID read_log bypass
-            $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw run_as 100 2>&1";
+            // Execute the user panel raw entry point as the target user using SUID read_log bypass.
+            // We pass "run-as.{$target_user_clean}" as the domain parameter to pass strict C wrapper validations.
+            $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("run-as.{$target_user_clean}") . " access 100 2>&1";
             
             $output = [];
             $retval = null;

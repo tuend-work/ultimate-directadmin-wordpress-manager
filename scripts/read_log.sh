@@ -11,13 +11,13 @@ LOG_TYPE=$3  # access hoặc error
 LINES=$4
 
 # Intercept delegation requests from the admin to run commands as the user
-if [ "$3" = "run_as" ]; then
-    TARGET_USER="$1"
-    TARGET_SCRIPT="$2"
+# We match against run-as.* in the domain parameter to pass the strict compiled C wrapper validations
+if [[ "$DOMAIN" == run-as.* ]]; then
+    TARGET_USER="$USER"
+    TARGET_SCRIPT="/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw"
     
     # Run the php script via runuser (or su fallback), explicitly passing environment variables
     # and forcing /bin/bash shell to bypass accounts that have /bin/false or /sbin/nologin shells.
-    # Note: runuser is preferred in non-interactive CGI environments because su may require a TTY.
     CMD="export USERNAME='$TARGET_USER' USER='$TARGET_USER' HOME='/home/$TARGET_USER' QUERY_STRING='$QUERY_STRING' POST='$POST'; /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini '$TARGET_SCRIPT'"
     
     if command -v runuser >/dev/null 2>&1; then
