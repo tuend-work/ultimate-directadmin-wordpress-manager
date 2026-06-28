@@ -4367,12 +4367,6 @@ function run_api() {
                 ob_end_clean();
             }
             
-            // Print DirectAdmin headers (required)
-            echo "HTTP/1.1 200 OK\r\n";
-            echo "Content-Type: application/json; charset=utf-8\r\n";
-            echo "Access-Control-Allow-Origin: *\r\n";
-            echo "\r\n";
-            
             // Find the JSON response starting from the output (skip shebang or warnings if any)
             $output_str = implode("\n", $output);
             $json_start = strpos($output_str, '{');
