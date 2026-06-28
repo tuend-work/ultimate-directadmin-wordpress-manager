@@ -32,6 +32,20 @@ if ($POST_STRING != "") {
 }
 
 /**
+ * Generate a cryptographically secure random string for WordPress keys/salts
+ */
+function wp_generate_random_secret(int $length = 64): string {
+    $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_ []{}<>~`+=,.;:/?|';
+    $chars_len = strlen($chars);
+    $secret = '';
+    $bytes = random_bytes($length);
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $chars[ord($bytes[$i]) % $chars_len];
+    }
+    return $secret;
+}
+
+/**
  * Determine if current executing user is administrator
  */
 function is_admin_user() {
@@ -3173,8 +3187,31 @@ function clone_wordpress_instance($params, $home) {
             $content .= $extra_defines;
         }
         
+        // Regenerate all WordPress security keys & salts to prevent session/cache
+        // collisions between the cloned site and the original site
+        $wp_security_keys = [
+            'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY',
+            'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT',
+            'WP_CACHE_KEY_SALT',
+        ];
+        foreach ($wp_security_keys as $key_name) {
+            $new_value = wp_generate_random_secret(64);
+            // Replace existing define if present
+            $pattern = "/define\s*\(\s*['\"]" . preg_quote($key_name, '/') . "['\"]\s*,\s*'[^']*'\s*\)\s*;/";
+            $replacement = "define('" . $key_name . "', '" . addslashes($new_value) . "');";
+            if (preg_match($pattern, $content)) {
+                $content = preg_replace($pattern, $replacement, $content);
+            }
+            // Also handle double-quoted values
+            $pattern_dq = "/define\s*\(\s*['\"]" . preg_quote($key_name, '/') . "['\"]\s*,\s*\"[^\"]*\"\s*\)\s*;/";
+            if (preg_match($pattern_dq, $content)) {
+                $content = preg_replace($pattern_dq, $replacement, $content);
+            }
+        }
+        
         file_put_contents($tgt_config, $content);
         @chmod($tgt_config, 0600); // Restore secure permissions
+
     }
     
     // 5. Database search and replace
