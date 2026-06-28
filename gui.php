@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.7.7';
+$plugin_version = '1.7.8';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3620,15 +3620,27 @@ async function createDB(name, user, pass, targetUser = '') {
     const p = new URLSearchParams(params);
     let url = '/CMD_API_DATABASES';
     const headers = {'Content-Type':'application/x-www-form-urlencoded'};
+    
     if (isAdmin && targetUser) {
-        headers['X-DirectAdmin-User'] = targetUser;
+        // Temporarily switch session to the target user's context
+        await fetch('/CMD_LOGIN_AS?user=' + encodeURIComponent(targetUser));
+        await fetch('/CMD_SELECT_USERS?select=user&user=' + encodeURIComponent(targetUser));
     }
-    const r = await fetch(url,{method:'POST',headers:headers,body:p.toString()});
-    const text = await r.text();
-    const q = new URLSearchParams(text);
-    if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
-    const prefix = targetUser || DA_USER;
-    return { db_name: q.get('db')||(prefix+'_'+name), db_user: q.get('user')||(prefix+'_'+user) };
+    
+    try {
+        const r = await fetch(url,{method:'POST',headers:headers,body:p.toString()});
+        const text = await r.text();
+        const q = new URLSearchParams(text);
+        if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
+        const prefix = targetUser || DA_USER;
+        return { db_name: q.get('db')||(prefix+'_'+name), db_user: q.get('user')||(prefix+'_'+user) };
+    } finally {
+        if (isAdmin && targetUser) {
+            // Revert session back to administrator level
+            await fetch('/CMD_SELECT_USERS?select=admin');
+            await fetch('/CMD_LOGIN_AS?action=select&select=admin');
+        }
+    }
 }
 
 async function executeInstall(e) {
