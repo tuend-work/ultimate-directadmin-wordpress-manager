@@ -5494,7 +5494,7 @@ function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
         }
     }
     
-    $mysql_host = $mysql_creds['host'] ?? '127.0.0.1';
+    $mysql_host = $mysql_creds['host'] ?? 'localhost';
     $mysql_admin = $mysql_creds['user'] ?? 'da_admin';
     $mysql_admin_pass = $mysql_creds['passwd'] ?? '';
     
@@ -5506,14 +5506,34 @@ function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
     $full_db   = $targetUser . '_' . $dbname;
     $full_user = $targetUser . '_' . $dbuser;
     
-    // Escape for shell — passwords may contain special chars
+    // da_admin is typically granted on localhost via Unix socket, not TCP 127.0.0.1.
+    // If host is 127.0.0.1 or localhost, omit -h flag to force Unix socket.
+    // If a custom remote host is configured, use -h explicitly.
     $esc_admin_pass = escapeshellarg($mysql_admin_pass);
-    $esc_db         = escapeshellarg($full_db);
-    $esc_user       = escapeshellarg($full_user);
-    $esc_pass       = escapeshellarg($dbpass);
-    $esc_host       = escapeshellarg($mysql_host);
-    $mysql_bin      = file_exists('/usr/bin/mariadb') ? '/usr/bin/mariadb' : 'mysql';
-    $mysql_cmd      = "$mysql_bin -h $esc_host -u " . escapeshellarg($mysql_admin) . " -p$esc_admin_pass";
+    $mysql_bin = file_exists('/usr/bin/mariadb') ? '/usr/bin/mariadb' : 'mysql';
+    $mysql_user_arg = '-u ' . escapeshellarg($mysql_admin);
+    
+    // Find socket path — try common locations
+    $socket_paths = [
+        $mysql_creds['socket'] ?? '',
+        '/var/lib/mysql/mysql.sock',
+        '/tmp/mysql.sock',
+        '/var/run/mysqld/mysqld.sock',
+    ];
+    $socket_arg = '';
+    foreach ($socket_paths as $sp) {
+        if (!empty($sp) && file_exists($sp)) {
+            $socket_arg = '--socket=' . escapeshellarg($sp);
+            break;
+        }
+    }
+    
+    if (in_array($mysql_host, ['localhost', '127.0.0.1', '::1'], true)) {
+        // Use Unix socket — either explicit socket path or let client find default
+        $mysql_cmd = "$mysql_bin $socket_arg $mysql_user_arg -p$esc_admin_pass";
+    } else {
+        $mysql_cmd = "$mysql_bin -h " . escapeshellarg($mysql_host) . " $mysql_user_arg -p$esc_admin_pass";
+    }
     
     // Step 3: Create database
     $sql_create_db = "CREATE DATABASE IF NOT EXISTS \`{$full_db}\`;";
