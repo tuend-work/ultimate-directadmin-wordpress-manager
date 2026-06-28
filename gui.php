@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.6.6';
+$plugin_version = '1.6.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3617,11 +3617,12 @@ function openInstallModal() {
 /* ─── Install: create DB + install WP ─── */
 async function createDB(name, user, pass, targetUser = '') {
     const params = {action:'create',name,user,passwd:pass,passwd2:pass};
-    if (isAdmin && targetUser) {
-        params.user = targetUser;
-    }
     const p = new URLSearchParams(params);
-    const r = await fetch('/CMD_API_DATABASES',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
+    let url = '/CMD_API_DATABASES';
+    if (isAdmin && targetUser) {
+        url += '?user=' + encodeURIComponent(targetUser);
+    }
+    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
     const text = await r.text();
     const q = new URLSearchParams(text);
     if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
