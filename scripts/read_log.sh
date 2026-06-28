@@ -15,16 +15,11 @@ if [ "$3" = "run_as" ]; then
     TARGET_USER="$1"
     TARGET_SCRIPT="$2"
     
-    # Export inherited environment variables to make them available in php
-    export USERNAME="$TARGET_USER"
-    export USER="$TARGET_USER"
-    export HOME="/home/$TARGET_USER"
+    # Run the php script via su, explicitly passing environment variables and forcing /bin/bash shell
+    # to bypass accounts that have /bin/false or /sbin/nologin shells.
+    CMD="export USERNAME='$TARGET_USER' USER='$TARGET_USER' HOME='/home/$TARGET_USER' QUERY_STRING='$QUERY_STRING' POST='$POST'; /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini '$TARGET_SCRIPT'"
     
-    if command -v runuser >/dev/null 2>&1; then
-        runuser -u "$TARGET_USER" -- /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini "$TARGET_SCRIPT"
-    else
-        su -s /bin/bash "$TARGET_USER" -c "/usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini $TARGET_SCRIPT"
-    fi
+    su -s /bin/bash "$TARGET_USER" -c "$CMD"
     exit 0
 fi
 
