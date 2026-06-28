@@ -3873,7 +3873,10 @@ function update_plugin_from_github() {
     }
 
     $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-    $wrapper    = $plugin_dir . '/scripts/wrapper';
+    $wrapper    = $plugin_dir . '/scripts/update_wrapper';
+    if (!file_exists($wrapper) || !is_executable($wrapper)) {
+        $wrapper = $plugin_dir . '/scripts/wrapper';
+    }
     $is_win     = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
     if ($is_win) {
@@ -3890,7 +3893,7 @@ function update_plugin_from_github() {
 
         // Kiểm tra wrapper có hỗ trợ action 'update' không (tránh lỗi với bản cũ)
         $probe = shell_exec(escapeshellcmd($wrapper) . ' 2>&1');
-        if ($probe !== null && strpos($probe, 'update') === false) {
+        if ($probe !== null && strpos($wrapper, 'update_wrapper') === false && strpos($probe, 'update') === false) {
             // Wrapper cũ — chưa được recompile với action 'update'
             throw new Exception(
                 "Wrapper binary is outdated and does not support 'update' action.\n\n" .

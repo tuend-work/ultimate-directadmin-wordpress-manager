@@ -66,10 +66,12 @@ chmod 755 "$PLUGIN_DIR/user/index.html"    2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 
 # Maintain existing SUID wrapper ownership and permissions (avoiding compilation errors during web updates)
-if [ -f "$PLUGIN_DIR/scripts/wrapper" ]; then
-    chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
-    chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
-fi
+for binary in wrapper update_wrapper; do
+    if [ -f "$PLUGIN_DIR/scripts/$binary" ]; then
+        chown root:diradmin "$PLUGIN_DIR/scripts/$binary"
+        chmod 4755 "$PLUGIN_DIR/scripts/$binary"
+    fi
+done
 
 chmod 755 "$PLUGIN_DIR/scripts/read_log.sh" 2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/scripts/self_update.sh" 2>/dev/null || true
