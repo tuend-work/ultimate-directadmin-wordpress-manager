@@ -40,7 +40,13 @@ function is_admin_user() {
         $current_user = getenv('USERNAME') ?: getenv('USER');
         return ($current_user === 'admin') || (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', 'admin') !== false);
     }
-    return (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/admin/') !== false);
+    // Check script path (canonical admin path in DirectAdmin)
+    if (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/admin/') !== false) {
+        return true;
+    }
+    // Fallback: DA Access Level switcher keeps /user/ URL but CGI runs as system user 'admin'
+    $sys_user = getenv('USER') ?: getenv('USERNAME') ?: '';
+    return $sys_user === 'admin';
 }
 
 /**
