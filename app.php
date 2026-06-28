@@ -5499,13 +5499,32 @@ function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
         throw new Exception("Failed to generate DirectAdmin API URL locally.");
     }
     
+    $admin_user = 'key';
+    $login_key = '';
+    
     $parsed = parse_url($api_url_output);
-    if (!$parsed || empty($parsed['user']) || empty($parsed['pass'])) {
-        throw new Exception("Failed to parse temporary API credentials.");
+    if ($parsed) {
+        if (!empty($parsed['user']) && !empty($parsed['pass'])) {
+            $admin_user = $parsed['user'];
+            $login_key = $parsed['pass'];
+        } elseif (!empty($parsed['query'])) {
+            parse_str($parsed['query'], $query_params);
+            if (!empty($query_params['key'])) {
+                $admin_user = 'key';
+                $login_key = $query_params['key'];
+            }
+        }
     }
     
-    $admin_user = $parsed['user'];
-    $login_key = $parsed['pass'];
+    if (empty($login_key)) {
+        if (preg_match('/key=([a-zA-Z0-9_-]+)/', $api_url_output, $matches)) {
+            $admin_user = 'key';
+            $login_key = $matches[1];
+        } else {
+            throw new Exception("Failed to parse temporary API credentials from: " . $api_url_output);
+        }
+    }
+    
     $auth_user = $admin_user . '|' . $targetUser;
     
     $ch = curl_init();
