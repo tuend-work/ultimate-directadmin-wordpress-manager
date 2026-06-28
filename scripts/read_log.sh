@@ -10,6 +10,24 @@ DOMAIN=$2
 LOG_TYPE=$3  # access hoặc error
 LINES=$4
 
+# Intercept delegation requests from the admin to run commands as the user
+if [ "$3" = "run_as" ]; then
+    TARGET_USER="$1"
+    TARGET_SCRIPT="$2"
+    
+    # Export inherited environment variables to make them available in php
+    export USERNAME="$TARGET_USER"
+    export USER="$TARGET_USER"
+    export HOME="/home/$TARGET_USER"
+    
+    if command -v runuser >/dev/null 2>&1; then
+        runuser -u "$TARGET_USER" -- /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini "$TARGET_SCRIPT"
+    else
+        su -s /bin/bash "$TARGET_USER" -c "/usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini $TARGET_SCRIPT"
+    fi
+    exit 0
+fi
+
 if [ -z "$USER" ] || [ -z "$DOMAIN" ] || [ -z "$LOG_TYPE" ] || [ -z "$LINES" ]; then
     echo "Error: Missing arguments."
     exit 1
