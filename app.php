@@ -35,8 +35,12 @@ if ($POST_STRING != "") {
  * Determine if current executing user is administrator
  */
 function is_admin_user() {
-    $current_user = getenv('USERNAME') ?: getenv('USER');
-    return (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/admin/') !== false) || ($current_user === 'admin');
+    $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    if ($is_win) {
+        $current_user = getenv('USERNAME') ?: getenv('USER');
+        return ($current_user === 'admin') || (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', 'admin') !== false);
+    }
+    return (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/admin/') !== false);
 }
 
 /**
