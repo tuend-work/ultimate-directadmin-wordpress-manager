@@ -65,48 +65,6 @@ chmod 755 "$PLUGIN_DIR/reseller/index.raw"  2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/user/index.html"    2>/dev/null || true
 chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 
-# Rebuild SUID wrapper (gcc compiler support)
-if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
-    echo "[update] Rebuilding SUID wrapper..."
-    
-    GCC_BIN=""
-    for try_gcc in gcc cc /usr/bin/gcc /usr/local/bin/gcc; do
-        if command -v "$try_gcc" >/dev/null 2>&1; then
-            GCC_BIN="$try_gcc"
-            break
-        fi
-    done
-
-    # Create a local tmp directory and set TMPDIR to bypass noexec /tmp restrictions on secure servers
-    LOCAL_TMP="$PLUGIN_DIR/scripts/tmp"
-    mkdir -p "$LOCAL_TMP"
-    export TMPDIR="$LOCAL_TMP"
-    export TEMP="$LOCAL_TMP"
-    export TMP="$LOCAL_TMP"
-
-    COMPILED=0
-    if [ -n "$GCC_BIN" ]; then
-        if cd "$PLUGIN_DIR/scripts" && "$GCC_BIN" -O2 wrapper.c -o wrapper.update.tmp; then
-            chown root:diradmin "$PLUGIN_DIR/scripts/wrapper.update.tmp"
-            chmod 4755 "$PLUGIN_DIR/scripts/wrapper.update.tmp"
-            mv -f "$PLUGIN_DIR/scripts/wrapper.update.tmp" "$PLUGIN_DIR/scripts/wrapper"
-            COMPILED=1
-        else
-            rm -f "$PLUGIN_DIR/scripts/wrapper.update.tmp"
-        fi
-    fi
-
-    # Clean up local tmp dir
-    rm -rf "$LOCAL_TMP"
-    unset TMPDIR TEMP TMP
-
-    if [ "$COMPILED" -eq 1 ]; then
-        echo "[update] SUID wrapper rebuilt successfully."
-    else
-        echo "[update] WARNING: SUID wrapper compilation failed (gcc/cc failed or not installed)."
-    fi
-fi
-
 # Maintain SUID permissions for both binary wrappers
 for binary in wrapper update_wrapper; do
     if [ -f "$PLUGIN_DIR/scripts/$binary" ]; then
