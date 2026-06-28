@@ -3207,11 +3207,26 @@ function clone_wordpress_instance($params, $home) {
         wp_manager_log("Search and replace failed: " . $e->getMessage());
     }
     
-    // If running as root (or if is_admin_user() is true), fix ownership of target directory to target user
-    if (is_admin_user() || (function_exists('getmyuid') && getmyuid() === 0)) {
+    // If running as root/admin, fix file ownership to target user using native PHP calls
+    // (exec/shell forks lose SUID elevation; native chown() runs in-process as root)
+    if (is_admin_user() || (function_exists('posix_getuid') && posix_getuid() === 0)) {
         $tgt_user = basename($home);
-        $chown_cmd = sprintf('chown -R %s:%s %s', escapeshellarg($tgt_user), escapeshellarg($tgt_user), escapeshellarg($target_dir));
-        @exec($chown_cmd);
+        $pw = function_exists('posix_getpwnam') ? posix_getpwnam($tgt_user) : false;
+        if ($pw) {
+            $uid = $pw['uid'];
+            $gid = $pw['gid'];
+            // Recursively chown every file and directory to the target user
+            $iter = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($target_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            chown($target_dir, $uid);
+            chgrp($target_dir, $gid);
+            foreach ($iter as $item) {
+                chown($item->getPathname(), $uid);
+                chgrp($item->getPathname(), $gid);
+            }
+        }
     }
     
     return [
