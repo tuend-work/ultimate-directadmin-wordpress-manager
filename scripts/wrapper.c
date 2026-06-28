@@ -193,6 +193,46 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Handle run_as subcommand to execute commands as another user context
+    if (strcmp(action, "run_as") == 0) {
+        if (argc < 4) {
+            fprintf(stderr, "Usage: %s run_as <username> <command> [args...]\n", argv[0]);
+            return 1;
+        }
+        const char *target_user = argv[2];
+        
+        // Security check: Only root and diradmin can run_as other users
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+            fprintf(stderr, "Error: Access denied.\n");
+            return 1;
+        }
+        
+        // Validate target_user
+        for (const char *p = target_user; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+                fprintf(stderr, "Error: Invalid target username.\n");
+                return 1;
+            }
+        }
+        
+        struct passwd *target_pw = getpwnam(target_user);
+        if (!target_pw) {
+            fprintf(stderr, "Error: User %s not found.\n", target_user);
+            return 1;
+        }
+        
+        // Change group and user to target user
+        if (setgid(target_pw->pw_gid) != 0 || setuid(target_pw->pw_uid) != 0) {
+            perror("Error: Failed to drop privileges to target user");
+            return 1;
+        }
+        
+        // Execute command
+        execv(argv[3], &argv[3]);
+        perror("Error: execv failed");
+        return 1;
+    }
+
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
         fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', or 'read_log'.\n");
         return 1;

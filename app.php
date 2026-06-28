@@ -4333,6 +4333,60 @@ function run_api() {
     
     $action = $_GET['action'] ?? $_POST['action'] ?? '';
     
+    // Delegation logic for admin impersonation
+    $current_exec_user = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+    $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin') {
+        $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
+        $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
+        if (!file_exists($wrapper)) {
+            $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+        }
+        
+        if (file_exists($wrapper)) {
+            $target_home = "/home/{$target_user_clean}";
+            $env_prefix = sprintf(
+                'USERNAME=%s USER=%s HOME=%s QUERY_STRING=%s POST=%s ',
+                escapeshellarg($target_user_clean),
+                escapeshellarg($target_user_clean),
+                escapeshellarg($target_home),
+                escapeshellarg(getenv('QUERY_STRING') ?: ''),
+                escapeshellarg(getenv('POST') ?: '')
+            );
+            
+            // Execute the user panel raw entry point as the target user using the SUID wrapper
+            $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($target_user_clean) . " /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw 2>&1";
+            
+            $output = [];
+            $retval = null;
+            exec($cmd, $output, $retval);
+            
+            // Clean output buffering to prevent header errors
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            
+            // Print DirectAdmin headers (required)
+            echo "HTTP/1.1 200 OK\r\n";
+            echo "Content-Type: application/json; charset=utf-8\r\n";
+            echo "Access-Control-Allow-Origin: *\r\n";
+            echo "\r\n";
+            
+            // Find the JSON response starting from the output (skip shebang or warnings if any)
+            $output_str = implode("\n", $output);
+            $json_start = strpos($output_str, '{');
+            if ($json_start !== false) {
+                echo substr($output_str, $json_start);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Lỗi thực thi ủy quyền (Delegation failed): ' . $output_str
+                ]);
+            }
+            exit;
+        }
+    }
+    
     try {
         switch ($action) {
             case 'get_users':
