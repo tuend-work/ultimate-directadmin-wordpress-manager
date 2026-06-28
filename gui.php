@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.7.8';
+$plugin_version = '1.7.9';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3616,31 +3616,21 @@ function openInstallModal() {
 
 /* ─── Install: create DB + install WP ─── */
 async function createDB(name, user, pass, targetUser = '') {
-    const params = {action:'create',name,user,passwd:pass,passwd2:pass};
-    const p = new URLSearchParams(params);
-    let url = '/CMD_API_DATABASES';
-    const headers = {'Content-Type':'application/x-www-form-urlencoded'};
-    
-    if (isAdmin && targetUser) {
-        // Temporarily switch session to the target user's context
-        await fetch('/CMD_LOGIN_AS?user=' + encodeURIComponent(targetUser));
-        await fetch('/CMD_SELECT_USERS?select=user&user=' + encodeURIComponent(targetUser));
+    const fd = new FormData();
+    fd.append('action', 'create_database');
+    fd.append('dbname', name);
+    fd.append('dbuser', user);
+    fd.append('dbpass', pass);
+    if (targetUser) {
+        fd.append('target_user', targetUser);
     }
-    
-    try {
-        const r = await fetch(url,{method:'POST',headers:headers,body:p.toString()});
-        const text = await r.text();
-        const q = new URLSearchParams(text);
-        if (q.get('error')==='1') throw new Error(decodeURIComponent(q.get('details')||'DB creation failed'));
-        const prefix = targetUser || DA_USER;
-        return { db_name: q.get('db')||(prefix+'_'+name), db_user: q.get('user')||(prefix+'_'+user) };
-    } finally {
-        if (isAdmin && targetUser) {
-            // Revert session back to administrator level
-            await fetch('/CMD_SELECT_USERS?select=admin');
-            await fetch('/CMD_LOGIN_AS?action=select&select=admin');
-        }
-    }
+    const r = await fetch(apiUrl('create_database'), {
+        method: 'POST',
+        body: fd
+    });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.error || 'DB creation failed');
+    return { db_name: d.db_name, db_user: d.db_user };
 }
 
 async function executeInstall(e) {

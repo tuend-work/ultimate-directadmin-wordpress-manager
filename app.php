@@ -4339,7 +4339,7 @@ function run_api() {
     // Delegation logic for admin impersonation
     $current_exec_user = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
-    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin') {
+    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin' && $action !== 'create_database') {
         $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
         $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
         if (!file_exists($wrapper)) {
@@ -4410,6 +4410,31 @@ function run_api() {
                 }
                 $users = get_all_directadmin_users();
                 echo json_encode(['success' => true, 'users' => $users]);
+                break;
+                
+            case 'create_database':
+                $dbname = isset($_POST['dbname']) ? $_POST['dbname'] : '';
+                $dbuser = isset($_POST['dbuser']) ? $_POST['dbuser'] : '';
+                $dbpass = isset($_POST['dbpass']) ? $_POST['dbpass'] : '';
+                $target_user_input = isset($_POST['target_user']) ? $_POST['target_user'] : '';
+                
+                if (empty($dbname) || empty($dbuser) || empty($dbpass)) {
+                    throw new Exception("Missing required database parameters.");
+                }
+                
+                $target_user = $username;
+                if (is_admin_user() && !empty($target_user_input)) {
+                    $target_user = $target_user_input;
+                }
+                
+                $result = create_directadmin_database($dbname, $dbuser, $dbpass, $target_user);
+                $prefix = $target_user;
+                
+                echo json_encode([
+                    'success' => true,
+                    'db_name' => isset($result['db']) ? $result['db'] : ($prefix . '_' . $dbname),
+                    'db_user' => isset($result['user']) ? $result['user'] : ($prefix . '_' . $dbuser)
+                ]);
                 break;
                 
             case 'get_domains':
@@ -5453,3 +5478,65 @@ function find_plugin_main_file($plugins_dir, $folder_name) {
     }
     return null;
 }
+
+function create_directadmin_database($dbname, $dbuser, $dbpass, $targetUser) {
+    $api_url_output = '';
+    $out1 = [];
+    $code1 = 0;
+    @exec('/usr/local/bin/da api-url 2>&1', $out1, $code1);
+    if ($code1 === 0 && !empty($out1)) {
+        $api_url_output = trim($out1[0]);
+    } else {
+        $out2 = [];
+        $code2 = 0;
+        @exec('/usr/local/directadmin/directadmin api-url 2>&1', $out2, $code2);
+        if ($code2 === 0 && !empty($out2)) {
+            $api_url_output = trim($out2[0]);
+        }
+    }
+    
+    if (empty($api_url_output)) {
+        throw new Exception("Failed to generate DirectAdmin API URL locally.");
+    }
+    
+    $parsed = parse_url($api_url_output);
+    if (!$parsed || empty($parsed['user']) || empty($parsed['pass'])) {
+        throw new Exception("Failed to parse temporary API credentials.");
+    }
+    
+    $admin_user = $parsed['user'];
+    $login_key = $parsed['pass'];
+    $auth_user = $admin_user . '|' . $targetUser;
+    
+    $ch = curl_init();
+    $post_fields = [
+        'action' => 'create',
+        'name' => $dbname,
+        'user' => $dbuser,
+        'passwd' => $dbpass,
+        'passwd2' => $dbpass
+    ];
+    
+    curl_setopt($ch, CURLOPT_URL, "http://127.0.0.1:2222/CMD_API_DATABASES");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_fields));
+    curl_setopt($ch, CURLOPT_USERPWD, "$auth_user:$login_key");
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($http_code !== 200) {
+        throw new Exception("DirectAdmin API database creation failed (HTTP {$http_code}): " . $response);
+    }
+    
+    parse_str($response, $result);
+    if (isset($result['error']) && $result['error'] === '1') {
+        throw new Exception("DirectAdmin API Error: " . urldecode($result['details']));
+    }
+    
+    return $result;
+}
+
