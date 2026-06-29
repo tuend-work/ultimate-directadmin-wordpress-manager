@@ -2606,19 +2606,16 @@ function parse_wp_config($wp_config_path) {
         $blogname = $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
 
-    // --- AUTHORITATIVE: derive domain and sub_path from siteurl (from DB) ---
-    // This is the single source of truth. The folder name under ~/domains/ can
-    // differ from the actual hostname (e.g. custom doc root for a subdomain).
-    $parsed = parse_url($siteurl);
-    if (!empty($parsed['host'])) {
-        $domain = $parsed['host'];
-        // Strip default port from host if present
-        if (strpos($domain, ':') !== false) {
-            $domain = explode(':', $domain)[0];
+    // --- AUTHORITATIVE: Prioritize deriving domain and sub_path from the folder path ---
+    // If the database has a siteurl, we extract its scheme (http/https) but keep the folder-derived domain and sub_path.
+    $protocol = 'http';
+    if (!empty($siteurl)) {
+        $parsed_db = parse_url($siteurl);
+        if (!empty($parsed_db['scheme'])) {
+            $protocol = $parsed_db['scheme'];
         }
-        // sub_path = URL path without leading/trailing slashes
-        $sub_path = isset($parsed['path']) ? trim($parsed['path'], '/') : '';
     }
+    $siteurl = $protocol . '://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     // If DB was unreachable, $domain and $sub_path remain as path-derived fallback
 
     
