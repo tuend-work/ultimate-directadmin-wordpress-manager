@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.8.8';
+$plugin_version = '1.8.9';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1679,6 +1679,9 @@ async function loadPlugins(i) {
                     ? 'Update this plugin'
                     : 'Force update/reinstall this plugin (already at latest version)';
                 
+                const pluginFolder = p.file.includes('/') ? '/' + p.file.substring(0, p.file.indexOf('/')) : '';
+                const pluginPath = '/wp-content/plugins' + pluginFolder;
+
                 return `
                 <div class="plugin-item">
                     <div class="plugin-info">
@@ -1687,6 +1690,7 @@ async function loadPlugins(i) {
                         <div class="plugin-meta">Current: <span id="plug-ver-${i}-${idx}">v${esc(p.version)}</span> | Latest: <span id="plug-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(p.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
+                        <button class="btn btn-sm btn-secondary" onclick="openSubPathInFileManager(${i}, '${escJsArg(pluginPath)}')" title="Xem thư mục trong File Manager"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> Files</button>
                         <button class="btn btn-sm btn-secondary" data-file="${esc(p.file)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-plug-up-${i}-${idx}" onclick="updatePlugin(${i}, ${idx}, '${esc(p.file)}')"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update</button>
                         <button class="btn btn-sm btn-secondary" id="btn-plug-reinst-${i}-${idx}" onclick="reinstallPlugin(${i}, ${idx}, '${esc(p.file)}')"><span class="dashicons dashicons-update wp-admin-icon"></span> Reinstall</button>
                         <button class="btn btn-sm ${actionBtnClass}" id="btn-plug-${i}-${idx}" onclick="togglePlugin(${i}, ${idx}, '${esc(p.file)}', ${p.active})">
@@ -2027,6 +2031,8 @@ async function loadThemes(i) {
                     ? 'Update this theme'
                     : 'Force update/reinstall this theme (already at latest version)';
                 
+                const themePath = '/wp-content/themes/' + t.folder;
+
                 return `
                 <div class="plugin-item">
                     <div class="plugin-info">
@@ -2035,6 +2041,7 @@ async function loadThemes(i) {
                         <div class="plugin-meta">Current: <span id="theme-ver-${i}-${idx}">v${esc(t.version)}</span> | Latest: <span id="theme-latest-${i}-${idx}">v${esc(latestVersion)}</span> | By ${esc(t.author)} | ${statusBadge} | ${updateBadge}</div>
                     </div>
                     <div class="plugin-toggle">
+                        <button class="btn btn-sm btn-secondary" onclick="openSubPathInFileManager(${i}, '${escJsArg(themePath)}')" title="Xem thư mục trong File Manager"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> Files</button>
                         <button class="btn btn-sm btn-secondary" data-folder="${esc(t.folder)}" ${updateDisabled} title="${esc(updateTitle)}" id="btn-theme-up-${i}-${idx}" onclick="updateTheme(${i}, ${idx}, '${esc(t.folder)}')"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update</button>
                         <button class="btn btn-sm btn-secondary" id="btn-theme-reinst-${i}-${idx}" onclick="reinstallTheme(${i}, ${idx}, '${esc(t.folder)}')"><span class="dashicons dashicons-update wp-admin-icon"></span> Reinstall</button>
                         <button class="btn btn-sm ${actionBtnClass}" ${disabledAttr} id="btn-theme-${i}-${idx}" onclick="activateTheme(${i}, ${idx}, '${esc(t.folder)}')">
@@ -3041,6 +3048,17 @@ function visitSite(i, suffix) {
 function openFileManager(i) {
     const s = allSites[i];
     let path = s.path;
+    const prefix = '/home/' + DA_USER;
+    if (path.startsWith(prefix)) {
+        path = path.substring(prefix.length);
+    }
+    window.open('/CMD_FILE_MANAGER?path=' + encodeURIComponent(path), '_blank');
+}
+
+/* ─── Open SubPath in File Manager ─── */
+function openSubPathInFileManager(i, subPath) {
+    const s = allSites[i];
+    let path = s.path + subPath;
     const prefix = '/home/' + DA_USER;
     if (path.startsWith(prefix)) {
         path = path.substring(prefix.length);
