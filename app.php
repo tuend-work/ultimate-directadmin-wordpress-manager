@@ -2197,30 +2197,74 @@ function create_wordpress_user($site_path, $username, $password, $email, $role) 
         throw new Exception("Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi tạo user.");
     }
 
-    wp_manager_bootstrap_auth($site_path);
-    
-    if (!function_exists('wp_insert_user')) {
-        throw new Exception("Không thể tải các hàm hỗ trợ của WordPress.");
+    $db = wp_manager_get_db_conn($site_path . '/wp-config.php');
+    if (!$db) {
+        throw new Exception("Không thể kết nối đến Database.");
     }
 
-    if (username_exists($username)) {
+    $prefix = $db['prefix'];
+
+    // Check if username already exists
+    $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$prefix}users` WHERE user_login = ?");
+    $stmt->execute([$username]);
+    if ($stmt->fetchColumn() > 0) {
         throw new Exception("Tên đăng nhập đã tồn tại.");
     }
 
-    if (email_exists($email)) {
+    // Check if email already exists
+    $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$prefix}users` WHERE user_email = ?");
+    $stmt->execute([$email]);
+    if ($stmt->fetchColumn() > 0) {
         throw new Exception("Email đã tồn tại.");
     }
 
-    $user_id = wp_insert_user([
-        'user_login' => $username,
-        'user_pass'  => $password,
-        'user_email' => $email,
-        'role'       => $role,
-    ]);
-
-    if (is_wp_error($user_id)) {
-        throw new Exception($user_id->get_error_message());
+    // Hash the password using WordPress's Phpass library
+    $phpass_file = $site_path . '/wp-includes/class-phpass.php';
+    if (!file_exists($phpass_file)) {
+        throw new Exception("Không tìm thấy thư viện băm mật khẩu của WordPress.");
     }
+    
+    require_once $phpass_file;
+    if (!class_exists('PasswordHash')) {
+        throw new Exception("Lớp băm mật khẩu không khả dụng.");
+    }
+
+    $wp_hasher = new PasswordHash(8, true);
+    $hashed_password = $wp_hasher->HashPassword($password);
+
+    // Insert user
+    $nicename = strtolower(preg_replace('/[^a-zA-Z0-9-]/', '', $username));
+    if (empty($nicename)) {
+        $nicename = 'user';
+    }
+    $display_name = $username;
+    $registered = (new DateTime("now", new DateTimeZone("Asia/Ho_Chi_Minh")))->format('Y-m-d H:i:s');
+
+    $stmt = $db['pdo']->prepare("
+        INSERT INTO `{$prefix}users` (user_login, user_pass, user_nicename, user_email, user_registered, user_status, display_name)
+        VALUES (?, ?, ?, ?, ?, 0, ?)
+    ");
+    $stmt->execute([$username, $hashed_password, $nicename, $email, $registered, $display_name]);
+    $user_id = $db['pdo']->lastInsertId();
+
+    if (!$user_id) {
+        throw new Exception("Không thể tạo User trong cơ sở dữ liệu.");
+    }
+
+    // Insert capabilities (Role)
+    $caps = serialize([$role => true]);
+    $stmt = $db['pdo']->prepare("INSERT INTO `{$prefix}usermeta` (user_id, meta_key, meta_value) VALUES (?, ?, ?)");
+    $stmt->execute([$user_id, $prefix . 'capabilities', $caps]);
+
+    // Insert user level
+    $level = 0;
+    if ($role === 'administrator') $level = 10;
+    elseif ($role === 'editor') $level = 7;
+    elseif ($role === 'author') $level = 2;
+    elseif ($role === 'contributor') $level = 1;
+
+    $stmt = $db['pdo']->prepare("INSERT INTO `{$prefix}usermeta` (user_id, meta_key, meta_value) VALUES (?, ?, ?)");
+    $stmt->execute([$user_id, $prefix . 'user_level', $level]);
 
     return [
         'success' => true,
