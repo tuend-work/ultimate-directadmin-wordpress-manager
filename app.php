@@ -2182,6 +2182,54 @@ function change_wordpress_user_password($site_path, $user_id, $new_password) {
 }
 
 /**
+ * Create a new WordPress user.
+ */
+function create_wordpress_user($site_path, $username, $password, $email, $role) {
+    if (empty($username) || empty($password) || empty($email) || empty($role)) {
+        throw new Exception("Vui lòng điền đầy đủ thông tin bắt buộc.");
+    }
+    if (strlen($password) < 8) {
+        throw new Exception("Mật khẩu phải dài ít nhất 8 ký tự.");
+    }
+    
+    // Check if website is locked
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi tạo user.");
+    }
+
+    wp_manager_bootstrap_auth($site_path);
+    
+    if (!function_exists('wp_insert_user')) {
+        throw new Exception("Không thể tải các hàm hỗ trợ của WordPress.");
+    }
+
+    if (username_exists($username)) {
+        throw new Exception("Tên đăng nhập đã tồn tại.");
+    }
+
+    if (email_exists($email)) {
+        throw new Exception("Email đã tồn tại.");
+    }
+
+    $user_id = wp_insert_user([
+        'user_login' => $username,
+        'user_pass'  => $password,
+        'user_email' => $email,
+        'role'       => $role,
+    ]);
+
+    if (is_wp_error($user_id)) {
+        throw new Exception($user_id->get_error_message());
+    }
+
+    return [
+        'success' => true,
+        'message' => 'Đã tạo tài khoản thành công!',
+        'user_id' => $user_id
+    ];
+}
+
+/**
  * Ensure a WordPress user exists in the target installation.
  */
 function wordpress_user_exists($site_path, $user_id) {
@@ -4931,6 +4979,19 @@ function run_api() {
                 wp_manager_log("Thay đổi mật khẩu user ID '" . $_POST['user_id'] . "' cho website: " . $_POST['path']);
                 $res = change_wordpress_user_password($_POST['path'], $_POST['user_id'], $_POST['password']);
                 wp_manager_log("Thay đổi mật khẩu user thành công.");
+                echo json_encode($res);
+                break;
+
+            case 'create_user':
+                if (empty($_POST['path']) || empty($_POST['username']) || empty($_POST['password']) || empty($_POST['email']) || empty($_POST['role'])) {
+                    throw new Exception("Thiếu thông tin bắt buộc để tạo User.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Yêu cầu quyền truy cập thư mục hợp lệ.");
+                }
+                wp_manager_log("Tạo user '" . $_POST['username'] . "' với email '" . $_POST['email'] . "' cho website: " . $_POST['path']);
+                $res = create_wordpress_user($_POST['path'], $_POST['username'], $_POST['password'], $_POST['email'], $_POST['role']);
+                wp_manager_log("Tạo user thành công.");
                 echo json_encode($res);
                 break;
 

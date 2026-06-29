@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.8.6';
+$plugin_version = '1.8.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1125,6 +1125,50 @@ input:disabled + .slider {
         <button class="btn btn-secondary" onclick="refreshLogs()"><span class="dashicons dashicons-update wp-admin-icon"></span> Làm mới</button>
         <button class="btn btn-secondary" onclick="closeModal('modal-logs')">Đóng</button>
     </div>
+</div>
+</div>
+
+<!-- ═══ MODAL: Create User ═══ -->
+<div class="modal-overlay" id="modal-create-user">
+<div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+        <h3><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Tạo Tài Khoản WordPress</h3>
+        <button class="modal-close" onclick="closeModal('modal-create-user')">✕</button>
+    </div>
+    <form id="form-create-user" onsubmit="executeCreateUser(event)">
+        <input type="hidden" id="create-user-site-idx">
+        <div class="modal-body">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Username <span style="color:var(--red)">*</span></label>
+                <input type="text" id="create-user-username" class="form-control" required placeholder="Ví dụ: admin_helper">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Email <span style="color:var(--red)">*</span></label>
+                <input type="email" id="create-user-email" class="form-control" required placeholder="Ví dụ: user@domain.com">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Mật khẩu <span style="color:var(--red)">*</span></label>
+                <div class="input-group-btn">
+                    <input type="text" id="create-user-password" class="form-control" required placeholder="Mật khẩu">
+                    <button type="button" class="btn btn-secondary" onclick="genPass('create-user-password')">Gen</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Vai trò (Role) <span style="color:var(--red)">*</span></label>
+                <select id="create-user-role" class="form-control">
+                    <option value="administrator" selected>Administrator (Quản trị viên)</option>
+                    <option value="editor">Editor (Biên tập viên)</option>
+                    <option value="author">Author (Tác giả)</option>
+                    <option value="contributor">Contributor (Cộng tác viên)</option>
+                    <option value="subscriber">Subscriber (Thành viên đăng ký)</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-create-user')">Hủy</button>
+            <button type="submit" class="btn btn-primary" id="btn-create-user-submit">Tạo User</button>
+        </div>
+    </form>
 </div>
 </div>
 
@@ -2336,6 +2380,57 @@ async function loginAsUser(siteIdx, userIdx, userId) {
     }
 }
 
+function openCreateUserModal(siteIdx) {
+    document.getElementById('create-user-site-idx').value = siteIdx;
+    document.getElementById('create-user-username').value = '';
+    document.getElementById('create-user-email').value = '';
+    document.getElementById('create-user-role').value = 'administrator';
+    genPass('create-user-password');
+    openModal('modal-create-user');
+}
+
+async function executeCreateUser(event) {
+    event.preventDefault();
+    const siteIdx = document.getElementById('create-user-site-idx').value;
+    const s = allSites[siteIdx];
+    if (!s) return;
+
+    const username = document.getElementById('create-user-username').value.trim();
+    const email = document.getElementById('create-user-email').value.trim();
+    const password = document.getElementById('create-user-password').value;
+    const role = document.getElementById('create-user-role').value;
+
+    const btn = document.getElementById('btn-create-user-submit');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Đang tạo...';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('username', username);
+        fd.append('email', email);
+        fd.append('password', password);
+        fd.append('role', role);
+
+        const r = await fetch(apiUrl('create_user'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'Đã tạo user thành công!', 'success');
+            closeModal('modal-create-user');
+            loadUsers(siteIdx);
+        } else {
+            toast(d.error || 'Lỗi khi tạo user.', 'error');
+        }
+    } catch (err) {
+        toast('Lỗi kết nối máy chủ.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
 
 /* ─── Security Manager ─── */
 async function loadSecurity(i) {
@@ -3224,7 +3319,10 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-users">
                     <div class="card-sec-title">
                         <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadUsers(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                        <div style="display:flex; gap:8px;" onclick="event.stopPropagation()">
+                            <button class="btn btn-primary btn-sm" onclick="openCreateUserModal(${i})"><span class="dashicons dashicons-plus wp-admin-icon"></span> Tạo User</button>
+                            <button class="btn btn-secondary btn-sm" onclick="loadUsers(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                        </div>
                     </div>
                     <div class="plugin-list" id="user-list-${i}">
                         <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
