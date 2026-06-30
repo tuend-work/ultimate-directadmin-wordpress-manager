@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.3';
+$plugin_version = '1.9.4';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -4326,6 +4326,78 @@ const STANDARD_WP_DEFINES = {
             { value: '\'local\'', label: 'Local (Cục bộ)' }
         ],
         default: '\'production\''
+    },
+    'DISABLE_WP_CRON': {
+        name: 'Tắt WP-Cron mặc định (DISABLE_WP_CRON)',
+        desc: 'Vô hiệu hóa WP-Cron tự động chạy ngầm mỗi khi có khách truy cập. Thường tắt để thay thế bằng cron thực tế của hệ thống hosting nhằm giảm tải server.',
+        type: 'bool',
+        default: 'false'
+    },
+    'DISALLOW_FILE_EDIT': {
+        name: 'Tắt sửa File trong Admin (DISALLOW_FILE_EDIT)',
+        desc: 'Tắt trình chỉnh sửa trực tiếp tệp tin Theme và Plugin từ trong bảng điều khiển WordPress Admin để nâng cao tính bảo mật.',
+        type: 'bool',
+        default: 'false'
+    },
+    'DISALLOW_FILE_MODS': {
+        name: 'Tắt cài đặt/cập nhật (DISALLOW_FILE_MODS)',
+        desc: 'Khóa hoàn toàn khả năng cài đặt mới hoặc cập nhật Theme, Plugin và WordPress Core từ giao diện Admin. Rất hữu ích khi bàn giao site.',
+        type: 'bool',
+        default: 'false'
+    },
+    'FORCE_SSL_ADMIN': {
+        name: 'Bắt buộc HTTPS trang Admin (FORCE_SSL_ADMIN)',
+        desc: 'Bắt buộc tất cả các phiên đăng nhập và các trang quản trị admin của WordPress phải được mã hóa và truyền tải qua giao thức bảo mật HTTPS/SSL.',
+        type: 'bool',
+        default: 'false'
+    },
+    'SCRIPT_DEBUG': {
+        name: 'Debug Scripts CSS/JS (SCRIPT_DEBUG)',
+        desc: 'Bắt buộc WordPress sử dụng các file JavaScript và CSS gốc chưa được nén (non-minified) thay vì bản thu gọn để hỗ trợ gỡ lỗi giao diện.',
+        type: 'bool',
+        default: 'false'
+    },
+    'CONCATENATE_SCRIPTS': {
+        name: 'Gộp Script trong Admin (CONCATENATE_SCRIPTS)',
+        desc: 'Mặc định WordPress gộp các file Javascript trong trang Admin để tối ưu tốc độ. Đặt thành false (tắt) nếu bạn gặp lỗi Javascript ở màn hình Admin.',
+        type: 'bool',
+        default: 'true'
+    },
+    'WP_HTTP_BLOCK_EXTERNAL': {
+        name: 'Chặn kết nối HTTP ra ngoài (WP_HTTP_BLOCK_EXTERNAL)',
+        desc: 'Chặn mọi yêu cầu kết nối mạng bên ngoài của WordPress. Hữu ích ở môi trường chạy cục bộ hoặc để bảo mật tuyệt đối.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_ACCESSIBLE_HOSTS': {
+        name: 'Các máy chủ được phép kết nối (WP_ACCESSIBLE_HOSTS)',
+        desc: 'Danh sách các tên miền máy chủ bên ngoài được phép kết nối (cách nhau bởi dấu phẩy) khi tính năng chặn kết nối HTTP ở trên được bật.',
+        type: 'string',
+        default: 'api.wordpress.org'
+    },
+    'WP_TEMP_DIR': {
+        name: 'Thư mục ghi tệp tạm (WP_TEMP_DIR)',
+        desc: 'Đường dẫn tuyệt đối đến thư mục chứa tệp tạm thời cho WordPress (ví dụ để tải về các bản cập nhật core, plugins, themes).',
+        type: 'string',
+        default: '/tmp'
+    },
+    'EMPTY_TRASH_DAYS': {
+        name: 'Số ngày tự dọn rác (EMPTY_TRASH_DAYS)',
+        desc: 'Số ngày tối đa lưu trữ bài viết, trang, bình luận trong Thùng rác trước khi bị xóa vĩnh viễn. Nhập số ngày, hoặc đặt bằng 0 để tắt thùng rác (xóa luôn lập tức).',
+        type: 'int',
+        default: '30'
+    },
+    'AUTOSAVE_INTERVAL': {
+        name: 'Tần suất lưu nháp bài viết (AUTOSAVE_INTERVAL)',
+        desc: 'Thời gian giãn cách tự động lưu bản nháp của trình soạn thảo WordPress khi bạn đang viết bài (tính bằng giây, mặc định là 60).',
+        type: 'int',
+        default: '60'
+    },
+    'IMAGE_EDIT_OVERWRITE': {
+        name: 'Ghi đè khi sửa ảnh (IMAGE_EDIT_OVERWRITE)',
+        desc: 'Khi cắt (crop) hoặc xoay ảnh, có ghi đè trực tiếp lên ảnh gốc cũ hay tạo thêm phiên bản ảnh mới.',
+        type: 'bool',
+        default: 'false'
     }
 };
 
