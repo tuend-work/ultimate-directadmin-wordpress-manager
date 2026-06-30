@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.0';
+$plugin_version = '1.9.1';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3038,6 +3038,44 @@ function refreshShot(i) {
     toast('Refreshing screenshot…');
 }
 
+/* ─── DirectAdmin iframe wheel bridge ─── */
+function enableParentWheelBridge() {
+    if (window.self === window.top) return;
+
+    const scrollTargets = ['TEXTAREA', 'SELECT'];
+    const getPageScrollElement = () => document.scrollingElement || document.documentElement;
+
+    window.addEventListener('wheel', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const scrollable = target ? target.closest('.modal, .terminal, textarea, select') : null;
+        if (scrollable) {
+            const style = window.getComputedStyle(scrollable);
+            const canScrollY = /(auto|scroll)/.test(style.overflowY) && scrollable.scrollHeight > scrollable.clientHeight;
+            const isNativeInput = scrollTargets.includes(scrollable.tagName);
+            const atTop = scrollable.scrollTop <= 0;
+            const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
+
+            if ((canScrollY || isNativeInput) && !((event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom))) {
+                return;
+            }
+        }
+
+        const page = getPageScrollElement();
+        if (page && page.scrollHeight > page.clientHeight) {
+            const atPageTop = page.scrollTop <= 0;
+            const atPageBottom = page.scrollTop + page.clientHeight >= page.scrollHeight - 1;
+            if (!((event.deltaY < 0 && atPageTop) || (event.deltaY > 0 && atPageBottom))) {
+                return;
+            }
+        }
+
+        try {
+            window.parent.scrollBy({ top: event.deltaY, left: event.deltaX, behavior: 'auto' });
+            event.preventDefault();
+        } catch (err) {}
+    }, { passive: false });
+}
+
 /* ─── Visit site / WP Admin ─── */
 function visitSite(i, suffix) {
     const s = allSites[i];
@@ -4084,6 +4122,7 @@ async function loadAdminUsers() {
 
 /* ─── Init ─── */
 window.addEventListener('DOMContentLoaded', () => {
+    enableParentWheelBridge();
     fetchSites(false);
     if (isAdmin) {
         loadAdminUsers();
