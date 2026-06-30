@@ -5420,6 +5420,62 @@ function run_api() {
                 ]);
                 break;
                 
+            case 'get_wp_defines':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $defines = get_wp_defines_from_config($_POST['path'] . '/wp-config.php');
+                echo json_encode(['success' => true, 'defines' => $defines]);
+                break;
+
+            case 'set_wp_define':
+                if (empty($_POST['path']) || !isset($_POST['constant']) || !isset($_POST['value']) || !isset($_POST['enable'])) {
+                    throw new Exception("Missing parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $wp_config_path = $_POST['path'] . '/wp-config.php';
+                if (is_wordpress_locked($_POST['path'])) {
+                    throw new Exception("Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi thay đổi cấu hình.");
+                }
+                check_wp_config_writable($wp_config_path);
+                $constant = preg_replace('/[^A-Z0-9_]/', '', strtoupper($_POST['constant']));
+                $value_raw = $_POST['value'];
+                $enable = ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+
+                // Determine value type
+                if (in_array(strtolower($value_raw), ['true', 'false', '1', '0'])) {
+                    // Boolean constants
+                    $val_bool = in_array(strtolower($value_raw), ['true', '1']);
+                    wp_manager_config_define_modify($wp_config_path, $constant, $val_bool, $enable);
+                } elseif (is_numeric($value_raw) && strpos($value_raw, '.') === false) {
+                    // Integer constants — store as string but without quotes in PHP
+                    $content = file_get_contents($wp_config_path);
+                    $pattern = "/\s*define\s*\(\s*['\"]" . preg_quote($constant, '/') . "['\"]\s*,\s*[^;]*\)\s*;/i";
+                    $content = preg_replace($pattern, '', $content);
+                    if ($enable) {
+                        $define_str = "\ndefine('{$constant}', " . intval($value_raw) . ");\n";
+                        $insert_pos = strpos($content, "/* That's all, stop editing!");
+                        if ($insert_pos === false) $insert_pos = strpos($content, "require_once");
+                        if ($insert_pos !== false) {
+                            $content = substr_replace($content, $define_str, $insert_pos, 0);
+                        } else {
+                            $content .= $define_str;
+                        }
+                    }
+                    @file_put_contents($wp_config_path, $content);
+                } else {
+                    // String constants
+                    wp_manager_config_define_modify($wp_config_path, $constant, $value_raw, $enable);
+                }
+                wp_manager_log("Cập nhật define '{$constant}' cho website: " . $_POST['path'] . " | Enable: " . ($enable ? 'true' : 'false') . " | Value: {$value_raw}");
+                echo json_encode(['success' => true, 'message' => "Define '{$constant}' đã được cập nhật thành công."]);
+                break;
+
             case 'clear_log_file':
                 if (empty($_POST['path']) || empty($_POST['log_type'])) {
                     throw new Exception("Missing parameters.");
@@ -5480,6 +5536,43 @@ function run_api() {
     $json_body = ob_get_clean();
     echo $json_body;
     exit;
+}
+
+
+/**
+ * Read all define() constants from wp-config.php and return them as an array
+ */
+function get_wp_defines_from_config($wp_config_path) {
+    if (!file_exists($wp_config_path)) {
+        return [];
+    }
+    $content = file_get_contents($wp_config_path);
+    $defines = [];
+    // Match both quoted string and boolean/int values
+    preg_match_all("/define\s*\(\s*['\"]([A-Z0-9_]+)['\"]\s*,\s*(.*?)\s*\)\s*;/im", $content, $matches, PREG_SET_ORDER);
+    foreach ($matches as $m) {
+        $constant = $m[1];
+        $raw_val  = trim($m[2]);
+        // Determine value type
+        if (preg_match("/^['\"](.*)['\"]\s*$/s", $raw_val, $sv)) {
+            $value = $sv[1];
+            $type  = 'string';
+        } elseif (strtolower($raw_val) === 'true') {
+            $value = 'true';
+            $type  = 'bool';
+        } elseif (strtolower($raw_val) === 'false') {
+            $value = 'false';
+            $type  = 'bool';
+        } elseif (is_numeric($raw_val)) {
+            $value = $raw_val;
+            $type  = 'int';
+        } else {
+            $value = $raw_val;
+            $type  = 'raw';
+        }
+        $defines[$constant] = ['value' => $value, 'type' => $type, 'defined' => true];
+    }
+    return $defines;
 }
 
 /**

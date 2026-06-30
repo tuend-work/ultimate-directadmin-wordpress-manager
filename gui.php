@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.2';
+$plugin_version = '1.9.3';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1172,6 +1172,38 @@ input:disabled + .slider {
 </div>
 </div>
 
+<!-- ═══ MODAL: Change User Password ═══ -->
+<div class="modal-overlay" id="modal-change-password">
+<div class="modal" style="max-width:460px;">
+    <div class="modal-head">
+        <h3><span class="dashicons dashicons-lock wp-admin-icon"></span> Đổi Mật Khẩu User</h3>
+        <button class="modal-close" onclick="closeModal('modal-change-password')">✕</button>
+    </div>
+    <form id="form-change-password" onsubmit="executeChangePassword(event)">
+        <input type="hidden" id="change-pass-site-idx">
+        <input type="hidden" id="change-pass-user-id">
+        <input type="hidden" id="change-pass-user-idx">
+        <div class="modal-body">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Username</label>
+                <input type="text" id="change-pass-username" class="form-control" readonly style="background-color: var(--bg2); color: var(--text3);">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Mật khẩu mới <span style="color:var(--red)">*</span></label>
+                <div class="input-group-btn">
+                    <input type="text" id="change-pass-password" class="form-control" required placeholder="Mật khẩu mới">
+                    <button type="button" class="btn btn-secondary" onclick="genPass('change-pass-password')">Gen</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-change-password')">Hủy</button>
+            <button type="submit" class="btn btn-primary" id="btn-change-pass-submit">Lưu thay đổi</button>
+        </div>
+    </form>
+</div>
+</div>
+
 <?php if ($isAdmin): ?>
 <!-- ═══ MODAL: Update Plugin ═══ -->
 <div class="modal-overlay" id="modal-update">
@@ -1455,6 +1487,11 @@ function switchTab(siteIdx, tabName, event) {
         const list = document.getElementById(`security-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking Security tab') || list.innerHTML.includes('will load status')) {
             loadSecurity(siteIdx);
+        }
+    } else if (tabName === 'wpdefine') {
+        const list = document.getElementById(`wpdefine-list-${siteIdx}`);
+        if (list.innerHTML.includes('Clicking WP Define tab') || list.innerHTML.includes('will load configuration') || list.innerHTML.includes('Đang tải cấu hình hằng số')) {
+            loadWpDefines(siteIdx);
         }
     }
 }
@@ -2314,42 +2351,71 @@ async function loadUsers(i) {
     }
 }
 
-async function changeUserPassword(siteIdx, userIdx, userId, displayName) {
+function changeUserPassword(siteIdx, userIdx, userId, displayName) {
+    document.getElementById('change-pass-site-idx').value = siteIdx;
+    document.getElementById('change-pass-user-id').value = userId;
+    document.getElementById('change-pass-user-idx').value = userIdx;
+    document.getElementById('change-pass-username').value = displayName;
+    
+    // Auto-fill random password
+    genPass('change-pass-password');
+    
+    openModal('modal-change-password');
+}
+
+async function executeChangePassword(event) {
+    event.preventDefault();
+    const siteIdx = document.getElementById('change-pass-site-idx').value;
+    const userId = document.getElementById('change-pass-user-id').value;
+    const userIdx = document.getElementById('change-pass-user-idx').value;
+    const password = document.getElementById('change-pass-password').value;
+    const displayName = document.getElementById('change-pass-username').value;
+    
     const s = allSites[siteIdx];
-    const password = prompt(`Enter new password for ${displayName}:`);
-    if (password === null) return;
+    if (!s) return;
+    
     if (password.length < 8) {
-        toast('Password must be at least 8 characters.', 'error');
+        toast('Mật khẩu phải có ít nhất 8 ký tự.', 'error');
         return;
     }
-
-    const btn = document.getElementById(`btn-user-pass-${siteIdx}-${userIdx}`);
-    const originalText = btn ? btn.textContent : 'Change Password';
+    
+    const btn = document.getElementById('btn-change-pass-submit');
+    const originalText = btn ? btn.textContent : 'Lưu thay đổi';
     if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Changing...';
+        btn.textContent = 'Đang lưu...';
     }
-
+    
+    // Also disable the list button
+    const listBtn = document.getElementById(`btn-user-pass-${siteIdx}-${userIdx}`);
+    if (listBtn) {
+        listBtn.disabled = true;
+    }
+    
     try {
         const fd = new FormData();
         fd.append('path', s.path);
         fd.append('user_id', userId);
         fd.append('password', password);
-
+        
         const r = await fetch(apiUrl('change_user_password'), { method: 'POST', body: fd });
         const d = await r.json();
-
+        
         if (d.success) {
-            toast(d.message || 'Password changed successfully.', 'success');
+            toast(`✅ Đã thay đổi mật khẩu cho user ${displayName} thành công!`, 'success');
+            closeModal('modal-change-password');
         } else {
-            toast(d.error || 'Failed to change password.', 'error');
+            toast('❌ Lỗi: ' + (d.error || 'Không thể đổi mật khẩu.'), 'error');
         }
     } catch (err) {
-        toast('Connection error.', 'error');
+        toast('❌ Lỗi kết nối máy chủ.', 'error');
     } finally {
         if (btn) {
             btn.disabled = false;
             btn.textContent = originalText;
+        }
+        if (listBtn) {
+            listBtn.disabled = false;
         }
     }
 }
@@ -3277,6 +3343,7 @@ function renderSites(sites) {
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'users', event)"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)"><span class="dashicons dashicons-list-view wp-admin-icon"></span> Task & Logs</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'wpdefine', event)"><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Define</button>
                 </div>
 
                 <!-- Tab 1: Overview Details -->
@@ -3492,6 +3559,22 @@ function renderSites(sites) {
                     
                     <div style="position: relative;" onclick="event.stopPropagation()">
                         <textarea id="log-terminal-${i}" readonly style="width:100%; height:420px; background:#05070a; border:1px solid var(--border); border-radius:6px; color:#39ff14; font-family:Consolas, 'Fira Code', Monaco, 'Courier New', monospace; font-size:15px; padding:12px; margin-top:10px; resize:vertical; outline:none; line-height:1.4; white-space: pre; overflow-wrap: normal; overflow-x: auto;" placeholder="[Hệ thống] Nhật ký đang được tải..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Tab 6: WordPress Define -->
+                <div class="card-tab-content" id="tab-content-${i}-wpdefine">
+                    <div class="card-sec-title">
+                        <span><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Config Defines (wp-config.php)</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadWpDefines(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                    </div>
+                    <div class="notice notice-info" style="margin-bottom: 12px; line-height: 1.4;">
+                        Tất cả các cấu hình hằng số (constants) định nghĩa thông qua <code>define('WP_...', ...)</code> trong tệp <code>wp-config.php</code> được tổng hợp dưới đây. Bạn có thể bật/tắt hoặc chỉnh sửa giá trị cấu hình trực tiếp.
+                    </div>
+                    <div class="plugin-list" id="wpdefine-list-${i}">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
+                            Đang tải cấu hình hằng số...
+                        </div>
                     </div>
                 </div>
                 </div>
@@ -4156,6 +4239,456 @@ async function loadAdminUsers() {
         }
     } catch (err) {
         console.error('Failed to load users', err);
+    }
+}
+
+/* ─── WordPress Config Define Tab Management ─── */
+const STANDARD_WP_DEFINES = {
+    'WP_DEBUG': {
+        name: 'Chế độ Debug (WP_DEBUG)',
+        desc: 'Bật/Tắt chế độ hiển thị hoặc ghi lại các cảnh báo và lỗi PHP từ WordPress core, themes và plugins.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_DEBUG_LOG': {
+        name: 'Ghi nhật ký lỗi (WP_DEBUG_LOG)',
+        desc: 'Ghi các thông báo lỗi vào tệp tin log <code>wp-content/debug.log</code> để bạn tiện xem lại mà không hiển thị ra ngoài website.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_DEBUG_DISPLAY': {
+        name: 'Hiển thị lỗi (WP_DEBUG_DISPLAY)',
+        desc: 'Hiển thị trực tiếp lỗi và cảnh báo PHP lên màn hình giao diện web. Tắt ở môi trường chạy chính thức.',
+        type: 'bool',
+        default: 'true'
+    },
+    'WP_CACHE': {
+        name: 'Kích hoạt Cache (WP_CACHE)',
+        desc: 'Cho phép nhân bản dữ liệu tĩnh và dùng các plugin bộ nhớ đệm tăng tốc độ truy cập WordPress.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_POST_REVISIONS': {
+        name: 'Lưu lịch sử bài viết (WP_POST_REVISIONS)',
+        desc: 'Giới hạn số lượng bản nháp sao lưu lịch sử của mỗi bài viết để tránh phình dung lượng cơ sở dữ liệu. Nhập số nguyên (ví dụ: 5, 10) hoặc false để tắt hoàn toàn.',
+        type: 'mixed',
+        default: 'true'
+    },
+    'WP_AUTO_UPDATE_CORE': {
+        name: 'Tự động cập nhật (WP_AUTO_UPDATE_CORE)',
+        desc: 'Kiểm soát cơ chế tự động cập nhật hệ thống WordPress Core.',
+        type: 'select',
+        options: [
+            { value: 'true', label: 'Tất cả các bản cập nhật (Bản lớn & nhỏ)' },
+            { value: '\'minor\'', label: 'Chỉ cập nhật nhỏ & vá bảo mật (Khuyên dùng)' },
+            { value: 'false', label: 'Tắt hoàn toàn tự động cập nhật' }
+        ],
+        default: '\'minor\''
+    },
+    'WP_MEMORY_LIMIT': {
+        name: 'Giới hạn RAM PHP (WP_MEMORY_LIMIT)',
+        desc: 'Giới hạn dung lượng bộ nhớ RAM tối đa cho giao diện người dùng bên ngoài của WordPress (ví dụ: 128M, 256M, 512M).',
+        type: 'string',
+        default: '128M'
+    },
+    'WP_MAX_MEMORY_LIMIT': {
+        name: 'Giới hạn RAM Admin (WP_MAX_MEMORY_LIMIT)',
+        desc: 'Giới hạn dung lượng bộ nhớ RAM tối đa cho trang quản trị WordPress Admin và các tác vụ nặng (ví dụ: 256M, 512M).',
+        type: 'string',
+        default: '256M'
+    },
+    'WP_ALLOW_MULTISITE': {
+        name: 'Kích hoạt Multisite (WP_ALLOW_MULTISITE)',
+        desc: 'Bật tính năng cho phép tạo mạng lưới nhiều trang web từ một cài đặt WordPress duy nhất.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_ALLOW_REPAIR': {
+        name: 'Tự động sửa Database (WP_ALLOW_REPAIR)',
+        desc: 'Cho phép tự động tối ưu hóa và sửa chữa cơ sở dữ liệu qua đường dẫn <code>/wp-admin/maint/repair.php</code> mà không cần đăng nhập.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_DISABLE_FATAL_ERROR_HANDLER': {
+        name: 'Tắt xử lý lỗi nặng (WP_DISABLE_FATAL_ERROR_HANDLER)',
+        desc: 'Tắt chế độ bảo vệ chống màn hình trắng chết chóc (WSOD) tự động của WordPress. Thường dùng khi debug.',
+        type: 'bool',
+        default: 'false'
+    },
+    'WP_ENVIRONMENT_TYPE': {
+        name: 'Môi trường Website (WP_ENVIRONMENT_TYPE)',
+        desc: 'Xác định loại môi trường hoạt động của trang web: production, staging, development, local.',
+        type: 'select',
+        options: [
+            { value: '\'production\'', label: 'Production (Thực tế chính thức)' },
+            { value: '\'staging\'', label: 'Staging (Chạy thử nghiệm)' },
+            { value: '\'development\'', label: 'Development (Phát triển)' },
+            { value: '\'local\'', label: 'Local (Cục bộ)' }
+        ],
+        default: '\'production\''
+    }
+};
+
+async function loadWpDefines(i) {
+    const s = allSites[i];
+    const container = document.getElementById('wpdefine-list-' + i);
+    if (!container) return;
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">⏳ Đang quét tệp cấu hình wp-config.php...</div>';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('get_wp_defines'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            renderWpDefines(i, d.defines);
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Không thể tải cấu hình hằng số.</div>';
+    }
+}
+
+function renderWpDefines(siteIdx, defines) {
+    const s = allSites[siteIdx];
+    const container = document.getElementById('wpdefine-list-' + siteIdx);
+    if (!container) return;
+
+    let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
+
+    // 1. Render standard defines
+    for (const key of Object.keys(STANDARD_WP_DEFINES)) {
+        const item = STANDARD_WP_DEFINES[key];
+        const data = defines[key] || { defined: false, value: item.default, type: item.type };
+        const isDefined = data.defined;
+        const currentVal = data.value;
+
+        let inputControl = '';
+        let checkedAttr = '';
+
+        if (item.type === 'bool') {
+            const isTrue = currentVal === 'true' || currentVal === true;
+            checkedAttr = isTrue ? 'checked' : '';
+        } else {
+            checkedAttr = isDefined ? 'checked' : '';
+        }
+
+        const disabledInput = !isDefined ? 'disabled style="opacity: 0.5;"' : '';
+
+        if (item.type === 'select') {
+            inputControl = `
+                <select id="define-val-${siteIdx}-${key}" ${disabledInput} class="form-control" style="width:250px; font-size:13px; display:inline-block; margin-left:12px;" onchange="saveWpDefine(${siteIdx}, '${key}', '${item.type}')">
+                    ${item.options.map(opt => {
+                        const isSel = (currentVal === opt.value || '\'' + currentVal.replace(/^'|'$/g, '') + '\'' === opt.value) ? 'selected' : '';
+                        return `<option value="${opt.value}" ${isSel}>${esc(opt.label)}</option>`;
+                    }).join('')}
+                </select>
+            `;
+        } else if (item.type === 'bool') {
+            inputControl = '';
+        } else if (item.type === 'mixed') {
+            inputControl = `
+                <div style="display:inline-flex; align-items:center; gap:8px; margin-left:12px;">
+                    <select id="define-mixed-type-${siteIdx}-${key}" ${disabledInput} class="form-control" style="width:100px; font-size:13px;" onchange="onWpDefineMixedTypeChange(${siteIdx}, '${key}')">
+                        <option value="bool_true" ${currentVal === 'true' ? 'selected' : ''}>Bật (true)</option>
+                        <option value="bool_false" ${currentVal === 'false' ? 'selected' : ''}>Tắt (false)</option>
+                        <option value="number" ${(!['true', 'false'].includes(String(currentVal))) ? 'selected' : ''}>Giới hạn số</option>
+                    </select>
+                    <input type="number" id="define-val-${siteIdx}-${key}" ${disabledInput} class="form-control" style="width:80px; font-size:13px; ${(!['true', 'false'].includes(String(currentVal))) ? '' : 'display:none;'}" value="${(!['true', 'false'].includes(String(currentVal))) ? esc(currentVal) : '10'}" placeholder="Số lượng">
+                    <button class="btn btn-secondary btn-sm" id="btn-save-def-${siteIdx}-${key}" ${disabledInput} onclick="saveWpDefine(${siteIdx}, '${key}', '${item.type}')"><span class="dashicons dashicons-yes wp-admin-icon"></span> Lưu</button>
+                </div>
+            `;
+        } else {
+            inputControl = `
+                <div style="display:inline-flex; align-items:center; gap:8px; margin-left:12px;">
+                    <input type="text" id="define-val-${siteIdx}-${key}" ${disabledInput} class="form-control" style="width:140px; font-size:13px;" value="${esc(currentVal.replace(/^'|'$/g, ''))}">
+                    <button class="btn btn-secondary btn-sm" id="btn-save-def-${siteIdx}-${key}" ${disabledInput} onclick="saveWpDefine(${siteIdx}, '${key}', '${item.type}')"><span class="dashicons dashicons-yes wp-admin-icon"></span> Lưu</button>
+                </div>
+            `;
+        }
+
+        html += `
+        <div class="plugin-item" style="padding:10px 14px; align-items: flex-start;">
+            <div style="font-size:20px; flex-shrink:0; margin-right:8px; color:var(--blue); margin-top:3px;">
+                <span class="dashicons dashicons-editor-code wp-admin-icon"></span>
+            </div>
+            <div class="plugin-info">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <span class="plugin-name" style="font-size:15px; font-weight:600; color:var(--text);">${esc(item.name)}</span>
+                    ${isDefined ? '<span class="badge badge-green" style="font-size:11px; padding:1px 6px;">Active</span>' : '<span class="badge badge-gray" style="font-size:11px; padding:1px 6px;">Default</span>'}
+                </div>
+                <div class="plugin-desc" style="font-size:13px; color:var(--text2); margin-top:2px; white-space:normal; line-height:1.4;">
+                    ${item.desc}
+                </div>
+            </div>
+            <div style="flex-shrink:0; margin-left:12px; display:flex; align-items:center; gap:12px; margin-top:4px;">
+                ${inputControl}
+                <label class="switch" style="margin-top:2px;">
+                    <input type="checkbox" id="define-switch-${siteIdx}-${key}" ${checkedAttr} onchange="toggleWpDefine(${siteIdx}, '${key}', '${item.type}')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        `;
+    }
+
+    // 2. Render other custom defines starting with WP_
+    const otherKeys = Object.keys(defines).filter(key => key.startsWith('WP_') && !STANDARD_WP_DEFINES[key]);
+    if (otherKeys.length > 0) {
+        html += `
+        <div style="margin-top:16px; padding-top:12px; border-top:1px dashed var(--border); font-weight:600; font-size:15px; color:var(--text);">
+            <span class="dashicons dashicons-admin-generic wp-admin-icon"></span> Các hằng số WP_ khác được định cấu hình:
+        </div>
+        `;
+        for (const key of otherKeys) {
+            const data = defines[key];
+            let currentVal = String(data.value).replace(/^'|'$/g, '');
+            
+            html += `
+            <div class="plugin-item" style="padding:10px 14px; align-items: center;">
+                <div style="font-size:20px; flex-shrink:0; margin-right:8px; color:var(--text3);">
+                    <span class="dashicons dashicons-editor-code wp-admin-icon"></span>
+                </div>
+                <div class="plugin-info">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="plugin-name" style="font-size:14px; font-weight:600; color:var(--text);">${esc(key)}</span>
+                        <span class="badge badge-green" style="font-size:11px; padding:1px 6px;">Active</span>
+                    </div>
+                </div>
+                <div style="flex-shrink:0; margin-left:12px; display:flex; align-items:center; gap:8px;">
+                    <input type="text" id="define-val-${siteIdx}-${key}" class="form-control" style="width:160px; font-size:13px;" value="${esc(currentVal)}">
+                    <button class="btn btn-secondary btn-sm" onclick="saveWpDefine(${siteIdx}, '${key}', 'string')"><span class="dashicons dashicons-yes wp-admin-icon"></span> Lưu</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteWpDefine(${siteIdx}, '${key}')"><span class="dashicons dashicons-trash wp-admin-icon"></span> Xóa</button>
+                </div>
+            </div>
+            `;
+        }
+    }
+
+    // 3. Form to add new custom define
+    html += `
+    <div style="margin-top:20px; padding:16px; background:var(--bg3); border:1px solid var(--border); border-radius:8px;">
+        <div style="font-weight:600; font-size:14px; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+            <span class="dashicons dashicons-plus wp-admin-icon"></span> Thêm mới hằng số WP_
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+                <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">Tên hằng số (Ví dụ: WP_PROXY_HOST)</label>
+                <input type="text" id="new-define-key-${siteIdx}" placeholder="WP_..." class="form-control" style="font-family:monospace; font-size:13px; text-transform:uppercase;">
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:200px;">
+                <label style="font-size:12px; color:var(--text2); display:block; margin-bottom:4px;">Giá trị hằng số (Ví dụ: true, false, 120, 'localhost')</label>
+                <input type="text" id="new-define-val-${siteIdx}" placeholder="Nhập giá trị" class="form-control" style="font-size:13px;">
+            </div>
+            <button class="btn btn-primary btn-sm" style="height:35px;" onclick="addWpDefine(${siteIdx})"><span class="dashicons dashicons-plus wp-admin-icon"></span> Thêm</button>
+        </div>
+    </div>
+    `;
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function onWpDefineMixedTypeChange(siteIdx, key) {
+    const select = document.getElementById(`define-mixed-type-${siteIdx}-${key}`);
+    const input = document.getElementById(`define-val-${siteIdx}-${key}`);
+    if (select.value === 'number') {
+        input.style.display = 'inline-block';
+    } else {
+        input.style.display = 'none';
+    }
+}
+
+async function toggleWpDefine(siteIdx, key, type) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi thay đổi cấu hình.', 'error');
+        loadWpDefines(siteIdx);
+        return;
+    }
+
+    const sw = document.getElementById(`define-switch-${siteIdx}-${key}`);
+    const isChecked = sw.checked;
+
+    let value = '';
+    let enable = true;
+
+    if (type === 'bool') {
+        value = isChecked ? 'true' : 'false';
+        enable = true;
+    } else {
+        enable = isChecked;
+        if (enable) {
+            const input = document.getElementById(`define-val-${siteIdx}-${key}`);
+            const select = document.getElementById(`define-val-${siteIdx}-${key}`);
+            value = input ? input.value : (select ? select.value : '');
+            if (!value) {
+                value = STANDARD_WP_DEFINES[key].default;
+            }
+        }
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('constant', key);
+        fd.append('value', value);
+        fd.append('enable', enable ? 'true' : 'false');
+
+        const r = await fetch(apiUrl('set_wp_define'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(`✅ Đã cập nhật cấu hình hằng số ${key} thành công!`, 'success');
+        } else {
+            toast('❌ Lỗi: ' + (d.error || 'Cập nhật thất bại.'), 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối mạng.', 'error');
+    } finally {
+        loadWpDefines(siteIdx);
+    }
+}
+
+async function saveWpDefine(siteIdx, key, type) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi thay đổi cấu hình.', 'error');
+        return;
+    }
+
+    let value = '';
+    const mixedSelect = document.getElementById(`define-mixed-type-${siteIdx}-${key}`);
+    if (mixedSelect) {
+        if (mixedSelect.value === 'bool_true') {
+            value = 'true';
+        } else if (mixedSelect.value === 'bool_false') {
+            value = 'false';
+        } else {
+            value = document.getElementById(`define-val-${siteIdx}-${key}`).value;
+        }
+    } else {
+        const input = document.getElementById(`define-val-${siteIdx}-${key}`);
+        value = input ? input.value : '';
+    }
+
+    const btn = document.getElementById(`btn-save-def-${siteIdx}-${key}`);
+    const originalText = btn ? btn.innerHTML : 'Lưu';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '...';
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('constant', key);
+        fd.append('value', value);
+        fd.append('enable', 'true');
+
+        const r = await fetch(apiUrl('set_wp_define'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(`✅ Đã lưu cấu hình hằng số ${key} thành công!`, 'success');
+        } else {
+            toast('❌ Lỗi: ' + (d.error || 'Lưu thất bại.'), 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối mạng.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+        loadWpDefines(siteIdx);
+    }
+}
+
+async function deleteWpDefine(siteIdx, key) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi thay đổi cấu hình.', 'error');
+        return;
+    }
+
+    if (!confirm(`Bạn có chắc chắn muốn xóa định nghĩa hằng số ${key} khỏi wp-config.php không?`)) {
+        return;
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('constant', key);
+        fd.append('value', '');
+        fd.append('enable', 'false');
+
+        const r = await fetch(apiUrl('set_wp_define'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(`✅ Đã xóa hằng số ${key} khỏi wp-config.php.`, 'success');
+        } else {
+            toast('❌ Lỗi: ' + (d.error || 'Xóa thất bại.'), 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối mạng.', 'error');
+    } finally {
+        loadWpDefines(siteIdx);
+    }
+}
+
+async function addWpDefine(siteIdx) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('🔒 Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi thêm cấu hình.', 'error');
+        return;
+    }
+
+    let keyInput = document.getElementById(`new-define-key-${siteIdx}`);
+    let valInput = document.getElementById(`new-define-val-${siteIdx}`);
+    
+    let key = keyInput.value.trim().toUpperCase();
+    let val = valInput.value.trim();
+
+    if (!key) {
+        alert('Tên hằng số không được để trống.');
+        return;
+    }
+
+    if (!key.startsWith('WP_')) {
+        alert('Hằng số cấu hình WordPress nên bắt đầu bằng tiền tố WP_');
+        return;
+    }
+
+    if (!/^[A-Z0-9_]+$/.test(key)) {
+        alert('Tên hằng số chỉ được chứa chữ cái in hoa, số và dấu gạch dưới.');
+        return;
+    }
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('constant', key);
+        fd.append('value', val);
+        fd.append('enable', 'true');
+
+        const r = await fetch(apiUrl('set_wp_define'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(`✅ Đã thêm hằng số ${key} thành công!`, 'success');
+            keyInput.value = '';
+            valInput.value = '';
+        } else {
+            toast('❌ Lỗi: ' + (d.error || 'Thêm thất bại.'), 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối mạng.', 'error');
+    } finally {
+        loadWpDefines(siteIdx);
     }
 }
 
