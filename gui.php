@@ -3434,7 +3434,21 @@ function renderSites(sites) {
                         </div>
                     </div>
                 </div>
-
+                <!-- Tab 6: WordPress Define -->
+                <div class="card-tab-content" id="tab-content-${i}-wpdefine">
+                    <div class="card-sec-title">
+                        <span><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Config Defines (wp-config.php)</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadWpDefines(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                    </div>
+                    <div class="notice notice-info" style="margin-bottom: 12px; line-height: 1.4;">
+                        Tất cả các cấu hình hằng số (constants) định nghĩa thông qua <code>define('WP_...', ...)</code> trong tệp <code>wp-config.php</code> được tổng hợp dưới đây. Bạn có thể bật/tắt hoặc chỉnh sửa giá trị cấu hình trực tiếp.
+                    </div>
+                    <div class="plugin-list" id="wpdefine-list-${i}">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
+                            Đang tải cấu hình hằng số...
+                        </div>
+                    </div>
+                </div>
                 <!-- Tab 2: Plugins -->
                 <div class="card-tab-content" id="tab-content-${i}-plugins">
                     <div class="card-sec-title">
@@ -3562,21 +3576,7 @@ function renderSites(sites) {
                     </div>
                 </div>
 
-                <!-- Tab 6: WordPress Define -->
-                <div class="card-tab-content" id="tab-content-${i}-wpdefine">
-                    <div class="card-sec-title">
-                        <span><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Config Defines (wp-config.php)</span>
-                        <button class="btn btn-secondary btn-sm" onclick="loadWpDefines(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
-                    </div>
-                    <div class="notice notice-info" style="margin-bottom: 12px; line-height: 1.4;">
-                        Tất cả các cấu hình hằng số (constants) định nghĩa thông qua <code>define('WP_...', ...)</code> trong tệp <code>wp-config.php</code> được tổng hợp dưới đây. Bạn có thể bật/tắt hoặc chỉnh sửa giá trị cấu hình trực tiếp.
-                    </div>
-                    <div class="plugin-list" id="wpdefine-list-${i}">
-                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
-                            Đang tải cấu hình hằng số...
-                        </div>
-                    </div>
-                </div>
+
                 </div>
 
             </div>
