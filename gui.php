@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.1';
+$plugin_version = '1.9.2';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3044,6 +3044,40 @@ function enableParentWheelBridge() {
 
     const scrollTargets = ['TEXTAREA', 'SELECT'];
     const getPageScrollElement = () => document.scrollingElement || document.documentElement;
+    let queuedX = 0;
+    let queuedY = 0;
+    let animationFrame = null;
+
+    const normalizeWheelDelta = (event) => {
+        const lineHeight = 16;
+        const pageHeight = window.innerHeight || 800;
+        const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? lineHeight
+            : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? pageHeight : 1);
+
+        return {
+            x: event.deltaX * scale,
+            y: event.deltaY * scale
+        };
+    };
+
+    const flushParentScroll = () => {
+        animationFrame = null;
+        const stepX = queuedX * 0.35;
+        const stepY = queuedY * 0.35;
+
+        queuedX -= stepX;
+        queuedY -= stepY;
+
+        window.parent.scrollBy(stepX, stepY);
+
+        if (Math.abs(queuedX) > 0.5 || Math.abs(queuedY) > 0.5) {
+            animationFrame = window.requestAnimationFrame(flushParentScroll);
+        } else {
+            queuedX = 0;
+            queuedY = 0;
+        }
+    };
 
     window.addEventListener('wheel', (event) => {
         const target = event.target instanceof Element ? event.target : null;
@@ -3070,7 +3104,12 @@ function enableParentWheelBridge() {
         }
 
         try {
-            window.parent.scrollBy({ top: event.deltaY, left: event.deltaX, behavior: 'auto' });
+            const delta = normalizeWheelDelta(event);
+            queuedX += delta.x;
+            queuedY += delta.y;
+            if (!animationFrame) {
+                animationFrame = window.requestAnimationFrame(flushParentScroll);
+            }
             event.preventDefault();
         } catch (err) {}
     }, { passive: false });
