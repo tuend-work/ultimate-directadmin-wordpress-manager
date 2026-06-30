@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.4';
+$plugin_version = '1.9.5';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3339,11 +3339,11 @@ function renderSites(sites) {
                 <div class="card-tabs" onclick="event.stopPropagation()">
                     <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)"><span class="dashicons dashicons-info wp-admin-icon"></span> Overview Details</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'security', event)"><span class="dashicons dashicons-shield wp-admin-icon"></span> Security & Protection</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'wpdefine', event)"><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Define</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'users', event)"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'logs', event)"><span class="dashicons dashicons-list-view wp-admin-icon"></span> Task & Logs</button>
-                    <button class="tab-btn" onclick="switchTab(${i}, 'wpdefine', event)"><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Define</button>
                 </div>
 
                 <!-- Tab 1: Overview Details -->
