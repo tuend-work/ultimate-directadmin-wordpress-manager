@@ -2653,6 +2653,7 @@ function parse_wp_config($wp_config_path) {
     }
 
     $weight_stats = wp_manager_get_site_weight_stats(dirname($wp_config_path), $pdo, $db_prefix, $db_name);
+    $wpc_optimize = get_wpc_optimize_status(dirname($wp_config_path));
     
     return [
         'path' => dirname($wp_config_path),
@@ -2670,7 +2671,8 @@ function parse_wp_config($wp_config_path) {
         'disable_wp_cron' => $disable_wp_cron,
         'disable_auto_update' => $disable_auto_update,
         'wp_debug_enabled' => $wp_debug_enabled,
-        'weight_stats' => $weight_stats
+        'weight_stats' => $weight_stats,
+        'wpc_optimize' => $wpc_optimize
     ];
 }
 
@@ -3989,6 +3991,72 @@ PHP;
 }
 
 /**
+ * Get the status of WPC Optimize mu-plugins files
+ */
+function get_wpc_optimize_status($site_path) {
+    $mu_dir = rtrim($site_path, '/') . '/wp-content/mu-plugins';
+    $files = [
+        'wpc-optimize-editor.php'       => false,
+        'wpc-optimize-security.php'     => false,
+        'wpc-optimize-compatibility.php'=> false,
+        'wpc-optimize-admin.php'        => false,
+        'wpc-optimize-media.php'        => false,
+        'wpc-optimize-frontend.php'     => false,
+        'wpc-optimize-flatsome.php'     => false,
+    ];
+    if (is_dir($mu_dir)) {
+        foreach ($files as $file => $val) {
+            if (file_exists($mu_dir . '/' . $file)) {
+                $files[$file] = true;
+            }
+        }
+    }
+    return $files;
+}
+
+/**
+ * Toggle WPC Optimize mu-plugin file (copy from template or delete)
+ */
+function toggle_wpc_optimize($site_path, $file_name, $enable) {
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website is under WordPress Lockdown. Please disable Lockdown before modifying mu-plugins.");
+    }
+
+    $mu_dir = rtrim($site_path, '/') . '/wp-content/mu-plugins';
+    $target_file = $mu_dir . '/' . $file_name;
+
+    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
+    }
+    $template_file = $plugin_dir . '/wpc-optimize-mu-plugins-wpcloud/mu-plugins/' . $file_name;
+
+    if ($enable) {
+        if (!is_dir($mu_dir)) {
+            mkdir($mu_dir, 0755, true);
+        }
+        if (!file_exists($template_file)) {
+            throw new Exception("Template file not found: " . $file_name);
+        }
+        if (@copy($template_file, $target_file)) {
+            @chmod($target_file, 0644);
+            return true;
+        } else {
+            throw new Exception("Không thể tạo file mu-plugin: " . $file_name);
+        }
+    } else {
+        if (file_exists($target_file)) {
+            if (@unlink($target_file)) {
+                return true;
+            } else {
+                throw new Exception("Không thể xoá file mu-plugin: " . $file_name);
+            }
+        }
+    }
+    return true;
+}
+
+/**
  * Toggle WP DEBUG status (WP_DEBUG, WP_DEBUG_LOG, WP_DEBUG_DISPLAY)
  */
 function toggle_wordpress_debug($site_path, $enable) {
@@ -5135,6 +5203,35 @@ function run_api() {
                     @unlink($cache_file);
                 }
                 echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái tự động kiểm tra cập nhật thành công.']);
+                break;
+
+            case 'get_wpc_optimize_status':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $status = get_wpc_optimize_status($_POST['path']);
+                echo json_encode(['success' => true, 'optimize_status' => $status]);
+                break;
+
+            case 'toggle_wpc_optimize':
+                if (empty($_POST['path']) || empty($_POST['file'])) {
+                    throw new Exception("Missing required parameters.");
+                }
+                if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $enable = isset($_POST['enable']) && ($_POST['enable'] === 'true' || $_POST['enable'] === '1');
+                $file = $_POST['file'];
+                wp_manager_log("Thay đổi trạng thái tối ưu WPC Optimize file '{$file}' cho website: " . $_POST['path'] . " | Bật: " . ($enable ? 'true' : 'false'));
+                toggle_wpc_optimize($_POST['path'], $file, $enable);
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    @unlink($cache_file);
+                }
+                echo json_encode(['success' => true, 'message' => 'Cập nhật trạng thái tối ưu thành công.']);
                 break;
 
             case 'toggle_debug':

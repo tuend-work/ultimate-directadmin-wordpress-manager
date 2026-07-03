@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.5';
+$plugin_version = '1.9.6';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1492,6 +1492,11 @@ function switchTab(siteIdx, tabName, event) {
         const list = document.getElementById(`wpdefine-list-${siteIdx}`);
         if (list.innerHTML.includes('Clicking WP Define tab') || list.innerHTML.includes('will load configuration') || list.innerHTML.includes('Đang tải cấu hình hằng số')) {
             loadWpDefines(siteIdx);
+        }
+    } else if (tabName === 'wpcoptimize') {
+        const list = document.getElementById(`wpcoptimize-list-${siteIdx}`);
+        if (list.innerHTML.includes('Clicking WPC Optimize tab') || list.innerHTML.includes('Đang tải trạng thái tối ưu hóa')) {
+            loadWpcOptimizeStatus(siteIdx);
         }
     }
 }
@@ -3340,6 +3345,7 @@ function renderSites(sites) {
                     <button class="tab-btn active" onclick="switchTab(${i}, 'details', event)"><span class="dashicons dashicons-info wp-admin-icon"></span> Overview Details</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'security', event)"><span class="dashicons dashicons-shield wp-admin-icon"></span> Security & Protection</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'wpdefine', event)"><span class="dashicons dashicons-editor-code wp-admin-icon"></span> WordPress Define</button>
+                    <button class="tab-btn" onclick="switchTab(${i}, 'wpcoptimize', event)"><span class="dashicons dashicons-performance wp-admin-icon"></span> WPC Optimize</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'plugins', event)"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Plugins</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'themes', event)"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes</button>
                     <button class="tab-btn" onclick="switchTab(${i}, 'users', event)"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</button>
@@ -3446,6 +3452,21 @@ function renderSites(sites) {
                     <div class="plugin-list" id="wpdefine-list-${i}">
                         <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
                             Đang tải cấu hình hằng số...
+                        </div>
+                    </div>
+                </div>
+                <!-- Tab WPC Optimize -->
+                <div class="card-tab-content" id="tab-content-${i}-wpcoptimize">
+                    <div class="card-sec-title">
+                        <span><span class="dashicons dashicons-performance wp-admin-icon"></span> Tối ưu website bởi WPCloud.vn (WPC Optimize)</span>
+                        <button class="btn btn-secondary btn-sm" onclick="loadWpcOptimizeStatus(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
+                    </div>
+                    <div class="notice notice-info" style="margin-bottom: 12px; line-height: 1.4;">
+                        Quản lý các file tối ưu hóa hiệu suất & bảo mật của WPCloud.vn trong thư mục <code>wp-content/mu-plugins/</code>. Khi được bật, các tính năng sẽ tự động tải và tối ưu toàn bộ website mà không cần kích hoạt thủ công trong WordPress.
+                    </div>
+                    <div class="plugin-list" id="wpcoptimize-list-${i}">
+                        <div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">
+                            Đang tải trạng thái tối ưu hóa...
                         </div>
                     </div>
                 </div>
@@ -4400,6 +4421,173 @@ const STANDARD_WP_DEFINES = {
         default: 'false'
     }
 };
+
+const WPC_OPTIMIZE_METADATA = {
+    'wpc-optimize-editor.php': {
+        name: 'WPC Optimize - Editor',
+        desc: 'Tối ưu trình soạn thảo mặc định của WordPress.',
+        details: [
+            'Cài đặt Classic Editor làm trình soạn thảo bài viết mặc định (tắt block editor Gutenberg).',
+            'Tắt trình chỉnh sửa widget dạng block (Widgets Block Editor), khôi phục giao diện quản lý widget truyền thống.'
+        ]
+    },
+    'wpc-optimize-security.php': {
+        name: 'WPC Optimize - Security',
+        desc: 'Nâng cao bảo mật cơ bản cho hệ thống.',
+        details: [
+            'Tắt hoàn toàn XML-RPC để ngăn chặn các cuộc tấn công Brute Force và DDoS.',
+            'Tắt tính năng Pingback để bảo vệ băng thông và tài nguyên máy chủ.',
+            'Loại bỏ header X-Pingback khỏi các phản hồi HTTP.',
+            'Ẩn phiên bản WordPress khỏi thẻ HTML generator để tránh bị khai thác lỗ hổng.',
+            'Chặn việc đăng ký hoặc đặt username chứa từ "test" nhằm hạn chế spam.',
+            'Tắt chức năng sửa code trực tiếp (Theme/Plugin File Editor) trong wp-admin (DISALLOW_FILE_EDIT).'
+        ]
+    },
+    'wpc-optimize-compatibility.php': {
+        name: 'WPC Optimize - Compatibility',
+        desc: 'Cải thiện tính tương thích và giảm lỗi hệ thống.',
+        details: [
+            'Tắt cảnh báo và thông báo lỗi không cần thiết của hàm _load_textdomain_just_in_time.',
+            'Giúp file debug.log và PHP error log không bị phình to bởi các cảnh báo dịch thuật dư thừa của các theme/plugin cũ.'
+        ]
+    },
+    'wpc-optimize-admin.php': {
+        name: 'WPC Optimize - Admin',
+        desc: 'Tối giản hóa trang quản trị WordPress dashboard.',
+        details: [
+            'Xóa bỏ các dashboard widget gây chậm tải trang quản trị như: dashboard_right_now (Tổng quan), dashboard_activity (Hoạt động), dashboard_primary (Tin tức WP), woocommerce_dashboard_recent_reviews, dashboard_site_health, dashboard_quick_press, rank_math_dashboard_widget, dashboard_rediscache.',
+            'Ẩn logo WordPress mặc định ở góc trái thanh quản trị (Admin Bar).'
+        ]
+    },
+    'wpc-optimize-media.php': {
+        name: 'WPC Optimize - Media',
+        desc: 'Tối ưu hóa quản lý và xử lý hình ảnh, tệp tải lên.',
+        details: [
+            'Tắt tính năng tự động crop và tạo thêm các kích thước ảnh phụ khi upload ảnh mới (tiết kiệm dung lượng ổ đĩa vô cùng hiệu quả).',
+            'Vô hiệu hóa bộ lọc kích thước ảnh trung gian (intermediate_image_sizes và intermediate_image_sizes_advanced).',
+            'Cho phép tải lên các tệp định dạng SVG (Mime type: image/svg+xml) và CSV (Mime type: text/csv) một cách an toàn.'
+        ]
+    },
+    'wpc-optimize-frontend.php': {
+        name: 'WPC Optimize - Frontend',
+        desc: 'Tối ưu tốc độ tải trang ngoài giao diện (Frontend).',
+        details: [
+            'Tắt RSS Feeds mặc định và tự động chuyển hướng các đường dẫn RSS feed về trang chủ.',
+            'Dọn dẹp mã nguồn HTML header: xóa rsd_link, wlwmanifest_link, wp_generator, shortlink, adjacent_posts_rel_link.',
+            'Tắt hoàn toàn script và style của Emojis trên toàn trang.',
+            'Ngăn Contact Form 7 tự động load CSS trên các trang không sử dụng form.',
+            'Loại bỏ Query String khỏi các file CSS và JS tĩnh (?ver=) để tối ưu caching trên trình duyệt và Cloudflare.',
+            'Đưa jQuery và các script phụ thuộc xuống chân trang (Footer) để loại bỏ tài nguyên chặn hiển thị (render-blocking).',
+            'Tắt các gợi ý tài nguyên prefetch và resource hints mặc định của Flatsome và WordPress.'
+        ]
+    },
+    'wpc-optimize-flatsome.php': {
+        name: 'WPC Optimize - Flatsome',
+        desc: 'Tối ưu hóa riêng cho Theme Flatsome bán chạy.',
+        details: [
+            'Ẩn hoàn toàn bảng yêu cầu nhập License Key và thông báo chưa kích hoạt của Flatsome trong giao diện admin.',
+            'Tắt thông báo nhắc nhở Maintenance Mode của Flatsome gây mất thẩm mỹ trong trang quản trị.'
+        ]
+    }
+};
+
+async function loadWpcOptimizeStatus(i) {
+    const s = allSites[i];
+    const container = document.getElementById('wpcoptimize-list-' + i);
+    if (!container) return;
+    container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">⏳ Đang kiểm tra thư mục mu-plugins...</div>';
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('get_wpc_optimize_status'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            renderWpcOptimizeStatus(i, d.optimize_status);
+        } else {
+            container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Lỗi: ${esc(d.error)}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Không thể kết nối API tối ưu hóa.</div>';
+    }
+}
+
+function renderWpcOptimizeStatus(siteIdx, status) {
+    const container = document.getElementById('wpcoptimize-list-' + siteIdx);
+    if (!container) return;
+
+    let html = '<div style="display:flex; flex-direction:column; gap:12px;">';
+
+    for (const file of Object.keys(WPC_OPTIMIZE_METADATA)) {
+        const meta = WPC_OPTIMIZE_METADATA[file];
+        const isEnabled = status[file] || false;
+
+        let detailsHtml = '';
+        if (meta.details && meta.details.length > 0) {
+            detailsHtml = '<ul style="margin: 8px 0 0 20px; padding: 0; color: var(--text3); font-size: 14px; line-height: 1.5;">' + 
+                          meta.details.map(d => `<li>${esc(d)}</li>`).join('') + 
+                          '</ul>';
+        }
+
+        html += `
+        <div class="plugin-item" style="padding:16px; flex-direction:column; align-items:stretch; gap:8px;">
+            <div style="display:flex; align-items:center; justify-between; gap:12px;">
+                <div class="plugin-info" style="flex:1;">
+                    <div class="plugin-name" style="font-size:17px; font-weight:700;">${esc(meta.name)} <span style="font-size:12px; font-family:monospace; color:var(--text3); font-weight:normal;">(${esc(file)})</span></div>
+                    <div class="plugin-desc" style="white-space:normal; font-size:14px; margin-top:4px; color:var(--text2);">${esc(meta.desc)}</div>
+                </div>
+                <div class="plugin-toggle" style="align-self:center;">
+                    <label class="switch">
+                        <input type="checkbox" id="wpc-opt-toggle-${siteIdx}-${file.replace(/\./g, '-')}" ${isEnabled ? 'checked' : ''} onchange="toggleWpcOptimize(${siteIdx}, '${file}')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            ${detailsHtml}
+        </div>
+        `;
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function toggleWpcOptimize(siteIdx, file) {
+    const s = allSites[siteIdx];
+    if (s.locked) {
+        toast('Website is under WordPress Lockdown. Please disable Lockdown before modifying mu-plugins.', 'error');
+        loadWpcOptimizeStatus(siteIdx);
+        return;
+    }
+
+    const checkbox = document.getElementById(`wpc-opt-toggle-${siteIdx}-${file.replace(/\./g, '-')}`);
+    const isChecked = checkbox.checked;
+    
+    checkbox.disabled = true;
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        fd.append('file', file);
+        fd.append('enable', isChecked ? 'true' : 'false');
+
+        const r = await fetch(apiUrl('toggle_wpc_optimize'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            toast(d.message || 'Cập nhật trạng thái tối ưu thành công.', 'success');
+        } else {
+            toast(d.error || 'Thao tác thất bại.', 'error');
+            checkbox.checked = !isChecked;
+        }
+    } catch (err) {
+        toast('Lỗi kết nối máy chủ.', 'error');
+        checkbox.checked = !isChecked;
+    } finally {
+        checkbox.disabled = false;
+    }
+}
 
 async function loadWpDefines(i) {
     const s = allSites[i];
