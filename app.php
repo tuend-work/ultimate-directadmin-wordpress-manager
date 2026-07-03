@@ -4025,11 +4025,7 @@ function toggle_wpc_optimize($site_path, $file_name, $enable) {
     $mu_dir = rtrim($site_path, '/') . '/wp-content/mu-plugins';
     $target_file = $mu_dir . '/' . $file_name;
 
-    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
-    }
-    $template_file = $plugin_dir . '/wpc-optimize-mu-plugins-wpcloud/mu-plugins/' . $file_name;
+    $template_file = __DIR__ . '/wpc-optimize-mu-plugins-wpcloud/mu-plugins/' . $file_name;
 
     if ($enable) {
         if (!is_dir($mu_dir)) {
