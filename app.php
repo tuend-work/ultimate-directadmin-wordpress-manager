@@ -4557,9 +4557,12 @@ function run_api() {
     $already_delegated = ($executing_uid === 0 || getenv('DELEGATED_BY_WRAPPER') === '1');
     
     $is_root_action = ($action === 'clone' || $action === 'create_database');
-    $should_delegate = !$is_win && !$already_delegated && is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user) && $action !== 'get_users' && $action !== 'update_plugin';
+    $should_delegate = !$is_win && !$already_delegated && (
+        (is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user)) ||
+        (!$already_delegated && $is_root_action)
+    ) && $action !== 'get_users' && $action !== 'update_plugin';
     if ($should_delegate) {
-        $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
+        $target_user_clean = !empty($target_user_input) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input) : $current_exec_user;
         $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
         if (!file_exists($wrapper)) {
             $wrapper = dirname(__FILE__) . '/scripts/wrapper';
