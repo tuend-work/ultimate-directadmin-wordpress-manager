@@ -4550,8 +4550,14 @@ function run_api() {
     // Delegation logic for admin impersonation
     $current_exec_user = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    
+    // Check if we are already running inside the wrapper delegation context to prevent infinite loops.
+    // If PHP's current system user is already root, or if a wrapper-specific environment variable is present, bypass.
+    $executing_uid = function_exists('posix_getuid') ? posix_getuid() : -1;
+    $already_delegated = ($executing_uid === 0 || getenv('DELEGATED_BY_WRAPPER') === '1');
+    
     $is_root_action = ($action === 'clone' || $action === 'create_database');
-    $should_delegate = !$is_win && is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user) && $action !== 'get_users' && $action !== 'update_plugin';
+    $should_delegate = !$is_win && !$already_delegated && is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user) && $action !== 'get_users' && $action !== 'update_plugin';
     if ($should_delegate) {
         $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
         $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
@@ -4562,7 +4568,7 @@ function run_api() {
         if (file_exists($wrapper)) {
             $target_home = "/home/{$target_user_clean}";
             $env_prefix = sprintf(
-                'USERNAME=%s USER=%s HOME=%s QUERY_STRING=%s POST=%s ',
+                'DELEGATED_BY_WRAPPER=1 USERNAME=%s USER=%s HOME=%s QUERY_STRING=%s POST=%s ',
                 escapeshellarg($target_user_clean),
                 escapeshellarg($target_user_clean),
                 escapeshellarg($target_home),
