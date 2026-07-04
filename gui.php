@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.8';
+$plugin_version = '1.9.9';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3921,7 +3921,15 @@ async function createDB(name, user, pass, targetUser = '') {
     if (targetUser) {
         fd.append('target_user', targetUser);
     }
-    const r = await fetch(apiUrl('create_database'), {
+    
+    let url = apiUrl('create_database');
+    if (isAdmin && targetUser) {
+        const u = new URL(url, window.location.href);
+        u.searchParams.set('target_user', targetUser);
+        url = u.pathname + u.search + u.hash;
+    }
+
+    const r = await fetch(url, {
         method: 'POST',
         body: fd
     });
