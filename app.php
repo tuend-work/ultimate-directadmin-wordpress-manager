@@ -4550,7 +4550,9 @@ function run_api() {
     // Delegation logic for admin impersonation
     $current_exec_user = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
     $is_win = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
-    if (!$is_win && is_admin_user() && !empty($target_user_input) && $target_user_input !== $current_exec_user && $action !== 'get_users' && $action !== 'update_plugin') {
+    $is_root_action = ($action === 'clone' || $action === 'create_database');
+    $should_delegate = !$is_win && is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user) && $action !== 'get_users' && $action !== 'update_plugin';
+    if ($should_delegate) {
         $target_user_clean = preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input);
         $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
         if (!file_exists($wrapper)) {
