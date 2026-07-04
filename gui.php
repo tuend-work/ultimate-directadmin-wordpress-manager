@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '1.9.6';
+$plugin_version = '1.9.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3943,7 +3943,8 @@ async function executeInstall(e) {
         const db = await createDB(
             document.getElementById('inst-dbname').value,
             document.getElementById('inst-dbuser').value,
-            document.getElementById('inst-dbpass').value
+            document.getElementById('inst-dbpass').value,
+            activeUser
         );
         toast('1/3 Database created.', 'success');
         
