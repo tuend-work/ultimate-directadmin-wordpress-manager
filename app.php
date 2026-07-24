@@ -3512,34 +3512,67 @@ function install_wordpress_instance($params, $home) {
         
         if ($db_file) {
             $db_file_path = $target_dir . '/' . $db_file;
+            $uncompressed_sql = sys_get_temp_dir() . '/prep_db_' . time() . '_' . wp_generate_random_secret(6) . '.sql';
             
-            // Build MySQL command
+            // 1. Decompress or copy to plain SQL file
             if (preg_match('/\.gz$/i', $db_file)) {
-                $cmd = sprintf(
-                    'gunzip -c %s | mysql -h %s -u %s -p%s %s 2>&1',
-                    escapeshellarg($db_file_path),
-                    escapeshellarg('localhost'),
-                    escapeshellarg($db_user),
-                    escapeshellarg($db_pass),
-                    escapeshellarg($db_name)
-                );
+                $sfp = gzopen($db_file_path, 'rb');
+                $dfp = fopen($uncompressed_sql, 'wb');
+                if ($sfp && $dfp) {
+                    while (!gzeof($sfp)) {
+                        fwrite($dfp, gzread($sfp, 4096));
+                    }
+                    gzclose($sfp);
+                    fclose($dfp);
+                } else {
+                    if ($sfp) gzclose($sfp);
+                    if ($dfp) fclose($dfp);
+                    @unlink($db_file_path);
+                    throw new Exception("Không thể giải nén file database .gz.");
+                }
             } else {
-                $cmd = sprintf(
-                    'mysql -h %s -u %s -p%s %s < %s 2>&1',
-                    escapeshellarg('localhost'),
-                    escapeshellarg($db_user),
-                    escapeshellarg($db_pass),
-                    escapeshellarg($db_name),
-                    escapeshellarg($db_file_path)
-                );
+                @copy($db_file_path, $uncompressed_sql);
             }
+            
+            // Delete original db file inside web directory for security
+            @unlink($db_file_path);
+            
+            // 2. Filter out 'CREATE DATABASE' and 'USE `...`' statements from SQL file
+            if (file_exists($uncompressed_sql)) {
+                $cleaned_sql = sys_get_temp_dir() . '/clean_db_' . time() . '_' . wp_generate_random_secret(6) . '.sql';
+                $in_fp = fopen($uncompressed_sql, 'r');
+                $out_fp = fopen($cleaned_sql, 'w');
+                if ($in_fp && $out_fp) {
+                    while (($line = fgets($in_fp)) !== false) {
+                        // Skip lines matching CREATE DATABASE or USE statements (case-insensitive)
+                        if (preg_match('/^\s*CREATE\s+DATABASE\b/i', $line) || preg_match('/^\s*USE\s+[`\'"]?[a-zA-Z0-9_\-]+[`\'"]?\s*;/i', $line)) {
+                            continue;
+                        }
+                        fwrite($out_fp, $line);
+                    }
+                    fclose($in_fp);
+                    fclose($out_fp);
+                    @unlink($uncompressed_sql);
+                    $uncompressed_sql = $cleaned_sql;
+                }
+            }
+            
+            // 3. Import sanitized SQL into MySQL
+            $cmd = sprintf(
+                'mysql -h %s -u %s -p%s %s < %s 2>&1',
+                escapeshellarg('localhost'),
+                escapeshellarg($db_user),
+                escapeshellarg($db_pass),
+                escapeshellarg($db_name),
+                escapeshellarg($uncompressed_sql)
+            );
             
             $output = [];
             $retval = null;
             exec($cmd, $output, $retval);
             
-            // Delete the database file immediately for security
-            @unlink($db_file_path);
+            // Delete temporary sql file
+            @unlink($uncompressed_sql);
             
             // Update wp-config.php with new database details
             $wp_config_path = $target_dir . '/wp-config.php';
