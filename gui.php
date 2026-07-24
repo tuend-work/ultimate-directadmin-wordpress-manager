@@ -917,14 +917,18 @@ input:disabled + .slider {
 
         <div class="form-section">
             <div class="form-section-title">Nguồn Cài Đặt (Source)</div>
-            <div style="display: flex; gap: 20px; margin-bottom: 12px;">
+            <div style="display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap;">
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
                     <input type="radio" name="inst-source" value="fresh" checked onchange="toggleInstallSource('fresh')" style="width:14px; height:14px; accent-color: var(--blue);">
                     <span>Cài đặt mới (Fresh WP)</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
                     <input type="radio" name="inst-source" value="zip" onchange="toggleInstallSource('zip')" style="width:14px; height:14px; accent-color: var(--blue);">
-                    <span>Cài đặt từ tệp ZIP (From ZIP)</span>
+                    <span>Chọn ZIP từ Hosting</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
+                    <input type="radio" name="inst-source" value="zip_url" onchange="toggleInstallSource('zip_url')" style="width:14px; height:14px; accent-color: var(--blue);">
+                    <span>Tải ZIP từ URL</span>
                 </label>
             </div>
             
@@ -937,6 +941,12 @@ input:disabled + .slider {
                     <button type="button" class="btn btn-secondary" onclick="loadUserZipFiles()"><span class="dashicons dashicons-update wp-admin-icon"></span> Quét lại</button>
                 </div>
                 <span style="font-size:14px;color:var(--text3)">Hãy upload tệp ZIP sao lưu của bạn lên hosting (qua FTP/File Manager) rồi chọn từ danh sách trên. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
+            </div>
+
+            <div id="inst-zip-url-wrapper" style="display: none;" class="form-group">
+                <label>Nhập URL tệp ZIP source code <span style="font-weight:400;color:var(--red)">*</span></label>
+                <input type="url" id="inst-zip-url" class="form-control" placeholder="https://example.com/backup.zip">
+                <span style="font-size:14px;color:var(--text3)">Hệ thống sẽ tự động tải file ZIP từ liên kết này về giải nén và tiến hành cài đặt WP. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
             </div>
         </div>
 
@@ -3882,18 +3892,31 @@ async function loadUserZipFiles() {
 function toggleInstallSource(mode) {
     const zipWrapper = document.getElementById('inst-zip-wrapper');
     const zipSelect = document.getElementById('inst-zip-path');
+    const zipUrlWrapper = document.getElementById('inst-zip-url-wrapper');
+    const zipUrlInput = document.getElementById('inst-zip-url');
     const adminSec = document.getElementById('inst-admin-section');
     const adminInputs = adminSec.querySelectorAll('input');
 
     if (mode === 'zip') {
         zipWrapper.style.display = 'block';
         zipSelect.required = true;
+        zipUrlWrapper.style.display = 'none';
+        zipUrlInput.required = false;
         adminSec.style.display = 'none';
         adminInputs.forEach(i => i.required = false);
         loadUserZipFiles();
+    } else if (mode === 'zip_url') {
+        zipWrapper.style.display = 'none';
+        zipSelect.required = false;
+        zipUrlWrapper.style.display = 'block';
+        zipUrlInput.required = true;
+        adminSec.style.display = 'none';
+        adminInputs.forEach(i => i.required = false);
     } else {
         zipWrapper.style.display = 'none';
         zipSelect.required = false;
+        zipUrlWrapper.style.display = 'none';
+        zipUrlInput.required = false;
         adminSec.style.display = 'block';
         adminInputs.forEach(i => i.required = true);
     }
@@ -3956,7 +3979,7 @@ async function executeInstall(e) {
         );
         toast('1/3 Database created.', 'success');
         
-        btn.textContent = mode === 'zip' ? 'Extracting ZIP & Importing database…' : 'Installing WordPress…';
+        btn.textContent = (mode === 'zip' || mode === 'zip_url') ? 'Downloading/Extracting ZIP & Importing database…' : 'Installing WordPress…';
 
         const fd = new FormData();
         fd.append('action', 'install');
@@ -3974,6 +3997,12 @@ async function executeInstall(e) {
                 throw new Error("Vui lòng chọn một tệp ZIP backup để tiến hành cài đặt!");
             }
             fd.append('zip_path', zipPath);
+        } else if (mode === 'zip_url') {
+            const zipUrl = document.getElementById('inst-zip-url').value;
+            if (!zipUrl) {
+                throw new Error("Vui lòng nhập đường dẫn URL tệp ZIP để tiến hành cài đặt!");
+            }
+            fd.append('zip_url', zipUrl);
         } else {
             fd.append('site_title', document.getElementById('inst-title').value);
             fd.append('admin_user', document.getElementById('inst-adminuser').value);

@@ -3410,26 +3410,71 @@ function install_wordpress_instance($params, $home) {
         throw new Exception("WordPress is already configured in this folder.");
     }
     
-    if ($mode === 'zip') {
-        // Zip install from path
-        $zip_path = $params['zip_path'] ?? '';
-        if (empty($zip_path) || !file_exists($zip_path)) {
-            throw new Exception("Không tìm thấy tệp ZIP cấu hình tại đường dẫn: " . $zip_path);
+    if ($mode === 'zip' || $mode === 'zip_url') {
+        $temp_downloaded_zip = null;
+        if ($mode === 'zip_url') {
+            $zip_url = filter_var($params['zip_url'] ?? '', FILTER_VALIDATE_URL);
+            if (!$zip_url) {
+                throw new Exception("Địa chỉ URL tệp ZIP không hợp lệ.");
+            }
+            
+            $cache_dir = $home . '/.wp-cache';
+            if (!is_dir($cache_dir)) {
+                mkdir($cache_dir, 0755, true);
+            }
+            $temp_downloaded_zip = $cache_dir . '/url_download_' . time() . '_' . wp_generate_random_secret(8) . '.zip';
+            
+            $fp = fopen($temp_downloaded_zip, 'w+');
+            if (!$fp) {
+                throw new Exception("Không thể tạo tệp tạm để lưu tệp ZIP từ URL.");
+            }
+            
+            $ch = curl_init($zip_url);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 600);
+            curl_setopt($ch, CURLOPT_FILE, $fp);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'DirectAdmin-WP-Manager');
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            $exec_ok = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curl_err = curl_error($ch);
+            curl_close($ch);
+            fclose($fp);
+            
+            if (!$exec_ok || $http_code < 200 || $http_code >= 300 || !file_exists($temp_downloaded_zip) || filesize($temp_downloaded_zip) === 0) {
+                @unlink($temp_downloaded_zip);
+                throw new Exception("Không thể tải tệp ZIP từ URL (HTTP {$http_code}): " . ($curl_err ? $curl_err : "Lỗi kết nối hoặc URL không hợp lệ."));
+            }
+            $zip_path = $temp_downloaded_zip;
+        } else {
+            // Zip install from path
+            $zip_path = $params['zip_path'] ?? '';
+            if (empty($zip_path) || !file_exists($zip_path)) {
+                throw new Exception("Không tìm thấy tệp ZIP cấu hình tại đường dẫn: " . $zip_path);
+            }
+            
+            // Save copy to .wp-cache for debugging
+            $cache_dir = $home . '/.wp-cache';
+            if (!is_dir($cache_dir)) {
+                mkdir($cache_dir, 0755, true);
+            }
+            @copy($zip_path, $cache_dir . '/uploaded_backup.zip');
         }
-        
-        // Save copy to .wp-cache for debugging
-        $cache_dir = $home . '/.wp-cache';
-        if (!is_dir($cache_dir)) {
-            mkdir($cache_dir, 0755, true);
-        }
-        @copy($zip_path, $cache_dir . '/uploaded_backup.zip');
         
         $zip = new ZipArchive;
         if ($zip->open($zip_path) === TRUE) {
             $zip->extractTo($target_dir);
             $zip->close();
         } else {
+            if ($temp_downloaded_zip && file_exists($temp_downloaded_zip)) {
+                @unlink($temp_downloaded_zip);
+            }
             throw new Exception("Không thể giải nén tệp ZIP source code.");
+        }
+
+        if ($temp_downloaded_zip && file_exists($temp_downloaded_zip)) {
+            @unlink($temp_downloaded_zip);
         }
         
         // Scan for database file
@@ -4691,7 +4736,14 @@ function run_api() {
             case 'install':
                 wp_manager_log("Install API triggered. POST: " . json_encode($_POST) . " | CONTENT_TYPE: " . ($_SERVER['CONTENT_TYPE'] ?? '') . " | CONTENT_LENGTH: " . ($_SERVER['CONTENT_LENGTH'] ?? ''));
                 $mode = $_POST['mode'] ?? 'fresh';
-                if ($mode === 'zip') {
+                if ($mode === 'zip_url') {
+                    $required = ['domain', 'db_name', 'db_user', 'db_pass', 'zip_url'];
+                    foreach ($required as $field) {
+                        if (empty($_POST[$field])) {
+                            throw new Exception("Required parameter missing: {$field}");
+                        }
+                    }
+                } else if ($mode === 'zip') {
                     $required = ['domain', 'db_name', 'db_user', 'db_pass', 'zip_path'];
                     foreach ($required as $field) {
                         if (empty($_POST[$field])) {
