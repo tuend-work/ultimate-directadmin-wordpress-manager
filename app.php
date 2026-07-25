@@ -2158,27 +2158,114 @@ function list_wordpress_users($site_path) {
 }
 
 /**
- * Change a WordPress user's password.
+ * Modify a WordPress user's details (username/login, email, display_name, role, and optional password).
  */
-function change_wordpress_user_password($site_path, $user_id, $new_password) {
+function modify_wordpress_user($site_path, $user_id, $data) {
     $user_id = (int)$user_id;
     if ($user_id <= 0) {
-        throw new Exception("Invalid user ID.");
+        throw new Exception("ID người dùng không hợp lệ.");
     }
-    if (strlen($new_password) < 8) {
-        throw new Exception("Password must be at least 8 characters.");
-    }
-    if (!wordpress_user_exists($site_path, $user_id)) {
-        throw new Exception("User not found.");
-    }
-
-    wp_manager_bootstrap_auth($site_path);
-    if (!function_exists('wp_set_password')) {
-        throw new Exception("WordPress password helper is unavailable.");
+    
+    // Check if website is locked
+    if (is_wordpress_locked($site_path)) {
+        throw new Exception("Website đang bị khóa (WP Lock). Vui lòng tắt WP Lock trước khi sửa thông tin user.");
     }
 
-    wp_set_password($new_password, $user_id);
-    return ['success' => true, 'message' => 'User password changed successfully.'];
+    $db = wp_manager_get_db_conn($site_path . '/wp-config.php');
+    if (!$db) {
+        throw new Exception("Không thể kết nối đến Database.");
+    }
+
+    $prefix = $db['prefix'];
+
+    // Ensure user exists
+    $stmt = $db['pdo']->prepare("SELECT user_login, user_email FROM `{$prefix}users` WHERE ID = ?");
+    $stmt->execute([$user_id]);
+    $current_user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$current_user) {
+        throw new Exception("Không tìm thấy người dùng.");
+    }
+
+    $username = trim($data['username'] ?? '');
+    $email = trim($data['email'] ?? '');
+    $display_name = trim($data['display_name'] ?? '');
+    $role = trim($data['role'] ?? '');
+    $password = $data['password'] ?? '';
+
+    if (empty($username) || empty($email)) {
+        throw new Exception("Tên đăng nhập và Email không được để trống.");
+    }
+
+    // Check if username changed and if new username conflicts
+    if (strcasecmp($username, $current_user['user_login']) !== 0) {
+        $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$prefix}users` WHERE user_login = ? AND ID != ?");
+        $stmt->execute([$username, $user_id]);
+        if ($stmt->fetchColumn() > 0) {
+            throw new Exception("Tên đăng nhập mới đã được sử dụng bởi tài khoản khác.");
+        }
+    }
+
+    // Check if email changed and if new email conflicts
+    if (strcasecmp($email, $current_user['user_email']) !== 0) {
+        $stmt = $db['pdo']->prepare("SELECT COUNT(*) FROM `{$prefix}users` WHERE user_email = ? AND ID != ?");
+        $stmt->execute([$email, $user_id]);
+        if ($stmt->fetchColumn() > 0) {
+            throw new Exception("Email mới đã được sử dụng bởi tài khoản khác.");
+        }
+    }
+
+    // Prepare fields to update in wp_users
+    $update_fields = [
+        'user_login = ?',
+        'user_email = ?',
+        'display_name = ?'
+    ];
+    $update_params = [$username, $email, !empty($display_name) ? $display_name : $username];
+
+    // If password provided, validate and hash
+    if (!empty($password)) {
+        if (strlen($password) < 8) {
+            throw new Exception("Mật khẩu phải dài ít nhất 8 ký tự.");
+        }
+        $phpass_file = $site_path . '/wp-includes/class-phpass.php';
+        if (!file_exists($phpass_file)) {
+            throw new Exception("Không tìm thấy thư viện băm mật khẩu của WordPress.");
+        }
+        require_once $phpass_file;
+        if (!class_exists('PasswordHash')) {
+            throw new Exception("Lớp băm mật khẩu không khả dụng.");
+        }
+        $wp_hasher = new PasswordHash(8, true);
+        $hashed_password = $wp_hasher->HashPassword($password);
+        $update_fields[] = 'user_pass = ?';
+        $update_params[] = $hashed_password;
+    }
+
+    $update_params[] = $user_id;
+    $sql = "UPDATE `{$prefix}users` SET " . implode(', ', $update_fields) . " WHERE ID = ?";
+    $stmt = $db['pdo']->prepare($sql);
+    $stmt->execute($update_params);
+
+    // Update role if provided
+    if (!empty($role)) {
+        $caps = serialize([$role => true]);
+        $stmt = $db['pdo']->prepare("
+            INSERT INTO `{$prefix}usermeta` (user_id, meta_key, meta_value) 
+            VALUES (?, ?, ?) 
+            ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value)
+        ");
+        $stmt->execute([$user_id, $prefix . 'capabilities', $caps]);
+
+        $level = 0;
+        if ($role === 'administrator') $level = 10;
+        elseif ($role === 'editor') $level = 7;
+        elseif ($role === 'author') $level = 2;
+        elseif ($role === 'contributor') $level = 1;
+
+        $stmt->execute([$user_id, $prefix . 'user_level', $level]);
+    }
+
+    return ['success' => true, 'message' => 'Cập nhật thông tin người dùng thành công.'];
 }
 
 /**
@@ -5170,16 +5257,16 @@ function run_api() {
                 echo json_encode(['success' => true, 'users' => $users]);
                 break;
 
-            case 'change_user_password':
-                if (empty($_POST['path']) || empty($_POST['user_id']) || !isset($_POST['password'])) {
-                    throw new Exception("Missing parameters.");
+            case 'modify_user':
+                if (empty($_POST['path']) || empty($_POST['user_id'])) {
+                    throw new Exception("Thiếu tham số bắt buộc.");
                 }
                 if (strpos(realpath($_POST['path']) ?: $_POST['path'], $home) !== 0) {
-                    throw new Exception("Invalid directory access.");
+                    throw new Exception("Yêu cầu quyền truy cập thư mục hợp lệ.");
                 }
-                wp_manager_log("Thay đổi mật khẩu user ID '" . $_POST['user_id'] . "' cho website: " . $_POST['path']);
-                $res = change_wordpress_user_password($_POST['path'], $_POST['user_id'], $_POST['password']);
-                wp_manager_log("Thay đổi mật khẩu user thành công.");
+                wp_manager_log("Chỉnh sửa thông tin user ID '" . $_POST['user_id'] . "' cho website: " . $_POST['path']);
+                $res = modify_wordpress_user($_POST['path'], $_POST['user_id'], $_POST);
+                wp_manager_log("Cập nhật thông tin user thành công.");
                 echo json_encode($res);
                 break;
 

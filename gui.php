@@ -1182,33 +1182,51 @@ input:disabled + .slider {
 </div>
 </div>
 
-<!-- ═══ MODAL: Change User Password ═══ -->
-<div class="modal-overlay" id="modal-change-password">
-<div class="modal" style="max-width:460px;">
+<!-- ═══ MODAL: Modify User ═══ -->
+<div class="modal-overlay" id="modal-modify-user">
+<div class="modal" style="max-width:480px;">
     <div class="modal-head">
-        <h3><span class="dashicons dashicons-lock wp-admin-icon"></span> Đổi Mật Khẩu User</h3>
-        <button class="modal-close" onclick="closeModal('modal-change-password')">✕</button>
+        <h3><span class="dashicons dashicons-edit wp-admin-icon"></span> Sửa Thông Tin User</h3>
+        <button class="modal-close" onclick="closeModal('modal-modify-user')">✕</button>
     </div>
-    <form id="form-change-password" onsubmit="executeChangePassword(event)">
-        <input type="hidden" id="change-pass-site-idx">
-        <input type="hidden" id="change-pass-user-id">
-        <input type="hidden" id="change-pass-user-idx">
+    <form id="form-modify-user" onsubmit="executeModifyUser(event)">
+        <input type="hidden" id="modify-user-site-idx">
+        <input type="hidden" id="modify-user-user-id">
+        <input type="hidden" id="modify-user-user-idx">
         <div class="modal-body">
             <div class="form-group" style="margin-bottom: 12px;">
-                <label>Username</label>
-                <input type="text" id="change-pass-username" class="form-control" readonly style="background-color: var(--bg2); color: var(--text3);">
+                <label>Tên đăng nhập (Username) <span style="color:var(--red)">*</span></label>
+                <input type="text" id="modify-user-username" class="form-control" required placeholder="Tên đăng nhập">
             </div>
             <div class="form-group" style="margin-bottom: 12px;">
-                <label>Mật khẩu mới <span style="color:var(--red)">*</span></label>
+                <label>Tên hiển thị (Display Name)</label>
+                <input type="text" id="modify-user-display-name" class="form-control" placeholder="Tên hiển thị">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Email <span style="color:var(--red)">*</span></label>
+                <input type="email" id="modify-user-email" class="form-control" required placeholder="Email">
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Vai trò (Role) <span style="color:var(--red)">*</span></label>
+                <select id="modify-user-role" class="form-control">
+                    <option value="administrator">Administrator (Quản trị viên)</option>
+                    <option value="editor">Editor (Biên tập viên)</option>
+                    <option value="author">Author (Tác giả)</option>
+                    <option value="contributor">Contributor (Cộng tác viên)</option>
+                    <option value="subscriber">Subscriber (Thành viên)</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Mật khẩu mới</label>
                 <div class="input-group-btn">
-                    <input type="text" id="change-pass-password" class="form-control" required placeholder="Mật khẩu mới">
-                    <button type="button" class="btn btn-secondary" onclick="genPass('change-pass-password')">Gen</button>
+                    <input type="text" id="modify-user-password" class="form-control" placeholder="Để trống nếu không muốn thay đổi">
+                    <button type="button" class="btn btn-secondary" onclick="genPass('modify-user-password')">Gen</button>
                 </div>
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-change-password')">Hủy</button>
-            <button type="submit" class="btn btn-primary" id="btn-change-pass-submit">Lưu thay đổi</button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-modify-user')">Hủy</button>
+            <button type="submit" class="btn btn-primary" id="btn-modify-user-submit">Lưu thay đổi</button>
         </div>
     </form>
 </div>
@@ -2345,6 +2363,7 @@ async function loadUsers(i) {
                 const displayName = u.display_name || u.user_login;
                 const roles = Array.isArray(u.roles) && u.roles.length ? u.roles.join(', ') : 'No role';
                 const email = u.user_email || 'No email';
+                const primaryRole = Array.isArray(u.roles) && u.roles.length ? u.roles[0] : 'administrator';
                 return `
                 <div class="plugin-item">
                     <div class="plugin-info">
@@ -2353,7 +2372,7 @@ async function loadUsers(i) {
                         <div class="plugin-meta">Login: ${esc(u.user_login)} | Roles: ${esc(roles)} | Registered: ${esc(u.user_registered || 'Unknown')}</div>
                     </div>
                     <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" id="btn-user-pass-${i}-${idx}" onclick="changeUserPassword(${i}, ${idx}, ${parseInt(u.ID, 10)}, '${escJsArg(displayName)}')"><span class="dashicons dashicons-admin-network wp-admin-icon"></span> Change Password</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-user-modify-${i}-${idx}" onclick="openModifyUserModal(${i}, ${idx}, ${parseInt(u.ID, 10)}, '${escJsArg(u.user_login || '')}', '${escJsArg(u.display_name || '')}', '${escJsArg(u.user_email || '')}', '${escJsArg(primaryRole)}')"><span class="dashicons dashicons-edit wp-admin-icon"></span> Modify User</button>
                         <button class="btn btn-sm btn-primary" id="btn-user-login-${i}-${idx}" onclick="loginAsUser(${i}, ${idx}, ${parseInt(u.ID, 10)})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Login As User</button>
                     </div>
                 </div>`;
@@ -2366,43 +2385,48 @@ async function loadUsers(i) {
     }
 }
 
-function changeUserPassword(siteIdx, userIdx, userId, displayName) {
-    document.getElementById('change-pass-site-idx').value = siteIdx;
-    document.getElementById('change-pass-user-id').value = userId;
-    document.getElementById('change-pass-user-idx').value = userIdx;
-    document.getElementById('change-pass-username').value = displayName;
+function openModifyUserModal(siteIdx, userIdx, userId, login, displayName, email, role) {
+    document.getElementById('modify-user-site-idx').value = siteIdx;
+    document.getElementById('modify-user-user-id').value = userId;
+    document.getElementById('modify-user-user-idx').value = userIdx;
+    document.getElementById('modify-user-username').value = login;
+    document.getElementById('modify-user-display-name').value = displayName;
+    document.getElementById('modify-user-email').value = email;
+    document.getElementById('modify-user-role').value = role || 'administrator';
     
-    // Auto-fill random password
-    genPass('change-pass-password');
+    // Default password field is empty as requested
+    document.getElementById('modify-user-password').value = '';
     
-    openModal('modal-change-password');
+    openModal('modal-modify-user');
 }
 
-async function executeChangePassword(event) {
+async function executeModifyUser(event) {
     event.preventDefault();
-    const siteIdx = document.getElementById('change-pass-site-idx').value;
-    const userId = document.getElementById('change-pass-user-id').value;
-    const userIdx = document.getElementById('change-pass-user-idx').value;
-    const password = document.getElementById('change-pass-password').value;
-    const displayName = document.getElementById('change-pass-username').value;
+    const siteIdx = document.getElementById('modify-user-site-idx').value;
+    const userId = document.getElementById('modify-user-user-id').value;
+    const userIdx = document.getElementById('modify-user-user-idx').value;
+    const username = document.getElementById('modify-user-username').value;
+    const displayName = document.getElementById('modify-user-display-name').value;
+    const email = document.getElementById('modify-user-email').value;
+    const role = document.getElementById('modify-user-role').value;
+    const password = document.getElementById('modify-user-password').value;
     
     const s = allSites[siteIdx];
     if (!s) return;
     
-    if (password.length < 8) {
-        toast('Mật khẩu phải có ít nhất 8 ký tự.', 'error');
+    if (password !== '' && password.length < 8) {
+        toast('Mật khẩu mới phải có ít nhất 8 ký tự.', 'error');
         return;
     }
     
-    const btn = document.getElementById('btn-change-pass-submit');
+    const btn = document.getElementById('btn-modify-user-submit');
     const originalText = btn ? btn.textContent : 'Lưu thay đổi';
     if (btn) {
         btn.disabled = true;
         btn.textContent = 'Đang lưu...';
     }
     
-    // Also disable the list button
-    const listBtn = document.getElementById(`btn-user-pass-${siteIdx}-${userIdx}`);
+    const listBtn = document.getElementById(`btn-user-modify-${siteIdx}-${userIdx}`);
     if (listBtn) {
         listBtn.disabled = true;
     }
@@ -2411,16 +2435,21 @@ async function executeChangePassword(event) {
         const fd = new FormData();
         fd.append('path', s.path);
         fd.append('user_id', userId);
+        fd.append('username', username);
+        fd.append('display_name', displayName);
+        fd.append('email', email);
+        fd.append('role', role);
         fd.append('password', password);
         
-        const r = await fetch(apiUrl('change_user_password'), { method: 'POST', body: fd });
+        const r = await fetch(apiUrl('modify_user'), { method: 'POST', body: fd });
         const d = await r.json();
         
         if (d.success) {
-            toast(`✅ Đã thay đổi mật khẩu cho user ${displayName} thành công!`, 'success');
-            closeModal('modal-change-password');
+            toast(`✅ Đã cập nhật thông tin user thành công!`, 'success');
+            closeModal('modal-modify-user');
+            loadUsers(siteIdx);
         } else {
-            toast('❌ Lỗi: ' + (d.error || 'Không thể đổi mật khẩu.'), 'error');
+            toast('❌ Lỗi: ' + (d.error || 'Không thể sửa thông tin user.'), 'error');
         }
     } catch (err) {
         toast('❌ Lỗi kết nối máy chủ.', 'error');
