@@ -2866,7 +2866,13 @@ function delete_site_from_cache($site_path) {
  * This approach is symlink-safe, depth-unlimited, and handles all DirectAdmin layouts.
  */
 function scan_wordpress_installations($home, $username) {
-    if (!empty($home) && !is_readable($home) && !empty($username)) {
+    $is_eff_root = false;
+    if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+        $is_eff_root = true;
+    }
+    $readable = $is_eff_root ? true : @is_readable($home);
+    
+    if (!empty($home) && !$readable && !empty($username)) {
         $cache_file = $home . '/.ultimate_wp_manager.json';
         if (file_exists($cache_file)) {
             $data = json_decode(file_get_contents($cache_file), true);
