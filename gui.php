@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.0';
+$plugin_version = '2.2.1';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1586,8 +1586,12 @@ const apiUrl = (action='') => {
     else if (!b.endsWith('/')) b += '/';
     
     let act = action;
-    if (isAdmin && activeUser === 'all' && (action === 'list' || action === '' || action === 'scan')) {
-        act = 'bulk_list';
+    if (isAdmin && activeUser === 'all') {
+        if (action === 'list' || action === '') {
+            act = 'bulk_list';
+        } else if (action === 'scan') {
+            act = 'bulk_scan';
+        }
     }
     
     let url = b + 'index.raw' + (act ? '?action='+act : '');
