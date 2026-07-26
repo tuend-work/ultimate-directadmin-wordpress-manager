@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.1.3';
+$plugin_version = '2.1.4';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -4485,24 +4485,10 @@ async function bulkLoadSites() {
 
     if (scope === 'all') {
         try {
-            // Use apiUrlAdmin to avoid auto-injecting target_user (which would trigger delegation)
-            const r = await fetch(apiUrlAdmin('get_users'));
+            const r = await fetch(apiUrl('bulk_list'));
             const d = await r.json();
-            if (d.success && d.users && d.users.length) {
-                for (const u of d.users) {
-                    try {
-                        // Scan sites for each user using apiUrlAdmin with explicit target_user
-                        const rSite = await fetch(apiUrlAdmin('scan', u));
-                        const text = await rSite.text();
-                        const json_start = text.indexOf('{');
-                        if (json_start === -1) continue;
-                        const dSite = JSON.parse(text.substring(json_start));
-                        if (dSite.success && dSite.sites && dSite.sites.length) {
-                            dSite.sites.forEach(s => { s._owner_user = u; });
-                            bulkSitesList.push(...dSite.sites);
-                        }
-                    } catch (e) { /* skip user on error */ }
-                }
+            if (d.success && d.sites && d.sites.length) {
+                bulkSitesList = d.sites;
             }
         } catch (e) {
             // Fallback to current loaded sites

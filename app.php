@@ -2826,6 +2826,9 @@ function scan_wordpress_installations($home, $username) {
     $cache_file = $home . '/.ultimate_wp_manager.json';
     file_put_contents($cache_file, json_encode($installations, JSON_PRETTY_PRINT));
     @chmod($cache_file, 0600);
+    if (function_exists('posix_getuid') && posix_getuid() === 0 && !empty($username)) {
+        @chown($cache_file, $username);
+    }
 
     return $installations;
 }
@@ -4746,7 +4749,7 @@ function run_api() {
     $executing_uid = function_exists('posix_getuid') ? posix_getuid() : -1;
     $already_delegated = ($executing_uid === 0 || getenv('DELEGATED_BY_WRAPPER') === '1');
     
-    $is_root_action = ($action === 'clone' || $action === 'create_database');
+    $is_root_action = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list');
     $should_delegate = !$is_win && !$already_delegated && (
         (is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user)) ||
         (!$already_delegated && $is_root_action)
@@ -4822,6 +4825,35 @@ function run_api() {
                 }
                 $users = get_all_directadmin_users();
                 echo json_encode(['success' => true, 'users' => $users]);
+                break;
+
+            case 'bulk_list':
+                if (!is_admin_user() && (!function_exists('posix_getuid') || posix_getuid() !== 0)) {
+                    throw new Exception("Forbidden: Access restricted to Administrators.");
+                }
+                $users = get_all_directadmin_users();
+                $all_sites = [];
+                foreach ($users as $u) {
+                    $u_home = "/home/{$u}";
+                    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                        $u_home = 'C:/Users/' . $u;
+                    }
+                    $cache_file = $u_home . '/.ultimate_wp_manager.json';
+                    $sites = [];
+                    if (file_exists($cache_file)) {
+                        $sites = json_decode(file_get_contents($cache_file), true);
+                    }
+                    if (!is_array($sites)) {
+                        $sites = scan_wordpress_installations($u_home, $u);
+                    }
+                    if (is_array($sites)) {
+                        foreach ($sites as $s) {
+                            $s['_owner_user'] = $u;
+                            $all_sites[] = $s;
+                        }
+                    }
+                }
+                echo json_encode(['success' => true, 'sites' => $all_sites]);
                 break;
                 
             case 'create_database':
