@@ -8,14 +8,24 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-PLUGIN_DIR="/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager"
+PLUGIN_DIR="/usr/local/directadmin/plugins/ultimate_da_wordpress_manager"
 TMP_DIR="/tmp/da_wp_manager_install"
 
-echo -e "\e[34m[1/4] Preparing directories...\e[0m"
+# Auto-install unzip if missing
+if ! command -v unzip &> /dev/null; then
+  echo -e "\e[33m[1/5] unzip utility is missing. Installing unzip...\e[0m"
+  if command -v yum &> /dev/null; then
+    yum install -y unzip
+  elif command -v apt-get &> /dev/null; then
+    apt-get update && apt-get install -y unzip
+  fi
+fi
+
+echo -e "\e[34m[2/5] Preparing directories...\e[0m"
 rm -rf "$TMP_DIR"
 mkdir -p "$TMP_DIR"
 
-echo -e "\e[34m[2/4] Downloading latest code from GitHub...\e[0m"
+echo -e "\e[34m[3/5] Downloading latest code from GitHub...\e[0m"
 curl -sSL https://github.com/tuend-work/ultimate-directadmin-wordpress-manager/archive/refs/heads/main.zip -o "$TMP_DIR/plugin.zip"
 
 if [ ! -f "$TMP_DIR/plugin.zip" ]; then
@@ -23,7 +33,7 @@ if [ ! -f "$TMP_DIR/plugin.zip" ]; then
   exit 1
 fi
 
-echo -e "\e[34m[3/4] Extracting plugin files...\e[0m"
+echo -e "\e[34m[4/5] Extracting plugin files...\e[0m"
 unzip -q "$TMP_DIR/plugin.zip" -d "$TMP_DIR"
 EXTRACTED_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "ultimate-directadmin-wordpress-manager-*" | head -n 1)
 
@@ -46,7 +56,7 @@ else
   cp -f /usr/local/lib/php.ini "$PLUGIN_DIR/php.ini" 2>/dev/null
 fi
 
-echo -e "\e[34m[4/4] Configuring ownership and permissions...\e[0m"
+echo -e "\e[34m[5/5] Configuring ownership and permissions...\e[0m"
 # Change ownership to diradmin:diradmin
 chown -R diradmin:diradmin "$PLUGIN_DIR"
 
@@ -67,19 +77,19 @@ chmod 755 "$PLUGIN_DIR"/reseller/index.raw 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/user/index.html 2>/dev/null
 chmod 755 "$PLUGIN_DIR"/user/index.raw 2>/dev/null
 
-echo -e "\e[34m[5/5] Compiling secure SUID wrapper...\e[0m"
-if [ -f "$PLUGIN_DIR/scripts/wrapper.c" ]; then
-  gcc -O2 "$PLUGIN_DIR/scripts/wrapper.c" -o "$PLUGIN_DIR/scripts/wrapper"
-  if [ -f "$PLUGIN_DIR/scripts/wrapper" ]; then
-    chown root:diradmin "$PLUGIN_DIR/scripts/wrapper"
-    chmod 4755 "$PLUGIN_DIR/scripts/wrapper"
-    echo -e "\e[32m✔ Wrapper compiled and SUID permissions configured successfully.\e[0m"
-  else
-    echo -e "\e[31mError: Failed to compile wrapper binary.\e[0m"
+echo -e "\e[34m[6/6] Compiling secure SUID wrappers...\e[0m"
+for binary in wrapper update_wrapper; do
+  if [ -f "$PLUGIN_DIR/scripts/${binary}.c" ]; then
+    gcc -O2 "$PLUGIN_DIR/scripts/${binary}.c" -o "$PLUGIN_DIR/scripts/${binary}"
+    if [ -f "$PLUGIN_DIR/scripts/${binary}" ]; then
+      chown root:diradmin "$PLUGIN_DIR/scripts/${binary}"
+      chmod 4755 "$PLUGIN_DIR/scripts/${binary}"
+      echo -e "\e[32m✔ ${binary} compiled and SUID permissions configured successfully.\e[0m"
+    else
+      echo -e "\e[31mError: Failed to compile ${binary} binary.\e[0m"
+    fi
   fi
-else
-  echo -e "\e[31mError: wrapper.c not found.\e[0m"
-fi
+done
 
 # Cleanup
 rm -rf "$TMP_DIR"
