@@ -4453,29 +4453,37 @@ async function startBulkUpdateProcess() {
             const r = await fetch(apiUrl('get_users'));
             const d = await r.json();
             if (d.success && d.users && d.users.length) {
-                log(`Found ${d.users.length} users. Standardizing site listings...`, 'ok');
+                log(`Tìm thấy ${d.users.length} tài khoản người dùng (${d.users.join(', ')}). Đang quét danh sách website...`, 'ok');
                 for (const u of d.users) {
-                    log(`Scanning sites for user: ${u}...`);
+                    log(`Đang quét website cho User: ${u}...`);
                     try {
-                        const uUrl = new URL(apiUrl('scan'), window.location.href);
-                        uUrl.searchParams.set('target_user', u);
-                        const rSite = await fetch(uUrl.pathname + uUrl.search + uUrl.hash);
-                        const dSite = await rSite.json();
-                        if (dSite.success && dSite.sites) {
+                        const rSite = await fetch(apiUrl('scan', u));
+                        const text = await rSite.text();
+                        let dSite;
+                        try {
+                            dSite = JSON.parse(text);
+                        } catch (e) {
+                            log(`  - Không đọc được phản hồi từ user ${u}: ${text.substring(0, 100)}`, 'err');
+                            continue;
+                        }
+                        if (dSite.success && dSite.sites && dSite.sites.length) {
+                            log(`  ↳ Đã tìm thấy ${dSite.sites.length} website cho user ${u}.`, 'ok');
                             targetSites.push(...dSite.sites);
+                        } else {
+                            log(`  ↳ Không có website nào dưới user ${u}.`);
                         }
                     } catch (err) {
-                        log(`Error scanning user ${u}: ${err.message}`, 'err');
+                        log(`Lỗi khi quét user ${u}: ${err.message}`, 'err');
                     }
                 }
-            } else {
-                targetSites = [...allSites];
             }
         } catch (e) {
-            log('Error fetching user list, defaulting to current loaded sites.', 'err');
-            targetSites = [...allSites];
+            log('Lỗi kết nối khi lấy danh sách user, chuyển về danh sách website hiện tại.', 'err');
         }
-    } else {
+    }
+
+    if (!targetSites.length) {
+        log('ℹ️ Không quét được site riêng lẻ, sử dụng danh sách website đã tải trên màn hình...', 'info');
         targetSites = [...allSites];
     }
 
