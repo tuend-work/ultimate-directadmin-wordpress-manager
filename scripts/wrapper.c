@@ -81,8 +81,8 @@ int main(int argc, char *argv[]) {
         const char *domain = argv[3];
         const char *type = argv[4];
         
-        // Security check: Only root and diradmin can query other users' domain configurations
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+        // Security check: Only root, diradmin, and admin can query other users' domain configurations
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
             if (strcmp(target_user, pw->pw_name) != 0) {
                 fprintf(stderr, "Error: Access denied. You can only query your own configurations.\n");
                 return 1;
@@ -141,8 +141,8 @@ int main(int argc, char *argv[]) {
         const char *log_type = argv[4];
         const char *lines_str = argv[5];
         
-        // Security check: Only root and diradmin can read logs of other users
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+        // Security check: Only root, diradmin, and admin can read logs of other users
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
             if (strcmp(target_user, pw->pw_name) != 0) {
                 fprintf(stderr, "Error: Access denied. You can only read logs for your own domain.\n");
                 return 1;
@@ -200,8 +200,8 @@ int main(int argc, char *argv[]) {
         }
         const char *target_user = argv[2];
         
-        // Security check: Only root and diradmin can run_as other users
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0) {
+        // Security check: Only root, diradmin, and admin can run_as other users
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
             fprintf(stderr, "Error: Access denied.\n");
             return 1;
         }
