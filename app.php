@@ -4784,12 +4784,12 @@ function run_api() {
             
             if ($supports_run_as) {
                 // If compiled wrapper supports run_as, run the php script directly with correct user context
-                $exec_user = ($action === 'clone' || $action === 'create_database') ? 'root' : $target_user_clean;
+                $exec_user = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list') ? 'root' : $target_user_clean;
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($exec_user) . " /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw 2>&1";
             } else {
                 // Fallback: Execute the user panel raw entry point as the target user using SUID read_log bypass.
                 // If action is clone or create_database, we run as root (run-as-root) to bypass cross-user file read boundaries.
-                $prefix = ($action === 'clone' || $action === 'create_database') ? 'run-as-root' : 'run-as';
+                $prefix = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list') ? 'run-as-root' : 'run-as';
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("{$prefix}.{$target_user_clean}") . " access 100 2>&1";
             }
             
