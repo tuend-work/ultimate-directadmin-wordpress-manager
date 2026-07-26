@@ -5,7 +5,7 @@
 
 set -e
 
-PLUGIN_DIR="/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager"
+PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_DIR="/tmp/da_wp_manager_update_$$"
 GITHUB_ZIP="https://github.com/tuend-work/ultimate-directadmin-wordpress-manager/archive/refs/heads/main.zip"
 

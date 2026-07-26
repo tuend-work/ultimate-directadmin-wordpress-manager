@@ -4365,17 +4365,12 @@ function update_plugin_from_github() {
         throw new Exception("Forbidden: Updates are restricted to Administrators.");
     }
 
-    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+    $plugin_dir = dirname(__FILE__);
     $wrapper    = $plugin_dir . '/scripts/update_wrapper';
     if (!file_exists($wrapper) || !is_executable($wrapper)) {
         $wrapper = $plugin_dir . '/scripts/wrapper';
     }
     $is_win     = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
-
-    if ($is_win) {
-        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
-        $wrapper    = null; // wrapper not available on Windows dev
-    }
 
     if (!is_dir($plugin_dir)) {
         throw new Exception("Plugin directory not found: {$plugin_dir}");
