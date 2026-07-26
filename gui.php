@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.1.6';
+$plugin_version = '2.1.7';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -5766,7 +5766,7 @@ function renderAdminAssets() {
         pContainer.innerHTML = filteredPlugins.map((p, idx) => {
             const updateAvailableCount = p.sites.filter(s => s.update_available).length;
             const updateBtn = updateAvailableCount > 0 
-                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdatePlugin('${escJsArg(p.plugin_file)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
+                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdatePlugin('${escJsArg(p.plugin_file)}', '${escJsArg(p.version)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
                 : '';
             
             const siteRows = p.sites.map(s => {
@@ -5830,7 +5830,7 @@ function renderAdminAssets() {
         tContainer.innerHTML = filteredThemes.map((t, idx) => {
             const updateAvailableCount = t.sites.filter(s => s.update_available).length;
             const updateBtn = updateAvailableCount > 0 
-                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdateTheme('${escJsArg(t.folder)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
+                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdateTheme('${escJsArg(t.folder)}', '${escJsArg(t.version)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
                 : '';
             
             const siteRows = t.sites.map(s => {
@@ -5885,9 +5885,9 @@ function filterAdminThemes() {
     renderAdminAssets();
 }
 
-async function bulkUpdatePlugin(pluginFile, btnEl) {
-    if (!confirm(`Bạn chắc chắn muốn cập nhật plugin ${pluginFile} trên tất cả các website có bản cập nhật?`)) return;
-    const pluginData = adminAssetsData.plugins.find(p => p.plugin_file === pluginFile);
+async function bulkUpdatePlugin(pluginFile, version, btnEl) {
+    if (!confirm(`Bạn chắc chắn muốn cập nhật plugin ${pluginFile} (v${version}) trên tất cả các website có bản cập nhật?`)) return;
+    const pluginData = adminAssetsData.plugins.find(p => p.plugin_file === pluginFile && p.version === version);
     if (!pluginData) return;
     const targetSites = pluginData.sites.filter(s => s.update_available);
     if (!targetSites.length) return;
@@ -5915,9 +5915,9 @@ async function bulkUpdatePlugin(pluginFile, btnEl) {
     loadAdminAssets(true);
 }
 
-async function bulkUpdateTheme(folder, btnEl) {
-    if (!confirm(`Bạn chắc chắn muốn cập nhật theme ${folder} trên tất cả các website có bản cập nhật?`)) return;
-    const themeData = adminAssetsData.themes.find(t => t.folder === folder);
+async function bulkUpdateTheme(folder, version, btnEl) {
+    if (!confirm(`Bạn chắc chắn muốn cập nhật theme ${folder} (v${version}) trên tất cả các website có bản cập nhật?`)) return;
+    const themeData = adminAssetsData.themes.find(t => t.folder === folder && t.version === version);
     if (!themeData) return;
     const targetSites = themeData.sites.filter(s => s.update_available);
     if (!targetSites.length) return;
