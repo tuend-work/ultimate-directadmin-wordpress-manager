@@ -831,6 +831,88 @@ input:disabled + .slider {
     gap: 12px;
     margin-top: 12px;
 }
+
+/* ── Responsive Mobile Styles ── */
+@media (max-width: 768px) {
+    .topbar {
+        height: auto;
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .topbar .user {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+    .toolbar {
+        padding: 10px 12px;
+    }
+    .toolbar-search {
+        width: 100%;
+    }
+    .content {
+        padding: 12px;
+    }
+    .card-header {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+    .site-thumb {
+        width: 64px;
+        height: 40px;
+    }
+    .badges {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+    .card-action-row {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+    .card-action-row .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+    .card-action-row .sep {
+        display: none;
+    }
+    .card-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 0 8px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+        padding: 10px 12px;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+    .card-sec-title {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .card-sec-title > div {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    .plugin-item {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .plugin-toggle {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .lock-section {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .tab-grid-details {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 </head>
 <body>
