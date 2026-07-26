@@ -54,6 +54,11 @@ for PLUGIN_DIR in "${PLUGIN_DIRS[@]}"; do
   rm -rf "$PLUGIN_DIR"/*
   cp -rf "$EXTRACTED_DIR"/* "$PLUGIN_DIR/"
 
+  # Dynamically replace hardcoded paths in wrapper.c, update_wrapper.c, and delegate.sh
+  sed -i "s|/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager|$PLUGIN_DIR|g" "$PLUGIN_DIR/scripts/wrapper.c"
+  sed -i "s|/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager|$PLUGIN_DIR|g" "$PLUGIN_DIR/scripts/update_wrapper.c"
+  sed -i "s|/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager|$PLUGIN_DIR|g" "$PLUGIN_DIR/scripts/delegate.sh"
+
   # Copy custom php.ini from resource manager template if exists
   if [ -f "/usr/local/directadmin/plugins/ultimate_da_resource_manager/php.ini" ]; then
     cp -f "/usr/local/directadmin/plugins/ultimate_da_resource_manager/php.ini" "$PLUGIN_DIR/php.ini"

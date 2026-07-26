@@ -787,10 +787,7 @@ function lock_wordpress_instance($site_path) {
         ];
     }
     
-    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
-    if (!file_exists($wrapper)) {
-        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-    }
+    $wrapper = dirname(__FILE__) . '/scripts/wrapper';
     
     if (!file_exists($wrapper)) {
         throw new Exception("Lock failed: SUID wrapper binary not found. Please run the install script (install.sh) as root to compile the binary.");
@@ -826,10 +823,7 @@ function unlock_wordpress_instance($site_path) {
         ];
     }
     
-    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
-    if (!file_exists($wrapper)) {
-        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-    }
+    $wrapper = dirname(__FILE__) . '/scripts/wrapper';
     
     if (!file_exists($wrapper)) {
         throw new Exception("Unlock failed: SUID wrapper binary not found. Please run the install script (install.sh) as root to compile the binary.");
@@ -3193,10 +3187,7 @@ function resolve_domain_path($domain_str, $home) {
     wp_manager_log("resolve_domain_path: domain_str={$domain_str}");
     $domains_dir = $home . '/domains';
     
-    $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
-    if (!file_exists($wrapper)) {
-        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-    }
+    $wrapper = dirname(__FILE__) . '/scripts/wrapper';
     
     // First, check if the domain_str exists directly as a main domain folder or a custom domain folder
     if (is_dir($domains_dir . '/' . $domain_str)) {
@@ -4835,10 +4826,7 @@ function run_api() {
     ) && $action !== 'get_users' && $action !== 'update_plugin';
     if ($should_delegate) {
         $target_user_clean = !empty($target_user_input) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $target_user_input) : $current_exec_user;
-        $wrapper = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/wrapper';
-        if (!file_exists($wrapper)) {
-            $wrapper = dirname(__FILE__) . '/scripts/wrapper';
-        }
+        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
         
         if (file_exists($wrapper)) {
             $target_home = "/home/{$target_user_clean}";
@@ -4864,7 +4852,7 @@ function run_api() {
             if ($supports_run_as) {
                 // If compiled wrapper supports run_as, run the php script directly with correct user context
                 $exec_user = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets') ? 'root' : $target_user_clean;
-                $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($exec_user) . " /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw 2>&1";
+                $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($exec_user) . " /usr/local/bin/php -nc " . escapeshellarg(dirname(__FILE__) . '/php.ini') . " " . escapeshellarg(dirname(__FILE__) . '/user/index.raw') . " 2>&1";
             } else {
                 // Fallback: Execute the user panel raw entry point as the target user using SUID read_log bypass.
                 // If action is clone or create_database, we run as root (run-as-root) to bypass cross-user file read boundaries.
@@ -5910,7 +5898,7 @@ function run_api() {
                 
                 if ($log_type === 'access' || $log_type === 'error') {
                     // Đọc log trực tiếp hệ thống qua wrapper SUID root
-                    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
+                    $plugin_dir = dirname(__FILE__);
                     if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                         $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
                     }
