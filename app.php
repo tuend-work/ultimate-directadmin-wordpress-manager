@@ -4898,14 +4898,19 @@ function run_api() {
                                             'sites' => []
                                         ];
                                     }
+                                    $latest_ver = $updates_plugins[$file]['latest_version'] ?? $p_ver;
+                                    $update_avail = $updates_plugins[$file]['update_available'] ?? false;
+                                    if ($update_avail && version_compare($p_ver, $latest_ver, '>=')) {
+                                        $update_avail = false;
+                                    }
                                     $plugins_grouped[$key]['sites'][] = [
                                         'domain' => $s['domain'] ?? '',
                                         'siteurl' => $site_url,
                                         'path' => $site_path,
                                         'owner' => $u,
                                         'active' => in_array($file, $active_plugins),
-                                        'update_available' => $updates_plugins[$file]['update_available'] ?? false,
-                                        'latest_version' => $updates_plugins[$file]['latest_version'] ?? $p_ver
+                                        'update_available' => $update_avail,
+                                        'latest_version' => $latest_ver
                                     ];
                                 }
                             } catch (Throwable $e) { /* ignore */ }
@@ -4928,14 +4933,19 @@ function run_api() {
                                             'sites' => []
                                         ];
                                     }
+                                    $latest_ver = $updates_themes[$folder]['latest_version'] ?? $t_ver;
+                                    $update_avail = $updates_themes[$folder]['update_available'] ?? false;
+                                    if ($update_avail && version_compare($t_ver, $latest_ver, '>=')) {
+                                        $update_avail = false;
+                                    }
                                     $themes_grouped[$key]['sites'][] = [
                                         'domain' => $s['domain'] ?? '',
                                         'siteurl' => $site_url,
                                         'path' => $site_path,
                                         'owner' => $u,
                                         'active' => ($folder === $active_theme),
-                                        'update_available' => $updates_themes[$folder]['update_available'] ?? false,
-                                        'latest_version' => $updates_themes[$folder]['latest_version'] ?? $t_ver
+                                        'update_available' => $update_avail,
+                                        'latest_version' => $latest_ver
                                     ];
                                 }
                             } catch (Throwable $e) { /* ignore */ }
@@ -5200,7 +5210,11 @@ function run_api() {
                     $details['file'] = $file;
                     $details['active'] = in_array($file, $active);
                     $details['latest_version'] = $update_info['latest_version'] ?? $details['version'];
-                    $details['update_available'] = $update_info['update_available'] ?? false;
+                    $update_avail = $update_info['update_available'] ?? false;
+                    if ($update_avail && version_compare($details['version'], $details['latest_version'], '>=')) {
+                        $update_avail = false;
+                    }
+                    $details['update_available'] = $update_avail;
                     $details['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_plugins[] = $details;
                 }
@@ -5327,7 +5341,11 @@ function run_api() {
                     $update_info = $updates[$theme['folder']] ?? [];
                     $theme['active'] = ($theme['folder'] === $active);
                     $theme['latest_version'] = $update_info['latest_version'] ?? $theme['version'];
-                    $theme['update_available'] = $update_info['update_available'] ?? false;
+                    $update_avail = $update_info['update_available'] ?? false;
+                    if ($update_avail && version_compare($theme['version'], $theme['latest_version'], '>=')) {
+                        $update_avail = false;
+                    }
+                    $theme['update_available'] = $update_avail;
                     $theme['update_package_available'] = $update_info['update_package_available'] ?? false;
                     $response_themes[] = $theme;
                 }
