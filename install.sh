@@ -83,6 +83,13 @@ for PLUGIN_DIR in "${PLUGIN_DIRS[@]}"; do
   chmod 755 "$PLUGIN_DIR"/user/index.html 2>/dev/null
   chmod 755 "$PLUGIN_DIR"/user/index.raw 2>/dev/null
 
+  # Dynamically update the shebang to point to the correct php.ini path
+  for file in "$PLUGIN_DIR"/admin/index.raw "$PLUGIN_DIR"/admin/index.html "$PLUGIN_DIR"/reseller/index.raw "$PLUGIN_DIR"/reseller/index.html "$PLUGIN_DIR"/user/index.raw "$PLUGIN_DIR"/user/index.html; do
+    if [ -f "$file" ]; then
+      sed -i "1s|#!.*|#!/usr/local/bin/php -nc $PLUGIN_DIR/php.ini|" "$file"
+    fi
+  done
+
   echo -e "\e[34mCompiling secure SUID wrappers for $PLUGIN_DIR...\e[0m"
   for binary in wrapper update_wrapper; do
     if [ -f "$PLUGIN_DIR/scripts/${binary}.c" ]; then

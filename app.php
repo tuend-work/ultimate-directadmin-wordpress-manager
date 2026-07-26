@@ -4555,12 +4555,7 @@ function run_gui() {
         ob_clean();
     }
     
-    $plugin_dir = '/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager';
-    // LOCAL DEVELOPMENT / WIN FALLBACK
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $plugin_dir = 'f:/ultimate-directadmin-wordpress-manager';
-    }
-    
+    $plugin_dir = dirname(__FILE__);
     require_once $plugin_dir . '/gui.php';
 }
 
