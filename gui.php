@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.1.7';
+$plugin_version = '2.1.8';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1570,7 +1570,7 @@ input:disabled + .slider {
 <script>
 const DA_USER = '<?php echo $username; ?>';
 const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
-let activeUser = isAdmin ? DA_USER : '';
+let activeUser = isAdmin ? 'all' : '';
 let allSites = [];
 let deletePath = '', deleteDb = '';
 
@@ -1584,9 +1584,15 @@ const apiUrl = (action='') => {
     let b = window.location.pathname.split('?')[0];
     if (b.endsWith('.html') || b.endsWith('.raw')) b = b.substring(0, b.lastIndexOf('/')+1);
     else if (!b.endsWith('/')) b += '/';
-    let url = b + 'index.raw' + (action ? '?action='+action : '');
-    if (isAdmin && activeUser) {
-        url += (action ? '&' : '?') + 'target_user=' + encodeURIComponent(activeUser);
+    
+    let act = action;
+    if (isAdmin && activeUser === 'all' && (action === 'list' || action === '' || action === 'scan')) {
+        act = 'bulk_list';
+    }
+    
+    let url = b + 'index.raw' + (act ? '?action='+act : '');
+    if (isAdmin && activeUser && activeUser !== 'all') {
+        url += (act ? '&' : '?') + 'target_user=' + encodeURIComponent(activeUser);
     }
     return url;
 };
@@ -4953,10 +4959,11 @@ async function refreshLogs() {
 /* ─── Admin Users Switching ─── */
 function onActiveUserChange() {
     activeUser = document.getElementById('active-user-select').value;
+    const prefixUser = activeUser === 'all' ? DA_USER : activeUser;
     const instDbnamePrefix = document.getElementById('inst-dbname-prefix');
-    if (instDbnamePrefix) instDbnamePrefix.textContent = activeUser + '_';
+    if (instDbnamePrefix) instDbnamePrefix.textContent = prefixUser + '_';
     const instDbuserPrefix = document.getElementById('inst-dbuser-prefix');
-    if (instDbuserPrefix) instDbuserPrefix.textContent = activeUser + '_';
+    if (instDbuserPrefix) instDbuserPrefix.textContent = prefixUser + '_';
     fetchSites(false);
 }
 
@@ -4978,6 +4985,11 @@ async function loadAdminUsers() {
             selectEl.innerHTML = '';
             if (cloneSelectEl) cloneSelectEl.innerHTML = '';
             
+            const optAll = document.createElement('option');
+            optAll.value = 'all';
+            optAll.textContent = '🌐 Toàn bộ User trên VPS';
+            selectEl.appendChild(optAll);
+            
             d.users.forEach(u => {
                 const opt = document.createElement('option');
                 opt.value = u;
@@ -4994,7 +5006,7 @@ async function loadAdminUsers() {
             
             selectEl.value = activeUser;
             if (cloneSelectEl) {
-                cloneSelectEl.value = activeUser;
+                cloneSelectEl.value = activeUser === 'all' ? DA_USER : activeUser;
             }
         }
     } catch (err) {
@@ -5895,6 +5907,7 @@ async function bulkUpdatePlugin(pluginFile, version, btnEl) {
     const originalHtml = btnEl.innerHTML;
     btnEl.disabled = true;
     let successCount = 0;
+    let failedSites = [];
     
     for (let i = 0; i < targetSites.length; i++) {
         const site = targetSites[i];
@@ -5905,11 +5918,23 @@ async function bulkUpdatePlugin(pluginFile, version, btnEl) {
             fd.append('plugin_file', pluginFile);
             const r = await fetch(apiUrlAdmin('update_wp_plugin', site.owner), { method: 'POST', body: fd });
             const d = await r.json();
-            if (d.success) successCount++;
-        } catch (e) { }
+            if (d.success) {
+                successCount++;
+            } else {
+                failedSites.push(`${site.domain}: ${d.error || 'Lỗi không xác định'}`);
+            }
+        } catch (e) {
+            failedSites.push(`${site.domain}: Lỗi kết nối`);
+        }
     }
     
-    toast(`Đã cập nhật thành công plugin ${pluginFile} trên ${successCount}/${targetSites.length} site!`, 'success');
+    if (successCount > 0) {
+        toast(`Đã cập nhật thành công plugin ${pluginFile} trên ${successCount}/${targetSites.length} site!`, 'success');
+    }
+    if (failedSites.length > 0) {
+        toast(`Thất bại trên ${failedSites.length} site:\n` + failedSites.join('\n'), 'error');
+    }
+    
     btnEl.innerHTML = originalHtml;
     btnEl.disabled = false;
     loadAdminAssets(true);
@@ -5925,6 +5950,7 @@ async function bulkUpdateTheme(folder, version, btnEl) {
     const originalHtml = btnEl.innerHTML;
     btnEl.disabled = true;
     let successCount = 0;
+    let failedSites = [];
     
     for (let i = 0; i < targetSites.length; i++) {
         const site = targetSites[i];
@@ -5935,11 +5961,23 @@ async function bulkUpdateTheme(folder, version, btnEl) {
             fd.append('theme_folder', folder);
             const r = await fetch(apiUrlAdmin('update_wp_theme', site.owner), { method: 'POST', body: fd });
             const d = await r.json();
-            if (d.success) successCount++;
-        } catch (e) { }
+            if (d.success) {
+                successCount++;
+            } else {
+                failedSites.push(`${site.domain}: ${d.error || 'Lỗi không xác định'}`);
+            }
+        } catch (e) {
+            failedSites.push(`${site.domain}: Lỗi kết nối`);
+        }
     }
     
-    toast(`Đã cập nhật thành công theme ${folder} trên ${successCount}/${targetSites.length} site!`, 'success');
+    if (successCount > 0) {
+        toast(`Đã cập nhật thành công theme ${folder} trên ${successCount}/${targetSites.length} site!`, 'success');
+    }
+    if (failedSites.length > 0) {
+        toast(`Thất bại trên ${failedSites.length} site:\n` + failedSites.join('\n'), 'error');
+    }
+    
     btnEl.innerHTML = originalHtml;
     btnEl.disabled = false;
     loadAdminAssets(true);
