@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.1.5';
+$plugin_version = '2.1.6';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -17,6 +17,10 @@ if (is_readable($conf_file)) {
     }
 }
 $isAdmin  = is_admin_user();
+$isUserInterface = (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/user/') !== false) || (strpos($_SERVER['REQUEST_URI'] ?? '', '/user/') !== false) || (strpos($_SERVER['REQUEST_URI'] ?? '', 'CMD_PLUGINS_USER') !== false);
+if ($isUserInterface) {
+    $isAdmin = false;
+}
 
 // Fetch server IP and hostname
 $hostname = gethostname();
@@ -913,6 +917,101 @@ input:disabled + .slider {
         grid-template-columns: 1fr;
     }
 }
+/* Admin Tabs styles */
+.admin-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 15px;
+}
+.admin-tabs .tab-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.admin-tabs .tab-btn:hover {
+    color: var(--text);
+    background: var(--bg3);
+}
+.admin-tabs .tab-btn.active {
+    color: var(--text);
+    background: var(--blue);
+}
+
+/* Asset tables and lists */
+.asset-group-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+.asset-group-header {
+    background: var(--bg3);
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.asset-group-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.asset-group-body {
+    padding: 6px 18px;
+}
+.asset-site-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border2);
+}
+.asset-site-row:last-child {
+    border-bottom: none;
+}
+.asset-site-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.asset-site-name {
+    font-weight: 500;
+    color: var(--text);
+}
+.asset-site-name a {
+    color: var(--text);
+    text-decoration: none;
+}
+.asset-site-name a:hover {
+    color: var(--blue);
+    text-decoration: underline;
+}
+.asset-site-url {
+    font-size: 12px;
+    color: var(--text3);
+}
+.asset-site-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
 </style>
 </head>
 <body>
@@ -958,11 +1057,68 @@ input:disabled + .slider {
 
 
 
+<?php if ($isAdmin): ?>
+<!-- Admin Tabs Navigation -->
+<div class="admin-tabs">
+    <button class="tab-btn active" onclick="switchAdminTab('sites')" id="admin-tab-btn-sites"><span class="dashicons dashicons-admin-multisite wp-admin-icon"></span> Websites</button>
+    <button class="tab-btn" onclick="switchAdminTab('plugins')" id="admin-tab-btn-plugins"><span class="dashicons dashicons-admin-plugins wp-admin-icon"></span> Plugins Toàn Server</button>
+    <button class="tab-btn" onclick="switchAdminTab('themes')" id="admin-tab-btn-themes"><span class="dashicons dashicons-admin-appearance wp-admin-icon"></span> Themes Toàn Server</button>
+</div>
+<?php endif; ?>
+
 <!-- Content -->
 <div class="content">
-    <div id="sites-container">
-        <div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span></div><strong>Loading installations…</strong></div>
+    <!-- Sites Tab (Standard or Admin Sites view) -->
+    <div id="admin-tab-content-sites" class="admin-tab-content active">
+        <?php if ($isAdmin): ?>
+        <!-- Bulk actions for admin sites -->
+        <div class="bulk-actions-bar" style="display:flex; align-items:center; gap:10px; padding: 12px 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+                <input type="checkbox" id="admin-select-all-sites" onchange="toggleSelectAllAdminSites(this)" style="accent-color:var(--blue); width:15px; height:15px;">
+                <span style="font-size:14px; font-weight:600; color:var(--text2);">Chọn tất cả</span>
+            </label>
+            <div style="width:1px; height:20px; background:var(--border);"></div>
+            <select id="admin-bulk-action-select" class="form-control" style="width:auto; height:32px; padding:2px 8px; font-size:14px; background: var(--bg2); border-color: var(--border); color: var(--text);">
+                <option value="" disabled selected>— Chọn hành động hàng loạt —</option>
+                <option value="update_core">🔄 Cập nhật WP Core</option>
+                <option value="update_plugins">🔌 Cập nhật Plugins</option>
+                <option value="update_themes">🎨 Cập nhật Themes</option>
+                <option value="lock">🔒 Khóa bảo vệ (Lockdown)</option>
+                <option value="unlock">🔓 Mở khóa bảo vệ</option>
+                <option value="delete">❌ Xóa cài đặt WordPress</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="executeAdminBulkAction()"><span class="dashicons dashicons-yes wp-admin-icon"></span> Áp dụng</button>
+        </div>
+        <?php endif; ?>
+        
+        <div id="sites-container">
+            <div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span></div><strong>Loading installations…</strong></div>
+        </div>
     </div>
+    
+    <?php if ($isAdmin): ?>
+    <!-- Plugins Tab -->
+    <div id="admin-tab-content-plugins" class="admin-tab-content" style="display:none;">
+        <div class="assets-controls-bar" style="margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; background: var(--bg3); padding: 10px 15px; border: 1px solid var(--border); border-radius: 6px;">
+            <input type="text" id="plugin-search-input" class="toolbar-search" placeholder="Tìm kiếm plugin..." oninput="filterAdminPlugins()" style="width:300px; margin:0;">
+            <button class="btn btn-secondary" onclick="loadAdminAssets(true)"><span class="dashicons dashicons-update wp-admin-icon"></span> Làm mới</button>
+        </div>
+        <div id="admin-plugins-container">
+            <div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span></div><strong>Đang tải danh sách plugin toàn server...</strong></div>
+        </div>
+    </div>
+    
+    <!-- Themes Tab -->
+    <div id="admin-tab-content-themes" class="admin-tab-content" style="display:none;">
+        <div class="assets-controls-bar" style="margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; background: var(--bg3); padding: 10px 15px; border: 1px solid var(--border); border-radius: 6px;">
+            <input type="text" id="theme-search-input" class="toolbar-search" placeholder="Tìm kiếm theme..." oninput="filterAdminThemes()" style="width:300px; margin:0;">
+            <button class="btn btn-secondary" onclick="loadAdminAssets(true)"><span class="dashicons dashicons-update wp-admin-icon"></span> Làm mới</button>
+        </div>
+        <div id="admin-themes-container">
+            <div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span></div><strong>Đang tải danh sách theme toàn server...</strong></div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <!-- ═══ MODAL: Install WordPress ═══ -->
@@ -3525,6 +3681,7 @@ function renderSites(sites) {
         return `<div class="site-card">
             <!-- Card header -->
             <div class="card-header" onclick="toggleCard(${i})">
+                ${isAdmin ? `<input type="checkbox" class="admin-site-select-chk" data-idx="${i}" onclick="event.stopPropagation()" style="accent-color:var(--blue); width:18px; height:18px; margin-right:12px; cursor:pointer;">` : ''}
                 <!-- Thumbnail -->
                 <div class="site-thumb">
                     <div class="thumb-loader" id="tl-${i}"><span class="dashicons dashicons-admin-site-alt3 wp-admin-icon"></span></div>
@@ -5532,6 +5689,330 @@ async function addWpDefine(siteIdx) {
     } finally {
         loadWpDefines(siteIdx);
     }
+}
+
+/* ─── Admin Tabs Actions & Asset Groups ─── */
+let currentAdminTab = 'sites';
+let adminAssetsData = null;
+
+function switchAdminTab(tabName) {
+    currentAdminTab = tabName;
+    document.querySelectorAll('.admin-tab-content').forEach(el => {
+        el.style.display = 'none';
+    });
+    document.querySelectorAll('.admin-tabs .tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.getElementById(`admin-tab-content-${tabName}`).style.display = 'block';
+    document.getElementById(`admin-tab-btn-${tabName}`).classList.add('active');
+    
+    if (tabName === 'plugins' || tabName === 'themes') {
+        if (!adminAssetsData) {
+            loadAdminAssets();
+        } else {
+            renderAdminAssets();
+        }
+    }
+}
+
+async function loadAdminAssets(force = false) {
+    if (!force && adminAssetsData) return;
+    
+    const pContainer = document.getElementById('admin-plugins-container');
+    const tContainer = document.getElementById('admin-themes-container');
+    
+    pContainer.innerHTML = '<div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin" style="font-size:52px; width:40px; height:40px;"></span></div><strong>Đang quét và tải danh sách plugin toàn VPS...</strong></div>';
+    tContainer.innerHTML = '<div class="empty-state"><div class="icon"><span class="dashicons dashicons-update wp-admin-icon dashicons-spin" style="font-size:52px; width:40px; height:40px;"></span></div><strong>Đang quét và tải danh sách theme toàn VPS...</strong></div>';
+    
+    try {
+        const r = await fetch(apiUrl('bulk_list_assets'));
+        const d = await r.json();
+        if (d.success) {
+            adminAssetsData = d;
+            renderAdminAssets();
+        } else {
+            const errHtml = `<div class="empty-state"><div class="icon"><span class="dashicons dashicons-warning wp-admin-icon"></span></div><strong>Không thể tải dữ liệu: ${esc(d.error || 'Lỗi không xác định')}</strong></div>`;
+            pContainer.innerHTML = errHtml;
+            tContainer.innerHTML = errHtml;
+        }
+    } catch (err) {
+        const errHtml = `<div class="empty-state"><div class="icon"><span class="dashicons dashicons-warning wp-admin-icon"></span></div><strong>Lỗi kết nối API: ${esc(err.message)}</strong></div>`;
+        pContainer.innerHTML = errHtml;
+        tContainer.innerHTML = errHtml;
+    }
+}
+
+function renderAdminAssets() {
+    if (!adminAssetsData) return;
+    
+    const pQ = document.getElementById('plugin-search-input').value.toLowerCase();
+    const tQ = document.getElementById('theme-search-input').value.toLowerCase();
+    
+    // 1. Render Plugins
+    const pContainer = document.getElementById('admin-plugins-container');
+    let filteredPlugins = adminAssetsData.plugins || [];
+    if (pQ) {
+        filteredPlugins = filteredPlugins.filter(p => 
+            p.name.toLowerCase().includes(pQ) || p.plugin_file.toLowerCase().includes(pQ)
+        );
+    }
+    
+    filteredPlugins.sort((a,b) => a.name.localeCompare(b.name));
+    
+    if (!filteredPlugins.length) {
+        pContainer.innerHTML = '<div class="empty-state"><strong>Không tìm thấy plugin nào.</strong></div>';
+    } else {
+        pContainer.innerHTML = filteredPlugins.map((p, idx) => {
+            const updateAvailableCount = p.sites.filter(s => s.update_available).length;
+            const updateBtn = updateAvailableCount > 0 
+                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdatePlugin('${escJsArg(p.plugin_file)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
+                : '';
+            
+            const siteRows = p.sites.map(s => {
+                const activeBadge = s.active 
+                    ? '<span class="asset-site-badge badge-green">Kích hoạt</span>' 
+                    : '<span class="asset-site-badge badge-gray">Tắt</span>';
+                const updateBadge = s.update_available 
+                    ? `<span class="asset-site-badge badge-yellow" title="Latest: ${esc(s.latest_version)}">Cập nhật có sẵn (${esc(s.latest_version)})</span>` 
+                    : '';
+                const ownerBadge = `<span style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:4px;">${esc(s.owner)}</span>`;
+                
+                return `
+                    <div class="asset-site-row">
+                        <div class="asset-site-info">
+                            <span class="dashicons dashicons-admin-site wp-admin-icon"></span>
+                            <span class="asset-site-name"><a href="${esc(s.siteurl)}" target="_blank">${esc(s.domain)}</a></span>
+                            ${ownerBadge}
+                            <span class="asset-site-url" style="margin-left: 10px; font-family: monospace;">${esc(s.path)}</span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${activeBadge}
+                            ${updateBadge}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="asset-group-card">
+                    <div class="asset-group-header">
+                        <div class="asset-group-title">
+                            <span class="dashicons dashicons-admin-plugins wp-admin-icon" style="color: var(--blue);"></span>
+                            <strong>${esc(p.name)}</strong>
+                            <span class="badge badge-gray" style="margin-left:8px;">v${esc(p.version)}</span>
+                            <span style="font-size: 13px; color: var(--text3); font-weight: normal; margin-left: 10px;">(Đang dùng trên ${p.sites.length} site)</span>
+                        </div>
+                        ${updateBtn}
+                    </div>
+                    <div class="asset-group-body">
+                        ${siteRows}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // 2. Render Themes
+    const tContainer = document.getElementById('admin-themes-container');
+    let filteredThemes = adminAssetsData.themes || [];
+    if (tQ) {
+        filteredThemes = filteredThemes.filter(t => 
+            t.name.toLowerCase().includes(tQ) || t.folder.toLowerCase().includes(tQ)
+        );
+    }
+    
+    filteredThemes.sort((a,b) => a.name.localeCompare(b.name));
+    
+    if (!filteredThemes.length) {
+        tContainer.innerHTML = '<div class="empty-state"><strong>Không tìm thấy theme nào.</strong></div>';
+    } else {
+        tContainer.innerHTML = filteredThemes.map((t, idx) => {
+            const updateAvailableCount = t.sites.filter(s => s.update_available).length;
+            const updateBtn = updateAvailableCount > 0 
+                ? `<button class="btn btn-primary btn-sm" onclick="bulkUpdateTheme('${escJsArg(t.folder)}', this)"><span class="dashicons dashicons-update wp-admin-icon"></span> Cập nhật cho ${updateAvailableCount} site</button>` 
+                : '';
+            
+            const siteRows = t.sites.map(s => {
+                const activeBadge = s.active 
+                    ? '<span class="asset-site-badge badge-green">Đang kích hoạt</span>' 
+                    : '';
+                const updateBadge = s.update_available 
+                    ? `<span class="asset-site-badge badge-yellow" title="Latest: ${esc(s.latest_version)}">Cập nhật có sẵn (${esc(s.latest_version)})</span>` 
+                    : '';
+                const ownerBadge = `<span style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:4px;">${esc(s.owner)}</span>`;
+                
+                return `
+                    <div class="asset-site-row">
+                        <div class="asset-site-info">
+                            <span class="dashicons dashicons-admin-appearance wp-admin-icon"></span>
+                            <span class="asset-site-name"><a href="${esc(s.siteurl)}" target="_blank">${esc(s.domain)}</a></span>
+                            ${ownerBadge}
+                            <span class="asset-site-url" style="margin-left: 10px; font-family: monospace;">${esc(s.path)}</span>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            ${activeBadge}
+                            ${updateBadge}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            return `
+                <div class="asset-group-card">
+                    <div class="asset-group-header">
+                        <div class="asset-group-title">
+                            <span class="dashicons dashicons-admin-appearance wp-admin-icon" style="color: var(--blue);"></span>
+                            <strong>${esc(t.name)}</strong>
+                            <span class="badge badge-gray" style="margin-left:8px;">v${esc(t.version)}</span>
+                            <span style="font-size: 13px; color: var(--text3); font-weight: normal; margin-left: 10px;">(Đang dùng trên ${t.sites.length} site)</span>
+                        </div>
+                        ${updateBtn}
+                    </div>
+                    <div class="asset-group-body">
+                        ${siteRows}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+function filterAdminPlugins() {
+    renderAdminAssets();
+}
+function filterAdminThemes() {
+    renderAdminAssets();
+}
+
+async function bulkUpdatePlugin(pluginFile, btnEl) {
+    if (!confirm(`Bạn chắc chắn muốn cập nhật plugin ${pluginFile} trên tất cả các website có bản cập nhật?`)) return;
+    const pluginData = adminAssetsData.plugins.find(p => p.plugin_file === pluginFile);
+    if (!pluginData) return;
+    const targetSites = pluginData.sites.filter(s => s.update_available);
+    if (!targetSites.length) return;
+    
+    const originalHtml = btnEl.innerHTML;
+    btnEl.disabled = true;
+    let successCount = 0;
+    
+    for (let i = 0; i < targetSites.length; i++) {
+        const site = targetSites[i];
+        btnEl.innerHTML = `<span class="dashicons dashicons-update dashicons-spin wp-admin-icon"></span> Đang cập nhật ${i+1}/${targetSites.length}...`;
+        try {
+            const fd = new FormData();
+            fd.append('path', site.path);
+            fd.append('plugin_file', pluginFile);
+            const r = await fetch(apiUrlAdmin('update_wp_plugin', site.owner), { method: 'POST', body: fd });
+            const d = await r.json();
+            if (d.success) successCount++;
+        } catch (e) { }
+    }
+    
+    toast(`Đã cập nhật thành công plugin ${pluginFile} trên ${successCount}/${targetSites.length} site!`, 'success');
+    btnEl.innerHTML = originalHtml;
+    btnEl.disabled = false;
+    loadAdminAssets(true);
+}
+
+async function bulkUpdateTheme(folder, btnEl) {
+    if (!confirm(`Bạn chắc chắn muốn cập nhật theme ${folder} trên tất cả các website có bản cập nhật?`)) return;
+    const themeData = adminAssetsData.themes.find(t => t.folder === folder);
+    if (!themeData) return;
+    const targetSites = themeData.sites.filter(s => s.update_available);
+    if (!targetSites.length) return;
+    
+    const originalHtml = btnEl.innerHTML;
+    btnEl.disabled = true;
+    let successCount = 0;
+    
+    for (let i = 0; i < targetSites.length; i++) {
+        const site = targetSites[i];
+        btnEl.innerHTML = `<span class="dashicons dashicons-update dashicons-spin wp-admin-icon"></span> Đang cập nhật ${i+1}/${targetSites.length}...`;
+        try {
+            const fd = new FormData();
+            fd.append('path', site.path);
+            fd.append('theme_folder', folder);
+            const r = await fetch(apiUrlAdmin('update_wp_theme', site.owner), { method: 'POST', body: fd });
+            const d = await r.json();
+            if (d.success) successCount++;
+        } catch (e) { }
+    }
+    
+    toast(`Đã cập nhật thành công theme ${folder} trên ${successCount}/${targetSites.length} site!`, 'success');
+    btnEl.innerHTML = originalHtml;
+    btnEl.disabled = false;
+    loadAdminAssets(true);
+}
+
+function toggleSelectAllAdminSites(el) {
+    document.querySelectorAll('.admin-site-select-chk').forEach(chk => {
+        chk.checked = el.checked;
+    });
+}
+
+async function executeAdminBulkAction() {
+    const action = document.getElementById('admin-bulk-action-select').value;
+    if (!action) {
+        toast('Vui lòng chọn một hành động hàng loạt.', 'error');
+        return;
+    }
+    const checkedChks = document.querySelectorAll('.admin-site-select-chk:checked');
+    if (!checkedChks.length) {
+        toast('Vui lòng chọn ít nhất một website.', 'error');
+        return;
+    }
+    const checkedIdxs = Array.from(checkedChks).map(chk => parseInt(chk.getAttribute('data-idx')));
+    
+    if (action === 'delete') {
+        if (!confirm(`CẢNH BÁO CỰC KỲ NGUY HIỂM!\nBạn có chắc chắn muốn xóa VĨNH VIỄN ${checkedIdxs.length} website đã chọn không?\nHành động này không thể hoàn tác!`)) {
+            return;
+        }
+    } else {
+        if (!confirm(`Bạn có chắc chắn muốn thực hiện hành động này trên ${checkedIdxs.length} website đã chọn không?`)) {
+            return;
+        }
+    }
+    
+    toast(`Bắt đầu xử lý hành động hàng loạt trên ${checkedIdxs.length} website...`);
+    let successCount = 0;
+    
+    for (let i = 0; i < checkedIdxs.length; i++) {
+        const idx = checkedIdxs[i];
+        const site = allSites[idx];
+        const ownerUser = site._owner_user || DA_USER;
+        try {
+            const fd = new FormData();
+            fd.append('path', site.path);
+            let urlAction = '';
+            
+            if (action === 'update_core') {
+                urlAction = 'update_core';
+            } else if (action === 'update_plugins') {
+                urlAction = 'update_all_wp_plugins';
+            } else if (action === 'update_themes') {
+                urlAction = 'update_all_wp_themes';
+            } else if (action === 'lock') {
+                urlAction = 'lock';
+            } else if (action === 'unlock') {
+                urlAction = 'unlock';
+            } else if (action === 'delete') {
+                urlAction = 'delete';
+                fd.append('delete_db', 'yes');
+            }
+            
+            if (urlAction) {
+                const r = await fetch(apiUrlAdmin(urlAction, ownerUser), { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success) successCount++;
+            }
+        } catch (e) { }
+    }
+    
+    toast(`Hoàn thành! Xử lý thành công trên ${successCount}/${checkedIdxs.length} website.`, 'success');
+    const selectAllChk = document.getElementById('admin-select-all-sites');
+    if (selectAllChk) selectAllChk.checked = false;
+    fetchSites(false);
 }
 
 /* ─── Init ─── */

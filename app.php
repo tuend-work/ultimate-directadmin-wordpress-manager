@@ -4749,7 +4749,7 @@ function run_api() {
     $executing_uid = function_exists('posix_getuid') ? posix_getuid() : -1;
     $already_delegated = ($executing_uid === 0 || getenv('DELEGATED_BY_WRAPPER') === '1');
     
-    $is_root_action = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list');
+    $is_root_action = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets');
     $should_delegate = !$is_win && !$already_delegated && (
         (is_admin_user() && !empty($target_user_input) && ($is_root_action || $target_user_input !== $current_exec_user)) ||
         (!$already_delegated && $is_root_action)
@@ -4784,12 +4784,12 @@ function run_api() {
             
             if ($supports_run_as) {
                 // If compiled wrapper supports run_as, run the php script directly with correct user context
-                $exec_user = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list') ? 'root' : $target_user_clean;
+                $exec_user = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets') ? 'root' : $target_user_clean;
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($exec_user) . " /usr/local/bin/php -nc /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/php.ini /usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/user/index.raw 2>&1";
             } else {
                 // Fallback: Execute the user panel raw entry point as the target user using SUID read_log bypass.
                 // If action is clone or create_database, we run as root (run-as-root) to bypass cross-user file read boundaries.
-                $prefix = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list') ? 'run-as-root' : 'run-as';
+                $prefix = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets') ? 'run-as-root' : 'run-as';
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("{$prefix}.{$target_user_clean}") . " access 100 2>&1";
             }
             
@@ -4854,6 +4854,99 @@ function run_api() {
                     }
                 }
                 echo json_encode(['success' => true, 'sites' => $all_sites]);
+                break;
+
+            case 'bulk_list_assets':
+                if (!is_admin_user() && (!function_exists('posix_getuid') || posix_getuid() !== 0)) {
+                    throw new Exception("Forbidden: Access restricted to Administrators.");
+                }
+                $users = get_all_directadmin_users();
+                $plugins_grouped = [];
+                $themes_grouped = [];
+                foreach ($users as $u) {
+                    $u_home = "/home/{$u}";
+                    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                        $u_home = 'C:/Users/' . $u;
+                    }
+                    $cache_file = $u_home . '/.ultimate_wp_manager.json';
+                    $sites = [];
+                    if (file_exists($cache_file)) {
+                        $sites = json_decode(file_get_contents($cache_file), true);
+                    }
+                    if (!is_array($sites)) {
+                        $sites = scan_wordpress_installations($u_home, $u);
+                    }
+                    if (is_array($sites)) {
+                        foreach ($sites as $s) {
+                            $site_path = $s['path'];
+                            $site_url = $s['siteurl'] ?? $s['domain'] ?? '';
+                            
+                            // Load plugins for this site
+                            try {
+                                $plugins = list_plugins($site_path);
+                                $active_plugins = get_active_plugins($site_path);
+                                $updates_plugins = get_wordpress_plugin_update_info($site_path);
+                                foreach ($plugins as $file => $p) {
+                                    $p_ver = $p['version'] ?? 'unknown';
+                                    $p_name = $p['name'] ?? $file;
+                                    $key = $file . '::' . $p_ver;
+                                    if (!isset($plugins_grouped[$key])) {
+                                        $plugins_grouped[$key] = [
+                                            'plugin_file' => $file,
+                                            'name' => $p_name,
+                                            'version' => $p_ver,
+                                            'sites' => []
+                                        ];
+                                    }
+                                    $plugins_grouped[$key]['sites'][] = [
+                                        'domain' => $s['domain'] ?? '',
+                                        'siteurl' => $site_url,
+                                        'path' => $site_path,
+                                        'owner' => $u,
+                                        'active' => in_array($file, $active_plugins),
+                                        'update_available' => $updates_plugins[$file]['update_available'] ?? false,
+                                        'latest_version' => $updates_plugins[$file]['latest_version'] ?? $p_ver
+                                    ];
+                                }
+                            } catch (Throwable $e) { /* ignore */ }
+
+                            // Load themes for this site
+                            try {
+                                $themes = list_themes($site_path);
+                                $active_theme = get_active_theme($site_path);
+                                $updates_themes = get_wordpress_theme_update_info($site_path);
+                                foreach ($themes as $t) {
+                                    $folder = $t['folder'] ?? '';
+                                    $t_ver = $t['version'] ?? 'unknown';
+                                    $t_name = $t['name'] ?? $folder;
+                                    $key = $folder . '::' . $t_ver;
+                                    if (!isset($themes_grouped[$key])) {
+                                        $themes_grouped[$key] = [
+                                            'folder' => $folder,
+                                            'name' => $t_name,
+                                            'version' => $t_ver,
+                                            'sites' => []
+                                        ];
+                                    }
+                                    $themes_grouped[$key]['sites'][] = [
+                                        'domain' => $s['domain'] ?? '',
+                                        'siteurl' => $site_url,
+                                        'path' => $site_path,
+                                        'owner' => $u,
+                                        'active' => ($folder === $active_theme),
+                                        'update_available' => $updates_themes[$folder]['update_available'] ?? false,
+                                        'latest_version' => $updates_themes[$folder]['latest_version'] ?? $t_ver
+                                    ];
+                                }
+                            } catch (Throwable $e) { /* ignore */ }
+                        }
+                    }
+                }
+                echo json_encode([
+                    'success' => true,
+                    'plugins' => array_values($plugins_grouped),
+                    'themes' => array_values($themes_grouped)
+                ]);
                 break;
                 
             case 'create_database':
