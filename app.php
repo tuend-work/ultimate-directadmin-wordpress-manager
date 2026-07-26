@@ -1520,9 +1520,14 @@ function update_wordpress_core($site_path, $home) {
         }
     }
 
-    $cache_file = $home . '/.ultimate_wp_manager.json';
-    if (file_exists($cache_file)) {
-        @unlink($cache_file);
+    // Find the new version from ABSPATH/wp-includes/version.php or similar
+    $wp_version_file = $site_path . '/wp-includes/version.php';
+    if (file_exists($wp_version_file)) {
+        $wp_version = '';
+        include $wp_version_file;
+        if (!empty($wp_version)) {
+            update_site_cache_field($site_path, 'version', $wp_version);
+        }
     }
 
     return ['success' => true, 'message' => 'WordPress core updated successfully.'];
@@ -2788,11 +2793,89 @@ function parse_wp_config($wp_config_path) {
     ];
 }
 
+function update_site_cache_field($site_path, $field, $value) {
+    if (preg_match('#^/home/([^/]+)#', $site_path, $m)) {
+        $username = $m[1];
+        $u_home = "/home/{$username}";
+    } else {
+        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+        $u_home = getenv('HOME') ?: "/home/{$username}";
+    }
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $u_home = 'C:/Users/local_user';
+    }
+    $cache_file = $u_home . '/.ultimate_wp_manager.json';
+    if (file_exists($cache_file)) {
+        $sites = json_decode(file_get_contents($cache_file), true);
+        if (is_array($sites)) {
+            $updated = false;
+            foreach ($sites as &$s) {
+                if (realpath($s['path']) === realpath($site_path) || $s['path'] === $site_path) {
+                    $s[$field] = $value;
+                    $updated = true;
+                }
+            }
+            if ($updated) {
+                file_put_contents($cache_file, json_encode($sites, JSON_PRETTY_PRINT));
+                @chmod($cache_file, 0600);
+                if (function_exists('posix_getuid') && posix_getuid() === 0 && !empty($username)) {
+                    @chown($cache_file, $username);
+                }
+            }
+        }
+    }
+}
+
+function delete_site_from_cache($site_path) {
+    if (preg_match('#^/home/([^/]+)#', $site_path, $m)) {
+        $username = $m[1];
+        $u_home = "/home/{$username}";
+    } else {
+        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+        $u_home = getenv('HOME') ?: "/home/{$username}";
+    }
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        $u_home = 'C:/Users/local_user';
+    }
+    $cache_file = $u_home . '/.ultimate_wp_manager.json';
+    if (file_exists($cache_file)) {
+        $sites = json_decode(file_get_contents($cache_file), true);
+        if (is_array($sites)) {
+            $new_sites = [];
+            $updated = false;
+            foreach ($sites as $s) {
+                if (realpath($s['path']) === realpath($site_path) || $s['path'] === $site_path) {
+                    $updated = true;
+                } else {
+                    $new_sites[] = $s;
+                }
+            }
+            if ($updated) {
+                file_put_contents($cache_file, json_encode($new_sites, JSON_PRETTY_PRINT));
+                @chmod($cache_file, 0600);
+                if (function_exists('posix_getuid') && posix_getuid() === 0 && !empty($username)) {
+                    @chown($cache_file, $username);
+                }
+            }
+        }
+    }
+}
+
 /**
  * Scans all WordPress installations under $home using the system `find` command.
  * This approach is symlink-safe, depth-unlimited, and handles all DirectAdmin layouts.
  */
 function scan_wordpress_installations($home, $username) {
+    if (!empty($home) && !is_readable($home) && !empty($username)) {
+        $cache_file = $home . '/.ultimate_wp_manager.json';
+        if (file_exists($cache_file)) {
+            $data = json_decode(file_get_contents($cache_file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+        return [];
+    }
     $installations = [];
     $seen_realpaths = [];
 
@@ -5145,6 +5228,7 @@ function run_api() {
                 $res = delete_wordpress_instance($_POST['path'], $home);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Xóa WordPress thành công tại: " . $_POST['path']);
+                    delete_site_from_cache($_POST['path']);
                 } else {
                     wp_manager_log("Xóa WordPress thất bại tại: " . $_POST['path']);
                 }
@@ -5162,12 +5246,9 @@ function run_api() {
                 $res = lock_wordpress_instance($_POST['path']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Khóa bảo vệ thành công tại: " . $_POST['path']);
+                    update_site_cache_field($_POST['path'], 'locked', true);
                 } else {
                     wp_manager_log("Khóa bảo vệ thất bại tại: " . $_POST['path']);
-                }
-                $cache_file = $home . '/.ultimate_wp_manager.json';
-                if (file_exists($cache_file)) {
-                    @unlink($cache_file);
                 }
                 echo json_encode($res);
                 break;
@@ -5183,12 +5264,9 @@ function run_api() {
                 $res = unlock_wordpress_instance($_POST['path']);
                 if (isset($res['success']) && $res['success']) {
                     wp_manager_log("Mở khóa bảo vệ thành công tại: " . $_POST['path']);
+                    update_site_cache_field($_POST['path'], 'locked', false);
                 } else {
                     wp_manager_log("Mở khóa bảo vệ thất bại tại: " . $_POST['path']);
-                }
-                $cache_file = $home . '/.ultimate_wp_manager.json';
-                if (file_exists($cache_file)) {
-                    @unlink($cache_file);
                 }
                 echo json_encode($res);
                 break;
