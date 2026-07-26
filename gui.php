@@ -1318,41 +1318,75 @@ input:disabled + .slider {
 <?php if ($isAdmin): ?>
 <!-- ═══ MODAL: Bulk Updates (WP Core / Themes / Plugins) ═══ -->
 <div class="modal-overlay" id="modal-bulk-update">
-<div class="modal" style="max-width:600px;">
+<div class="modal" style="max-width:820px;">
     <div class="modal-head">
-        <h3><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bulk Update Websites (Toàn bộ Web)</h3>
-        <button class="modal-close" onclick="closeModal('modal-bulk-update')">✕</button>
+        <h3><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bulk Updates — Cập nhật hàng loạt</h3>
+        <button class="modal-close" onclick="closeBulkModal()">✕</button>
     </div>
-    <div class="modal-body">
-        <div class="form-group" style="margin-bottom: 14px;">
-            <label>Chọn phạm vi cập nhật (Target Scope)</label>
-            <select id="bulk-update-target" class="form-control">
-                <option value="current">Tất cả website của user đang chọn (Current User Sites)</option>
-                <option value="all">Tất cả website của TOÀN BỘ User trên VPS/Hosting</option>
-            </select>
-        </div>
-        <div class="form-group" style="margin-bottom: 14px;">
-            <label>Chọn thành phần cập nhật (Components to Update)</label>
-            <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px; background:var(--bg3); padding:10px; border-radius:6px; border:1px solid var(--border);">
-                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
-                    <input type="checkbox" id="bulk-up-core" checked style="accent-color:var(--blue); width:16px; height:16px;">
-                    <span>WordPress Core (Cập nhật nhân WordPress lên bản mới nhất)</span>
+    <div class="modal-body" style="padding:0;">
+        <!-- Controls bar -->
+        <div id="bulk-controls" style="padding:14px 18px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--bg3);">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; flex:1;">
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-core" checked style="accent-color:var(--blue);width:15px;height:15px;">
+                    <span>🔄 WP Core</span>
                 </label>
-                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
-                    <input type="checkbox" id="bulk-up-plugins" checked style="accent-color:var(--blue); width:16px; height:16px;">
-                    <span>WordPress Plugins (Cập nhật tất cả Plugins có bản mới)</span>
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-plugins" checked style="accent-color:var(--blue);width:15px;height:15px;">
+                    <span>🔌 Plugins</span>
                 </label>
-                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
-                    <input type="checkbox" id="bulk-up-themes" checked style="accent-color:var(--blue); width:16px; height:16px;">
-                    <span>WordPress Themes (Cập nhật tất cả Themes có bản mới)</span>
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-themes" checked style="accent-color:var(--blue);width:15px;height:15px;">
+                    <span>🎨 Themes</span>
                 </label>
+                <div style="width:1px;height:20px;background:var(--border);margin:0 4px;"></div>
+                <select id="bulk-update-target" class="form-control" style="width:auto;height:32px;padding:2px 8px;font-size:14px;" onchange="bulkLoadSites()">
+                    <option value="current">Các website của User hiện tại</option>
+                    <option value="all">🌐 Toàn bộ User trên VPS</option>
+                </select>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" id="btn-bulk-check-all" onclick="bulkToggleAll(true)">☑ Chọn tất cả</button>
+                <button class="btn btn-secondary btn-sm" onclick="bulkToggleAll(false)">☐ Bỏ chọn</button>
+                <button class="btn btn-primary btn-sm" id="btn-bulk-update-start" onclick="startBulkUpdateProcess()">
+                    <span class="dashicons dashicons-update-alt wp-admin-icon"></span> Cập nhật đã chọn
+                </button>
             </div>
         </div>
-        <div class="terminal" id="bulk-update-terminal" style="height:220px;">[Hệ thống] Nhấn nút "Bắt đầu cập nhật hàng loạt" để tiến hành...</div>
+        <!-- Progress summary bar -->
+        <div id="bulk-progress-bar-wrap" style="display:none; padding:8px 18px; background:var(--bg3); border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:14px;color:var(--text2);" id="bulk-progress-label">Đang xử lý...</span>
+                <span style="font-size:14px;color:var(--text3);" id="bulk-progress-count">0/0</span>
+            </div>
+            <div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden;">
+                <div id="bulk-progress-bar" style="height:100%;background:var(--blue);width:0%;transition:width 0.3s ease;"></div>
+            </div>
+        </div>
+        <!-- Site table -->
+        <div id="bulk-sites-table-wrap" style="max-height:420px;overflow-y:auto;">
+            <div id="bulk-sites-loading" style="text-align:center;padding:32px;color:var(--text3);">
+                <span class="dashicons dashicons-update dashicons-spin wp-admin-icon" style="font-size:32px;width:32px;height:32px;"></span>
+                <p style="margin-top:8px;">Đang tải danh sách website...</p>
+            </div>
+            <table id="bulk-sites-table" style="width:100%;border-collapse:collapse;display:none;">
+                <thead>
+                    <tr style="background:var(--bg3);position:sticky;top:0;z-index:1;">
+                        <th style="padding:8px 12px;text-align:center;width:40px;border-bottom:1px solid var(--border);"></th>
+                        <th style="padding:8px 12px;text-align:left;font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);">Website</th>
+                        <th style="padding:8px 12px;text-align:center;font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);">WP Core</th>
+                        <th style="padding:8px 12px;text-align:center;font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);">Plugins</th>
+                        <th style="padding:8px 12px;text-align:center;font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);">Themes</th>
+                        <th style="padding:8px 12px;text-align:center;font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);">Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody id="bulk-sites-tbody"></tbody>
+            </table>
+        </div>
     </div>
-    <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-bulk-update')">Hủy / Đóng</button>
-        <button class="btn btn-primary" id="btn-bulk-update-start" onclick="startBulkUpdateProcess()"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bắt đầu cập nhật hàng loạt</button>
+    <div class="modal-footer" style="justify-content:space-between;">
+        <span id="bulk-summary-text" style="font-size:14px;color:var(--text3);"></span>
+        <button class="btn btn-secondary" onclick="closeBulkModal()">Đóng</button>
     </div>
 </div>
 </div>
@@ -1398,6 +1432,16 @@ const apiUrl = (action='') => {
     if (isAdmin && activeUser) {
         url += (action ? '&' : '?') + 'target_user=' + encodeURIComponent(activeUser);
     }
+    return url;
+};
+
+/* Admin-only URL builder: no auto target_user injection (for get_users, admin-level scan) */
+const apiUrlAdmin = (action='', targetUser='') => {
+    let b = window.location.pathname.split('?')[0];
+    if (b.endsWith('.html') || b.endsWith('.raw')) b = b.substring(0, b.lastIndexOf('/')+1);
+    else if (!b.endsWith('/')) b += '/';
+    let url = b + 'index.raw' + (action ? '?action='+action : '');
+    if (targetUser) url += (action ? '&' : '?') + 'target_user=' + encodeURIComponent(targetUser);
     return url;
 };
 
@@ -4414,187 +4458,289 @@ async function executeDelete() {
 }
 
 <?php if ($isAdmin): ?>
-/* ─── Bulk Updates (WP Core / Themes / Plugins) ─── */
-function openBulkUpdateModal() {
-    document.getElementById('bulk-update-terminal').innerHTML = '[Hệ thống] Nhấn "Bắt đầu cập nhật hàng loạt" để tiến hành...';
+/* ─── Bulk Updates: WP Toolkit-style ─── */
+let bulkSitesList = []; // Sites loaded for bulk update modal
+
+function closeBulkModal() {
+    closeModal('modal-bulk-update');
+}
+
+async function openBulkUpdateModal() {
+    document.getElementById('bulk-sites-loading').style.display = 'block';
+    document.getElementById('bulk-sites-table').style.display = 'none';
+    document.getElementById('bulk-progress-bar-wrap').style.display = 'none';
+    document.getElementById('bulk-summary-text').textContent = '';
     document.getElementById('btn-bulk-update-start').disabled = false;
     openModal('modal-bulk-update');
+    await bulkLoadSites();
+}
+
+async function bulkLoadSites() {
+    const scope = document.getElementById('bulk-update-target').value;
+    document.getElementById('bulk-sites-loading').style.display = 'block';
+    document.getElementById('bulk-sites-table').style.display = 'none';
+    document.getElementById('bulk-sites-loading').innerHTML = '<span class="dashicons dashicons-update dashicons-spin wp-admin-icon" style="font-size:32px;width:32px;height:32px;"></span><p style="margin-top:8px;">Đang tải danh sách website...</p>';
+
+    bulkSitesList = [];
+
+    if (scope === 'all') {
+        try {
+            // Use apiUrlAdmin to avoid auto-injecting target_user (which would trigger delegation)
+            const r = await fetch(apiUrlAdmin('get_users'));
+            const d = await r.json();
+            if (d.success && d.users && d.users.length) {
+                for (const u of d.users) {
+                    try {
+                        // Scan sites for each user using apiUrlAdmin with explicit target_user
+                        const rSite = await fetch(apiUrlAdmin('scan', u));
+                        const text = await rSite.text();
+                        const json_start = text.indexOf('{');
+                        if (json_start === -1) continue;
+                        const dSite = JSON.parse(text.substring(json_start));
+                        if (dSite.success && dSite.sites && dSite.sites.length) {
+                            dSite.sites.forEach(s => { s._owner_user = u; });
+                            bulkSitesList.push(...dSite.sites);
+                        }
+                    } catch (e) { /* skip user on error */ }
+                }
+            }
+        } catch (e) {
+            // Fallback to current loaded sites
+            bulkSitesList = allSites.map(s => ({ ...s, _owner_user: activeUser || DA_USER }));
+        }
+    } else {
+        bulkSitesList = allSites.map(s => ({ ...s, _owner_user: activeUser || DA_USER }));
+    }
+
+    bulkRenderTable();
+}
+
+function bulkRenderTable() {
+    const tbody = document.getElementById('bulk-sites-tbody');
+    tbody.innerHTML = '';
+
+    if (!bulkSitesList.length) {
+        document.getElementById('bulk-sites-loading').style.display = 'block';
+        document.getElementById('bulk-sites-loading').innerHTML = '<p style="color:var(--text3);padding:20px;">Không tìm thấy website nào.</p>';
+        document.getElementById('bulk-sites-table').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('bulk-sites-loading').style.display = 'none';
+    document.getElementById('bulk-sites-table').style.display = 'table';
+
+    bulkSitesList.forEach((site, idx) => {
+        const isLocked = site.locked;
+        const ownerBadge = site._owner_user ? `<span style="font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:4px;">${esc(site._owner_user)}</span>` : '';
+        const lockBadge = isLocked ? `<span style="font-size:11px;color:var(--yellow);margin-left:4px;">🔒 Locked</span>` : '';
+
+        const tr = document.createElement('tr');
+        tr.id = `bulk-row-${idx}`;
+        tr.style.cssText = 'border-bottom:1px solid var(--border);transition:background .12s;';
+        tr.onmouseenter = function() { this.style.background = 'rgba(255,255,255,.03)'; };
+        tr.onmouseleave = function() { this.style.background = ''; };
+        tr.innerHTML = `
+            <td style="padding:10px 12px;text-align:center;">
+                <input type="checkbox" class="bulk-site-chk" data-idx="${idx}" ${isLocked ? 'disabled' : 'checked'} style="accent-color:var(--blue);width:15px;height:15px;">
+            </td>
+            <td style="padding:10px 12px;">
+                <div style="font-weight:600;font-size:15px;color:var(--text);">${esc(site.domain || site.path)}${ownerBadge}${lockBadge}</div>
+                <div style="font-size:12px;color:var(--text3);font-family:monospace;">${esc(site.path)}</div>
+            </td>
+            <td style="padding:10px 12px;text-align:center;">
+                <span id="bulk-core-status-${idx}" class="badge badge-gray" style="font-size:12px;">WP ${esc(site.version || '?')}</span>
+            </td>
+            <td style="padding:10px 12px;text-align:center;">
+                <span id="bulk-plugins-status-${idx}" class="badge badge-gray" style="font-size:12px;">—</span>
+            </td>
+            <td style="padding:10px 12px;text-align:center;">
+                <span id="bulk-themes-status-${idx}" class="badge badge-gray" style="font-size:12px;">—</span>
+            </td>
+            <td style="padding:10px 12px;text-align:center;" id="bulk-row-status-${idx}">
+                ${isLocked ? '<span style="color:var(--yellow);font-size:13px;">🔒 Bỏ qua</span>' : '<span style="color:var(--text3);font-size:13px;">Chờ...</span>'}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('bulk-summary-text').textContent = `${bulkSitesList.length} website tổng cộng`;
+}
+
+function bulkToggleAll(state) {
+    document.querySelectorAll('.bulk-site-chk:not(:disabled)').forEach(chk => { chk.checked = state; });
+}
+
+function bulkSetRowStatus(idx, html) {
+    const el = document.getElementById(`bulk-row-status-${idx}`);
+    if (el) el.innerHTML = html;
+}
+function bulkSetCellStatus(col, idx, html) {
+    const el = document.getElementById(`bulk-${col}-status-${idx}`);
+    if (el) el.innerHTML = html;
 }
 
 async function startBulkUpdateProcess() {
-    const scope = document.getElementById('bulk-update-target').value;
     const upCore = document.getElementById('bulk-up-core').checked;
     const upPlugins = document.getElementById('bulk-up-plugins').checked;
     const upThemes = document.getElementById('bulk-up-themes').checked;
-    const term = document.getElementById('bulk-update-terminal');
     const startBtn = document.getElementById('btn-bulk-update-start');
 
     if (!upCore && !upPlugins && !upThemes) {
-        toast('Vui lòng chọn ít nhất 1 thành phần để cập nhật (Core/Plugins/Themes).', 'error');
+        toast('Vui lòng chọn ít nhất 1 thành phần để cập nhật.', 'error');
+        return;
+    }
+
+    const checkedIdxs = [];
+    document.querySelectorAll('.bulk-site-chk:checked').forEach(chk => {
+        checkedIdxs.push(parseInt(chk.getAttribute('data-idx')));
+    });
+
+    if (!checkedIdxs.length) {
+        toast('Vui lòng chọn ít nhất 1 website để cập nhật.', 'error');
         return;
     }
 
     startBtn.disabled = true;
-    term.innerHTML = '';
-    const log = (msg, cls='') => {
-        const ln = document.createElement('div');
-        if (cls) ln.className = cls;
-        ln.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
-        term.appendChild(ln);
-        term.scrollTop = term.scrollHeight;
-    };
+    const progressWrap = document.getElementById('bulk-progress-bar-wrap');
+    const progressBar = document.getElementById('bulk-progress-bar');
+    const progressLabel = document.getElementById('bulk-progress-label');
+    const progressCount = document.getElementById('bulk-progress-count');
+    progressWrap.style.display = 'block';
 
-    log(`🚀 Khởi chạy cập nhật hàng loạt (${scope === 'all' ? 'Tất cả User trên VPS/Hosting' : 'Các website của User đang chọn'})...`);
+    let done = 0;
+    const total = checkedIdxs.length;
 
-    let targetSites = [];
-    if (scope === 'all') {
-        log('🔍 Đang tải danh sách tất cả các User DirectAdmin...');
-        try {
-            const r = await fetch(apiUrl('get_users'));
-            const d = await r.json();
-            if (d.success && d.users && d.users.length) {
-                log(`Tìm thấy ${d.users.length} tài khoản người dùng (${d.users.join(', ')}). Đang quét danh sách website...`, 'ok');
-                for (const u of d.users) {
-                    log(`Đang quét website cho User: ${u}...`);
-                    try {
-                        const rSite = await fetch(apiUrl('scan', u));
-                        const text = await rSite.text();
-                        let dSite;
-                        try {
-                            dSite = JSON.parse(text);
-                        } catch (e) {
-                            log(`  - Không đọc được phản hồi từ user ${u}: ${text.substring(0, 100)}`, 'err');
-                            continue;
-                        }
-                        if (dSite.success && dSite.sites && dSite.sites.length) {
-                            log(`  ↳ Đã tìm thấy ${dSite.sites.length} website cho user ${u}.`, 'ok');
-                            targetSites.push(...dSite.sites);
-                        } else {
-                            log(`  ↳ Không có website nào dưới user ${u}.`);
-                        }
-                    } catch (err) {
-                        log(`Lỗi khi quét user ${u}: ${err.message}`, 'err');
-                    }
-                }
-            }
-        } catch (e) {
-            log('Lỗi kết nối khi lấy danh sách user, chuyển về danh sách website hiện tại.', 'err');
-        }
-    }
+    for (const idx of checkedIdxs) {
+        const site = bulkSitesList[idx];
+        const ownerUser = site._owner_user || DA_USER;
+        
+        progressLabel.textContent = `Đang xử lý: ${site.domain || site.path}`;
+        progressCount.textContent = `${done}/${total}`;
+        progressBar.style.width = `${Math.round(done / total * 100)}%`;
+        bulkSetRowStatus(idx, '<span style="color:var(--blue);font-size:13px;" class="dashicons dashicons-update dashicons-spin wp-admin-icon" style="font-size:16px;"></span> <span style="color:var(--blue);font-size:13px;">Đang xử lý...</span>');
 
-    if (!targetSites.length) {
-        log('ℹ️ Không quét được site riêng lẻ, sử dụng danh sách website đã tải trên màn hình...', 'info');
-        targetSites = [...allSites];
-    }
+        let coreOk = null, pluginsOk = null, themesOk = null;
 
-    if (!targetSites.length) {
-        log('❌ Không tìm thấy website nào để cập nhật.', 'err');
-        startBtn.disabled = false;
-        return;
-    }
-
-    log(`📋 Đã tổng hợp ${targetSites.length} website để xử lý cập nhật hàng loạt.`, 'ok');
-
-    for (let idx = 0; idx < targetSites.length; idx++) {
-        const site = targetSites[idx];
-        log(`\n--------------------------------------------------`);
-        log(`🌐 [${idx + 1}/${targetSites.length}] Xử lý Website: ${site.domain} (${site.path})`);
-
-        if (site.locked) {
-            log(`🔒 Website ${site.domain} đang bật WP Lock (Khóa bảo vệ). Bỏ qua cập nhật.`, 'err');
-            continue;
-        }
-
-        // 1. Update Core
+        // 1. Update WP Core
         if (upCore) {
-            log(`  ↳ ⏳ Đang cập nhật WordPress Core...`);
+            bulkSetCellStatus('core', idx, '<span style="color:var(--blue);font-size:12px;">⏳...</span>');
             try {
                 const fd = new FormData();
                 fd.append('path', site.path);
-                const r = await fetch(apiUrl('update_core'), { method: 'POST', body: fd });
-                const d = await r.json();
+                const r = await fetch(apiUrlAdmin('update_core', ownerUser), { method: 'POST', body: fd });
+                const text = await r.text();
+                const json_start = text.indexOf('{');
+                const d = JSON.parse(json_start >= 0 ? text.substring(json_start) : text);
                 if (d.success) {
-                    log(`  ↳ ✅ WP Core: ${d.message || 'Thành công'}`, 'ok');
+                    coreOk = true;
+                    bulkSetCellStatus('core', idx, '<span class="badge badge-green" style="font-size:12px;">✓ Updated</span>');
                 } else {
-                    log(`  ↳ ❌ WP Core: ${d.error || 'Thất bại'}`, 'err');
+                    coreOk = false;
+                    bulkSetCellStatus('core', idx, `<span class="badge badge-red" style="font-size:12px;" title="${esc(d.error||'')}">✗ Fail</span>`);
                 }
-            } catch (err) {
-                log(`  ↳ ❌ Lỗi kết nối khi update Core: ${err.message}`, 'err');
+            } catch (e) {
+                coreOk = false;
+                bulkSetCellStatus('core', idx, '<span class="badge badge-red" style="font-size:12px;">✗ Error</span>');
             }
+        } else {
+            bulkSetCellStatus('core', idx, '<span style="color:var(--text3);font-size:12px;">—</span>');
         }
 
         // 2. Update Plugins
         if (upPlugins) {
-            log(`  ↳ ⏳ Đang kiểm tra & cập nhật Plugins...`);
+            bulkSetCellStatus('plugins', idx, '<span style="color:var(--blue);font-size:12px;">⏳...</span>');
             try {
                 const fd = new FormData();
                 fd.append('path', site.path);
-                const r = await fetch(apiUrl('list_plugins'), { method: 'POST', body: fd });
-                const d = await r.json();
+                const r = await fetch(apiUrlAdmin('list_plugins', ownerUser), { method: 'POST', body: fd });
+                const text = await r.text();
+                const json_start = text.indexOf('{');
+                const d = JSON.parse(json_start >= 0 ? text.substring(json_start) : text);
+                let updatedPlugs = 0, totalPlugs = 0;
                 if (d.success && d.plugins && d.plugins.length) {
-                    let updatedPlugs = 0;
                     for (const p of d.plugins) {
                         if (p.update_available) {
-                            log(`     - Đang nâng cấp plugin: ${p.name} (${p.file})...`);
+                            totalPlugs++;
                             const fdUp = new FormData();
                             fdUp.append('path', site.path);
                             fdUp.append('plugin_file', p.file);
-                            const rUp = await fetch(apiUrl('update_wp_plugin'), { method: 'POST', body: fdUp });
-                            const dUp = await rUp.json();
-                            if (dUp.success) {
-                                updatedPlugs++;
-                            } else {
-                                log(`     - ❌ Lỗi plugin ${p.name}: ${dUp.error}`, 'err');
-                            }
+                            try {
+                                const rUp = await fetch(apiUrlAdmin('update_wp_plugin', ownerUser), { method: 'POST', body: fdUp });
+                                const tUp = await rUp.text();
+                                const js = tUp.indexOf('{');
+                                const dUp = JSON.parse(js >= 0 ? tUp.substring(js) : tUp);
+                                if (dUp.success) updatedPlugs++;
+                            } catch (e) { /* skip */ }
                         }
                     }
-                    log(`  ↳ ✅ Plugins: Đã cập nhật ${updatedPlugs} plugin.`, 'ok');
+                    pluginsOk = true;
+                    bulkSetCellStatus('plugins', idx, `<span class="badge ${updatedPlugs > 0 ? 'badge-green' : 'badge-gray'}" style="font-size:12px;">${updatedPlugs > 0 ? `✓ +${updatedPlugs}` : '✓ OK'}</span>`);
                 } else {
-                    log(`  ↳ ℹ️ Plugins: Không có plugin hoặc không đọc được danh sách.`);
+                    pluginsOk = true;
+                    bulkSetCellStatus('plugins', idx, '<span class="badge badge-gray" style="font-size:12px;">— None</span>');
                 }
-            } catch (err) {
-                log(`  ↳ ❌ Lỗi khi cập nhật Plugins: ${err.message}`, 'err');
+            } catch (e) {
+                pluginsOk = false;
+                bulkSetCellStatus('plugins', idx, '<span class="badge badge-red" style="font-size:12px;">✗ Error</span>');
             }
+        } else {
+            bulkSetCellStatus('plugins', idx, '<span style="color:var(--text3);font-size:12px;">—</span>');
         }
 
         // 3. Update Themes
         if (upThemes) {
-            log(`  ↳ ⏳ Đang kiểm tra & cập nhật Themes...`);
+            bulkSetCellStatus('themes', idx, '<span style="color:var(--blue);font-size:12px;">⏳...</span>');
             try {
                 const fd = new FormData();
                 fd.append('path', site.path);
-                const r = await fetch(apiUrl('list_themes'), { method: 'POST', body: fd });
-                const d = await r.json();
+                const r = await fetch(apiUrlAdmin('list_themes', ownerUser), { method: 'POST', body: fd });
+                const text = await r.text();
+                const json_start = text.indexOf('{');
+                const d = JSON.parse(json_start >= 0 ? text.substring(json_start) : text);
+                let updatedThemes = 0;
                 if (d.success && d.themes && d.themes.length) {
-                    let updatedThemes = 0;
                     for (const t of d.themes) {
                         if (t.update_available) {
-                            log(`     - Đang nâng cấp theme: ${t.name} (${t.folder})...`);
                             const fdUp = new FormData();
                             fdUp.append('path', site.path);
                             fdUp.append('theme_folder', t.folder);
-                            const rUp = await fetch(apiUrl('update_wp_theme'), { method: 'POST', body: fdUp });
-                            const dUp = await rUp.json();
-                            if (dUp.success) {
-                                updatedThemes++;
-                            } else {
-                                log(`     - ❌ Lỗi theme ${t.name}: ${dUp.error}`, 'err');
-                            }
+                            try {
+                                const rUp = await fetch(apiUrlAdmin('update_wp_theme', ownerUser), { method: 'POST', body: fdUp });
+                                const tUp = await rUp.text();
+                                const js = tUp.indexOf('{');
+                                const dUp = JSON.parse(js >= 0 ? tUp.substring(js) : tUp);
+                                if (dUp.success) updatedThemes++;
+                            } catch (e) { /* skip */ }
                         }
                     }
-                    log(`  ↳ ✅ Themes: Đã cập nhật ${updatedThemes} theme.`, 'ok');
+                    themesOk = true;
+                    bulkSetCellStatus('themes', idx, `<span class="badge ${updatedThemes > 0 ? 'badge-green' : 'badge-gray'}" style="font-size:12px;">${updatedThemes > 0 ? `✓ +${updatedThemes}` : '✓ OK'}</span>`);
                 } else {
-                    log(`  ↳ ℹ️ Themes: Không có theme hoặc không đọc được danh sách.`);
+                    themesOk = true;
+                    bulkSetCellStatus('themes', idx, '<span class="badge badge-gray" style="font-size:12px;">— None</span>');
                 }
-            } catch (err) {
-                log(`  ↳ ❌ Lỗi khi cập nhật Themes: ${err.message}`, 'err');
+            } catch (e) {
+                themesOk = false;
+                bulkSetCellStatus('themes', idx, '<span class="badge badge-red" style="font-size:12px;">✗ Error</span>');
             }
+        } else {
+            bulkSetCellStatus('themes', idx, '<span style="color:var(--text3);font-size:12px;">—</span>');
         }
+
+        const allOk = [coreOk, pluginsOk, themesOk].filter(v => v !== null).every(v => v === true);
+        bulkSetRowStatus(idx, allOk
+            ? '<span style="color:var(--green);font-size:13px;font-weight:600;">✅ Hoàn tất</span>'
+            : '<span style="color:var(--yellow);font-size:13px;">⚠️ Có lỗi</span>');
+
+        done++;
+        progressCount.textContent = `${done}/${total}`;
+        progressBar.style.width = `${Math.round(done / total * 100)}%`;
     }
 
-    log(`\n🎉 HOÀN TẤT TẤT CẢ TÁC VỤ CẬP NHẬT HÀNG LOẠT!`, 'ok');
+    progressLabel.textContent = `🎉 Hoàn tất ${done}/${total} website!`;
+    progressBar.style.background = 'var(--green)';
     startBtn.disabled = false;
-    fetchSites(false);
+    toast(`Đã cập nhật xong ${done} website!`, 'success');
 }
 
 /* ─── Plugin update ─── */
