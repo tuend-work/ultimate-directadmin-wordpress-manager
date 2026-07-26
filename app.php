@@ -74,24 +74,49 @@ function get_all_directadmin_users() {
     // Try to list /usr/local/directadmin/data/users/
     $da_users_dir = '/usr/local/directadmin/data/users';
     if (is_dir($da_users_dir)) {
-        $dirs = array_diff(scandir($da_users_dir), ['.', '..']);
-        foreach ($dirs as $d) {
-            if (is_dir($da_users_dir . '/' . $d)) {
-                $users[] = $d;
+        $scan = @scandir($da_users_dir);
+        if (is_array($scan)) {
+            $dirs = array_diff($scan, ['.', '..']);
+            foreach ($dirs as $d) {
+                if (is_dir($da_users_dir . '/' . $d)) {
+                    $users[] = $d;
+                }
             }
         }
     }
     // Fallback: list directories in /home
     if (empty($users) && is_dir('/home')) {
-        $dirs = array_diff(scandir('/home'), ['.', '..']);
-        foreach ($dirs as $d) {
-            if (is_dir('/home/' . $d . '/domains')) {
-                $users[] = $d;
+        $scan = @scandir('/home');
+        if (is_array($scan)) {
+            $dirs = array_diff($scan, ['.', '..']);
+            foreach ($dirs as $d) {
+                if (is_dir('/home/' . $d . '/domains')) {
+                    $users[] = $d;
+                }
+            }
+        }
+    }
+    // Deep fallback: parse /etc/passwd for users with home directories in /home/
+    if (empty($users) && is_readable('/etc/passwd')) {
+        $lines = @file('/etc/passwd');
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                $parts = explode(':', trim($line));
+                if (count($parts) >= 6) {
+                    $u = $parts[0];
+                    $home_dir = $parts[5];
+                    if (strpos($home_dir, '/home/') === 0) {
+                        // Ensure it's not a generic system user
+                        if ($u !== 'tmp' && $u !== 'nobody' && $u !== 'mysql') {
+                            $users[] = $u;
+                        }
+                    }
+                }
             }
         }
     }
     sort($users);
-    return $users;
+    return array_values(array_unique($users));
 }
 
 
@@ -4828,10 +4853,13 @@ function run_api() {
                 $domains_dir = $home . '/domains';
                 $domains = [];
                 if (is_dir($domains_dir)) {
-                    $dirs = array_diff(scandir($domains_dir), ['.', '..']);
-                    foreach ($dirs as $dir) {
-                        if (is_dir($domains_dir . '/' . $dir . '/public_html')) {
-                            $domains[] = $dir;
+                    $scan = @scandir($domains_dir);
+                    if (is_array($scan)) {
+                        $dirs = array_diff($scan, ['.', '..']);
+                        foreach ($dirs as $dir) {
+                            if (is_dir($domains_dir . '/' . $dir . '/public_html')) {
+                                $domains[] = $dir;
+                            }
                         }
                     }
                 }
