@@ -4843,6 +4843,45 @@ function run_api() {
                 echo json_encode(['success' => true, 'sites' => $sites]);
                 break;
                 
+            case 'reload_single_site':
+                if (empty($_POST['path'])) {
+                    throw new Exception("Missing site path parameter.");
+                }
+                $site_path = $_POST['path'];
+                if (strpos(realpath($site_path) ?: $site_path, $home) !== 0) {
+                    throw new Exception("Invalid directory access.");
+                }
+                $wp_config = $site_path . '/wp-config.php';
+                if (!file_exists($wp_config)) {
+                    throw new Exception("wp-config.php not found at site path.");
+                }
+                $single_site = parse_wp_config($wp_config);
+                if (!$single_site) {
+                    throw new Exception("Failed to parse site configuration.");
+                }
+
+                // Refresh cache file if exists
+                $cache_file = $home . '/.ultimate_wp_manager.json';
+                if (file_exists($cache_file)) {
+                    $sites = json_decode(file_get_contents($cache_file), true);
+                    if (is_array($sites)) {
+                        $updated = false;
+                        foreach ($sites as &$s) {
+                            if (isset($s['path']) && realpath($s['path']) === (realpath($site_path) ?: $site_path)) {
+                                $s = $single_site;
+                                $updated = true;
+                                break;
+                            }
+                        }
+                        unset($s);
+                        if ($updated) {
+                            file_put_contents($cache_file, json_encode($sites, JSON_PRETTY_PRINT));
+                        }
+                    }
+                }
+                echo json_encode(['success' => true, 'site' => $single_site]);
+                break;
+
             case 'list':
                 $cache_file = $home . '/.ultimate_wp_manager.json';
                 if (file_exists($cache_file)) {

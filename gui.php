@@ -2355,34 +2355,61 @@ async function loadUsers(i) {
         const d = await r.json();
 
         if (d.success) {
-            if (!d.users.length) {
-                container.innerHTML = '<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">No users found.</div>';
-                return;
+            s.rawUsers = d.users || [];
+            const roleFilterEl = document.getElementById(`user-role-filter-${i}`);
+            if (roleFilterEl) {
+                roleFilterEl.value = 'all';
             }
-            container.innerHTML = d.users.map((u, idx) => {
-                const displayName = u.display_name || u.user_login;
-                const roles = Array.isArray(u.roles) && u.roles.length ? u.roles.join(', ') : 'No role';
-                const email = u.user_email || 'No email';
-                const primaryRole = Array.isArray(u.roles) && u.roles.length ? u.roles[0] : 'administrator';
-                return `
-                <div class="plugin-item">
-                    <div class="plugin-info">
-                        <div class="plugin-name" title="${esc(displayName)}">${esc(displayName)}</div>
-                        <div class="plugin-desc" title="${esc(email)}">${esc(email)}</div>
-                        <div class="plugin-meta">Login: ${esc(u.user_login)} | Roles: ${esc(roles)} | Registered: ${esc(u.user_registered || 'Unknown')}</div>
-                    </div>
-                    <div class="plugin-toggle">
-                        <button class="btn btn-sm btn-secondary" id="btn-user-modify-${i}-${idx}" onclick="openModifyUserModal(${i}, ${idx}, ${parseInt(u.ID, 10)}, '${escJsArg(u.user_login || '')}', '${escJsArg(u.display_name || '')}', '${escJsArg(u.user_email || '')}', '${escJsArg(primaryRole)}')"><span class="dashicons dashicons-edit wp-admin-icon"></span> Modify User</button>
-                        <button class="btn btn-sm btn-primary" id="btn-user-login-${i}-${idx}" onclick="loginAsUser(${i}, ${idx}, ${parseInt(u.ID, 10)})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Login As User</button>
-                    </div>
-                </div>`;
-            }).join('');
+            renderUserList(i);
         } else {
             container.innerHTML = `<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Error: ${esc(d.error)}</div>`;
         }
     } catch (err) {
         container.innerHTML = '<div style="color:var(--red);font-size:16px;padding:12px;text-align:center;">Cannot load users.</div>';
     }
+}
+
+function filterUserList(i) {
+    renderUserList(i);
+}
+
+function renderUserList(i) {
+    const s = allSites[i];
+    const container = document.getElementById('user-list-' + i);
+    if (!container) return;
+
+    const roleFilter = (document.getElementById(`user-role-filter-${i}`)?.value || 'all').toLowerCase();
+    const users = s.rawUsers || [];
+
+    const filtered = users.filter(u => {
+        if (roleFilter === 'all') return true;
+        if (!Array.isArray(u.roles) || !u.roles.length) return false;
+        return u.roles.some(r => r.toLowerCase() === roleFilter);
+    });
+
+    if (!filtered.length) {
+        container.innerHTML = `<div style="color:var(--text3);font-size:16px;padding:12px;text-align:center;">${users.length ? 'Không có user nào phù hợp với vai trò đã chọn.' : 'No users found.'}</div>`;
+        return;
+    }
+
+    container.innerHTML = filtered.map((u, idx) => {
+        const displayName = u.display_name || u.user_login;
+        const roles = Array.isArray(u.roles) && u.roles.length ? u.roles.join(', ') : 'No role';
+        const email = u.user_email || 'No email';
+        const primaryRole = Array.isArray(u.roles) && u.roles.length ? u.roles[0] : 'administrator';
+        return `
+        <div class="plugin-item">
+            <div class="plugin-info">
+                <div class="plugin-name" title="${esc(displayName)}">${esc(displayName)}</div>
+                <div class="plugin-desc" title="${esc(email)}">${esc(email)}</div>
+                <div class="plugin-meta">Login: ${esc(u.user_login)} | Roles: ${esc(roles)} | Registered: ${esc(u.user_registered || 'Unknown')}</div>
+            </div>
+            <div class="plugin-toggle">
+                <button class="btn btn-sm btn-secondary" id="btn-user-modify-${i}-${idx}" onclick="openModifyUserModal(${i}, ${idx}, ${parseInt(u.ID, 10)}, '${escJsArg(u.user_login || '')}', '${escJsArg(u.display_name || '')}', '${escJsArg(u.user_email || '')}', '${escJsArg(primaryRole)}')"><span class="dashicons dashicons-edit wp-admin-icon"></span> Modify User</button>
+                <button class="btn btn-sm btn-primary" id="btn-user-login-${i}-${idx}" onclick="loginAsUser(${i}, ${idx}, ${parseInt(u.ID, 10)})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Login As User</button>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function openModifyUserModal(siteIdx, userIdx, userId, login, displayName, email, role) {
@@ -3359,6 +3386,7 @@ function renderSites(sites) {
             <div class="card-action-row" onclick="event.stopPropagation()">
                 <button class="btn btn-blue btn-sm" onclick="doMagicLogin(${i})"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Magic Login</button>
                 <div class="sep"></div>
+                <button class="btn btn-secondary btn-sm" id="btn-reload-site-${i}" onclick="reloadSingleSite(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Reload Data</button>
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})"><span class="dashicons dashicons-admin-page wp-admin-icon"></span> Clone Website</button>
                 <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> File Manager</button>
                 <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})"><span class="dashicons dashicons-database wp-admin-icon"></span> phpMyAdmin</button>
@@ -3555,7 +3583,15 @@ function renderSites(sites) {
                 <div class="card-tab-content" id="tab-content-${i}-users">
                     <div class="card-sec-title">
                         <span><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Users</span>
-                        <div style="display:flex; gap:8px;" onclick="event.stopPropagation()">
+                        <div style="display:flex; gap:8px; align-items:center;" onclick="event.stopPropagation()">
+                            <select id="user-role-filter-${i}" class="form-control" style="width: auto; padding: 4px 8px; font-size: 13px;" onchange="filterUserList(${i})">
+                                <option value="all">Tất cả vai trò (All Roles)</option>
+                                <option value="administrator">Administrator</option>
+                                <option value="editor">Editor</option>
+                                <option value="author">Author</option>
+                                <option value="contributor">Contributor</option>
+                                <option value="subscriber">Subscriber</option>
+                            </select>
                             <button class="btn btn-primary btn-sm" onclick="openCreateUserModal(${i})"><span class="dashicons dashicons-plus wp-admin-icon"></span> Tạo User</button>
                             <button class="btn btn-secondary btn-sm" onclick="loadUsers(${i})"><span class="dashicons dashicons-update wp-admin-icon"></span> Refresh</button>
                         </div>
@@ -3848,6 +3884,46 @@ async function triggerScan() {
     await fetchSites(true);
     btn.disabled=false; btn.innerHTML='<span class="dashicons dashicons-update wp-admin-icon"></span> Scan Hosting';
     toast('Scan complete.', 'success');
+}
+
+async function reloadSingleSite(i) {
+    const s = allSites[i];
+    if (!s) return;
+    const btn = document.getElementById(`btn-reload-site-${i}`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="dashicons dashicons-update wp-admin-icon dashicons-spin"></span> Reloading...';
+    }
+    toast(`Đang tải lại dữ liệu website ${s.domain}...`);
+
+    try {
+        const fd = new FormData();
+        fd.append('path', s.path);
+        const r = await fetch(apiUrl('reload_single_site'), { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success && d.site) {
+            allSites[i] = d.site;
+            renderSites(allSites);
+            // Re-open card if it was expanded
+            const cardBody = document.getElementById(`cb-${i}`);
+            if (cardBody) {
+                cardBody.classList.add('open');
+                const chev = document.getElementById(`cv-${i}`);
+                if (chev) chev.textContent = '▼';
+            }
+            toast(`✅ Đã tải lại dữ liệu website ${d.site.domain} thành công!`, 'success');
+        } else {
+            toast('❌ Lỗi: ' + (d.error || 'Không thể tải lại dữ liệu website.'), 'error');
+        }
+    } catch (err) {
+        toast('❌ Lỗi kết nối máy chủ.', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="dashicons dashicons-update wp-admin-icon"></span> Reload Data';
+        }
+    }
 }
 
 /* ─── Install: domain list ─── */
