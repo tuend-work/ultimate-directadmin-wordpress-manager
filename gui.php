@@ -947,7 +947,8 @@ input:disabled + .slider {
     <button class="btn btn-secondary" id="btn-scan" onclick="triggerScan()"><span class="dashicons dashicons-update wp-admin-icon"></span> Scan Hosting</button>
     <?php if ($isAdmin): ?>
     <div class="toolbar-sep"></div>
-    <button class="btn btn-secondary" onclick="openUpdateModal()"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Update Plugin</button>
+    <button class="btn btn-secondary" onclick="openBulkUpdateModal()"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bulk Updates (WP/Themes/Plugins)</button>
+    <button class="btn btn-secondary" onclick="openUpdateModal()"><span class="dashicons dashicons-cloud-upload wp-admin-icon"></span> Update DA Plugin</button>
     <?php endif; ?>
     <div class="toolbar-sep"></div>
     <input type="text" id="search-input" class="toolbar-search" placeholder="Search by name, URL, path…" oninput="filterSites()">
@@ -1315,11 +1316,52 @@ input:disabled + .slider {
 </div>
 
 <?php if ($isAdmin): ?>
-<!-- ═══ MODAL: Update Plugin ═══ -->
+<!-- ═══ MODAL: Bulk Updates (WP Core / Themes / Plugins) ═══ -->
+<div class="modal-overlay" id="modal-bulk-update">
+<div class="modal" style="max-width:600px;">
+    <div class="modal-head">
+        <h3><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bulk Update Websites (Toàn bộ Web)</h3>
+        <button class="modal-close" onclick="closeModal('modal-bulk-update')">✕</button>
+    </div>
+    <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 14px;">
+            <label>Chọn phạm vi cập nhật (Target Scope)</label>
+            <select id="bulk-update-target" class="form-control">
+                <option value="current">Tất cả website của user đang chọn (Current User Sites)</option>
+                <option value="all">Tất cả website của TOÀN BỘ User trên VPS/Hosting</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 14px;">
+            <label>Chọn thành phần cập nhật (Components to Update)</label>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px; background:var(--bg3); padding:10px; border-radius:6px; border:1px solid var(--border);">
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-core" checked style="accent-color:var(--blue); width:16px; height:16px;">
+                    <span>WordPress Core (Cập nhật nhân WordPress lên bản mới nhất)</span>
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-plugins" checked style="accent-color:var(--blue); width:16px; height:16px;">
+                    <span>WordPress Plugins (Cập nhật tất cả Plugins có bản mới)</span>
+                </label>
+                <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:normal; color:var(--text2);">
+                    <input type="checkbox" id="bulk-up-themes" checked style="accent-color:var(--blue); width:16px; height:16px;">
+                    <span>WordPress Themes (Cập nhật tất cả Themes có bản mới)</span>
+                </label>
+            </div>
+        </div>
+        <div class="terminal" id="bulk-update-terminal" style="height:220px;">[Hệ thống] Nhấn nút "Bắt đầu cập nhật hàng loạt" để tiến hành...</div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-bulk-update')">Hủy / Đóng</button>
+        <button class="btn btn-primary" id="btn-bulk-update-start" onclick="startBulkUpdateProcess()"><span class="dashicons dashicons-update-alt wp-admin-icon"></span> Bắt đầu cập nhật hàng loạt</button>
+    </div>
+</div>
+</div>
+
+<!-- ═══ MODAL: Update DA Plugin ═══ -->
 <div class="modal-overlay" id="modal-update">
 <div class="modal" style="max-width:520px;">
     <div class="modal-head">
-        <h3><span class="dashicons dashicons-upload wp-admin-icon"></span> Update Plugin from GitHub</h3>
+        <h3><span class="dashicons dashicons-cloud-upload wp-admin-icon"></span> Update DA Plugin from GitHub</h3>
         <button class="modal-close" onclick="closeModal('modal-update')">✕</button>
     </div>
     <div class="modal-body">
@@ -4372,6 +4414,181 @@ async function executeDelete() {
 }
 
 <?php if ($isAdmin): ?>
+/* ─── Bulk Updates (WP Core / Themes / Plugins) ─── */
+function openBulkUpdateModal() {
+    document.getElementById('bulk-update-terminal').innerHTML = '[Hệ thống] Nhấn "Bắt đầu cập nhật hàng loạt" để tiến hành...';
+    document.getElementById('btn-bulk-update-start').disabled = false;
+    openModal('modal-bulk-update');
+}
+
+async function startBulkUpdateProcess() {
+    const scope = document.getElementById('bulk-update-target').value;
+    const upCore = document.getElementById('bulk-up-core').checked;
+    const upPlugins = document.getElementById('bulk-up-plugins').checked;
+    const upThemes = document.getElementById('bulk-up-themes').checked;
+    const term = document.getElementById('bulk-update-terminal');
+    const startBtn = document.getElementById('btn-bulk-update-start');
+
+    if (!upCore && !upPlugins && !upThemes) {
+        toast('Vui lòng chọn ít nhất 1 thành phần để cập nhật (Core/Plugins/Themes).', 'error');
+        return;
+    }
+
+    startBtn.disabled = true;
+    term.innerHTML = '';
+    const log = (msg, cls='') => {
+        const ln = document.createElement('div');
+        if (cls) ln.className = cls;
+        ln.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+        term.appendChild(ln);
+        term.scrollTop = term.scrollHeight;
+    };
+
+    log(`🚀 Khởi chạy cập nhật hàng loạt (${scope === 'all' ? 'Tất cả User trên VPS/Hosting' : 'Các website của User đang chọn'})...`);
+
+    let targetSites = [];
+    if (scope === 'all') {
+        log('🔍 Đang tải danh sách tất cả các User DirectAdmin...');
+        try {
+            const r = await fetch(apiUrl('get_users'));
+            const d = await r.json();
+            if (d.success && d.users && d.users.length) {
+                log(`Found ${d.users.length} users. Standardizing site listings...`, 'ok');
+                for (const u of d.users) {
+                    log(`Scanning sites for user: ${u}...`);
+                    try {
+                        const uUrl = new URL(apiUrl('scan'), window.location.href);
+                        uUrl.searchParams.set('target_user', u);
+                        const rSite = await fetch(uUrl.pathname + uUrl.search + uUrl.hash);
+                        const dSite = await rSite.json();
+                        if (dSite.success && dSite.sites) {
+                            targetSites.push(...dSite.sites);
+                        }
+                    } catch (err) {
+                        log(`Error scanning user ${u}: ${err.message}`, 'err');
+                    }
+                }
+            } else {
+                targetSites = [...allSites];
+            }
+        } catch (e) {
+            log('Error fetching user list, defaulting to current loaded sites.', 'err');
+            targetSites = [...allSites];
+        }
+    } else {
+        targetSites = [...allSites];
+    }
+
+    if (!targetSites.length) {
+        log('❌ Không tìm thấy website nào để cập nhật.', 'err');
+        startBtn.disabled = false;
+        return;
+    }
+
+    log(`📋 Đã tổng hợp ${targetSites.length} website để xử lý cập nhật hàng loạt.`, 'ok');
+
+    for (let idx = 0; idx < targetSites.length; idx++) {
+        const site = targetSites[idx];
+        log(`\n--------------------------------------------------`);
+        log(`🌐 [${idx + 1}/${targetSites.length}] Xử lý Website: ${site.domain} (${site.path})`);
+
+        if (site.locked) {
+            log(`🔒 Website ${site.domain} đang bật WP Lock (Khóa bảo vệ). Bỏ qua cập nhật.`, 'err');
+            continue;
+        }
+
+        // 1. Update Core
+        if (upCore) {
+            log(`  ↳ ⏳ Đang cập nhật WordPress Core...`);
+            try {
+                const fd = new FormData();
+                fd.append('path', site.path);
+                const r = await fetch(apiUrl('update_core'), { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success) {
+                    log(`  ↳ ✅ WP Core: ${d.message || 'Thành công'}`, 'ok');
+                } else {
+                    log(`  ↳ ❌ WP Core: ${d.error || 'Thất bại'}`, 'err');
+                }
+            } catch (err) {
+                log(`  ↳ ❌ Lỗi kết nối khi update Core: ${err.message}`, 'err');
+            }
+        }
+
+        // 2. Update Plugins
+        if (upPlugins) {
+            log(`  ↳ ⏳ Đang kiểm tra & cập nhật Plugins...`);
+            try {
+                const fd = new FormData();
+                fd.append('path', site.path);
+                const r = await fetch(apiUrl('list_plugins'), { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success && d.plugins && d.plugins.length) {
+                    let updatedPlugs = 0;
+                    for (const p of d.plugins) {
+                        if (p.update_available) {
+                            log(`     - Đang nâng cấp plugin: ${p.name} (${p.file})...`);
+                            const fdUp = new FormData();
+                            fdUp.append('path', site.path);
+                            fdUp.append('plugin_file', p.file);
+                            const rUp = await fetch(apiUrl('update_wp_plugin'), { method: 'POST', body: fdUp });
+                            const dUp = await rUp.json();
+                            if (dUp.success) {
+                                updatedPlugs++;
+                            } else {
+                                log(`     - ❌ Lỗi plugin ${p.name}: ${dUp.error}`, 'err');
+                            }
+                        }
+                    }
+                    log(`  ↳ ✅ Plugins: Đã cập nhật ${updatedPlugs} plugin.`, 'ok');
+                } else {
+                    log(`  ↳ ℹ️ Plugins: Không có plugin hoặc không đọc được danh sách.`);
+                }
+            } catch (err) {
+                log(`  ↳ ❌ Lỗi khi cập nhật Plugins: ${err.message}`, 'err');
+            }
+        }
+
+        // 3. Update Themes
+        if (upThemes) {
+            log(`  ↳ ⏳ Đang kiểm tra & cập nhật Themes...`);
+            try {
+                const fd = new FormData();
+                fd.append('path', site.path);
+                const r = await fetch(apiUrl('list_themes'), { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.success && d.themes && d.themes.length) {
+                    let updatedThemes = 0;
+                    for (const t of d.themes) {
+                        if (t.update_available) {
+                            log(`     - Đang nâng cấp theme: ${t.name} (${t.folder})...`);
+                            const fdUp = new FormData();
+                            fdUp.append('path', site.path);
+                            fdUp.append('theme_folder', t.folder);
+                            const rUp = await fetch(apiUrl('update_wp_theme'), { method: 'POST', body: fdUp });
+                            const dUp = await rUp.json();
+                            if (dUp.success) {
+                                updatedThemes++;
+                            } else {
+                                log(`     - ❌ Lỗi theme ${t.name}: ${dUp.error}`, 'err');
+                            }
+                        }
+                    }
+                    log(`  ↳ ✅ Themes: Đã cập nhật ${updatedThemes} theme.`, 'ok');
+                } else {
+                    log(`  ↳ ℹ️ Themes: Không có theme hoặc không đọc được danh sách.`);
+                }
+            } catch (err) {
+                log(`  ↳ ❌ Lỗi khi cập nhật Themes: ${err.message}`, 'err');
+            }
+        }
+    }
+
+    log(`\n🎉 HOÀN TẤT TẤT CẢ TÁC VỤ CẬP NHẬT HÀNG LOẠT!`, 'ok');
+    startBtn.disabled = false;
+    fetchSites(false);
+}
+
 /* ─── Plugin update ─── */
 function openUpdateModal() {
     document.getElementById('update-terminal').innerHTML='';
