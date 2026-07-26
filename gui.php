@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.5';
+$plugin_version = '2.2.6';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -4913,8 +4913,7 @@ async function runPluginUpdate() {
     };
     log('Connecting to GitHub…');
     try {
-        const p=new URLSearchParams({action:'update_plugin'});
-        const r=await fetch(apiUrl(),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()});
+        const r=await fetch(apiUrl('update_plugin'),{method:'POST'});
         const d=await r.json();
         if(d.success){
             log(d.message,'ok');

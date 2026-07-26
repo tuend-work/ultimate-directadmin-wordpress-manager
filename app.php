@@ -4928,20 +4928,82 @@ function run_api() {
                     throw new Exception("Forbidden: Access restricted to Administrators.");
                 }
                 $users = get_all_directadmin_users();
+                $user_sites = [];
+                foreach ($users as $u) {
+                    $user_sites[$u] = [];
+                }
+                
+                $home_base = '/home';
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    $home_base = 'C:/Users';
+                }
+                
+                // Run find command once on the entire home directory
+                $cmd = sprintf(
+                    'find %s -maxdepth 5 -name "wp-config.php" -not -path "*/wp-content/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null',
+                    escapeshellarg($home_base)
+                );
+                $output = [];
+                exec($cmd, $output);
+                
+                $seen_realpaths = [];
+                foreach ($output as $wp_config_path) {
+                    $wp_config_path = trim($wp_config_path);
+                    if ($wp_config_path === '') continue;
+                    
+                    $real = realpath($wp_config_path);
+                    if ($real !== false) {
+                        if (isset($seen_realpaths[$real])) continue;
+                        $seen_realpaths[$real] = true;
+                    }
+                    
+                    // Extract username from path
+                    $username = '';
+                    if (preg_match('#^/home/([^/]+)#', $wp_config_path, $m)) {
+                        $username = $m[1];
+                    } elseif (preg_match('#^C:/Users/([^/]+)#i', $wp_config_path, $m)) {
+                        $username = $m[1];
+                    }
+                    
+                    if (!empty($username) && isset($user_sites[$username])) {
+                        $info = parse_wp_config($wp_config_path);
+                        if ($info) {
+                            $user_sites[$username][] = $info;
+                        }
+                    }
+                }
+                
+                // Save caches and collect all sites
                 $all_sites = [];
                 foreach ($users as $u) {
                     $u_home = "/home/{$u}";
                     if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
                         $u_home = 'C:/Users/' . $u;
                     }
-                    $sites = scan_wordpress_installations($u_home, $u);
-                    if (is_array($sites)) {
-                        foreach ($sites as $s) {
-                            $s['_owner_user'] = $u;
-                            $all_sites[] = $s;
+                    
+                    $sites = $user_sites[$u];
+                    $cache_file = $u_home . '/.ultimate_wp_manager.json';
+                    
+                    $is_eff_root = false;
+                    if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+                        $is_eff_root = true;
+                    }
+                    $writable = $is_eff_root ? true : @is_writable($u_home);
+                    
+                    if ($writable) {
+                        file_put_contents($cache_file, json_encode($sites, JSON_PRETTY_PRINT));
+                        @chmod($cache_file, 0600);
+                        if ($is_eff_root && !empty($u)) {
+                            @chown($cache_file, $u);
                         }
                     }
+                    
+                    foreach ($sites as $s) {
+                        $s['_owner_user'] = $u;
+                        $all_sites[] = $s;
+                    }
                 }
+                
                 echo json_encode(['success' => true, 'sites' => $all_sites]);
                 break;
 
