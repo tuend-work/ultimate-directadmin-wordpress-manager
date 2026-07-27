@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.24';
+$plugin_version = '2.2.25';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -6166,18 +6166,7 @@ async function fixPermissions(idx) {
 
 /* ─── Go to User ─── */
 function goToUser(username) {
-    let parentPath = '';
-    try {
-        parentPath = window.parent.location.pathname;
-    } catch(e) {}
-    if (!parentPath) {
-        parentPath = window.location.pathname;
-    }
-    
-    let isResellerContext = parentPath.includes('/reseller/') || parentPath.includes('_RESELLER');
-    let prefix = isResellerContext ? '/reseller/users/' : '/admin/users/';
-    let url = prefix + encodeURIComponent(username) + '/view/domains';
-    
+    let url = '/reseller/users/' + encodeURIComponent(username) + '/view/domains';
     if (window.parent && window.parent !== window) {
         window.parent.location.href = url;
     } else {
