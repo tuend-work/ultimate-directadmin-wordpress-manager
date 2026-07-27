@@ -2601,10 +2601,24 @@ function parse_wp_config($wp_config_path) {
     $domain = '';
     $sub_path = '';
     
-    $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
-    $home = getenv('HOME') ?: "/home/{$username}";
-    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-        $home = 'C:/Users/local_user';
+    $username_from_path = '';
+    if (preg_match('#^/home/([^/]+)/#i', $wp_config_path, $m)) {
+        $username_from_path = $m[1];
+    } elseif (preg_match('#^C:/Users/([^/]+)/#i', $wp_config_path, $m)) {
+        $username_from_path = $m[1];
+    }
+    
+    if (!empty($username_from_path)) {
+        $home = "/home/{$username_from_path}";
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $home = 'C:/Users/' . $username_from_path;
+        }
+    } else {
+        $username = getenv('USERNAME') ?: getenv('USER') ?: 'nobody';
+        $home = getenv('HOME') ?: "/home/{$username}";
+        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+            $home = 'C:/Users/local_user';
+        }
     }
     
     $domains_prefix = $home . '/domains/';
