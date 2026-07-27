@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.7';
+$plugin_version = '2.2.8';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1026,7 +1026,7 @@ input:disabled + .slider {
 <!-- Top bar -->
 <div class="topbar">
     <div class="logo">
-        <img src="images/logo.png?v=<?php echo htmlspecialchars($plugin_version); ?>" alt="Logo" class="logo-img">
+        <img src="images/admin_icon.svg?v=<?php echo htmlspecialchars($plugin_version); ?>" alt="Logo" class="logo-img">
         Ultimate WordPress Manager
         <span style="font-size:13px;font-weight:500;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin-left:2px;letter-spacing:.3px;">v<?php echo htmlspecialchars($plugin_version); ?></span>
     </div>
@@ -4923,7 +4923,7 @@ async function runPluginUpdate() {
         const r=await fetch(apiUrl('update_plugin'),{method:'POST'});
         const d=await r.json();
         if(d.success){
-            log(d.message,'ok');
+            log(d.message || 'Cập nhật plugin DirectAdmin thành công.','ok');
             log('✅ Done! Tự động tải lại trang sau 3 giây...','ok');
             let sec = 3;
             const countdown = setInterval(() => {

@@ -4390,6 +4390,7 @@ function update_plugin_from_github() {
         $retcode = 0;
         exec(escapeshellcmd($wrapper) . ' update 2>&1', $output, $retcode);
         $out_str = implode("\n", $output);
+        $out_str = mb_convert_encoding($out_str, 'UTF-8', 'UTF-8');
 
         if ($retcode !== 0) {
             throw new Exception("Wrapper update failed (exit {$retcode}):\n{$out_str}");
