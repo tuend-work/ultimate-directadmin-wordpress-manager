@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.11';
+$plugin_version = '2.2.12';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -1177,6 +1177,10 @@ input:disabled + .slider {
                     <input type="radio" name="inst-source" value="zip_url" onchange="toggleInstallSource('zip_url')" style="width:14px; height:14px; accent-color: var(--blue);">
                     <span>Tải ZIP từ URL</span>
                 </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2);">
+                    <input type="radio" name="inst-source" value="folder" onchange="toggleInstallSource('folder')" style="width:14px; height:14px; accent-color: var(--blue);">
+                    <span>Cài từ thư mục trên Host</span>
+                </label>
             </div>
             
             <div id="inst-zip-wrapper" style="display: none;" class="form-group">
@@ -1194,6 +1198,17 @@ input:disabled + .slider {
                 <label>Nhập URL tệp ZIP source code <span style="font-weight:400;color:var(--red)">*</span></label>
                 <input type="url" id="inst-zip-url" class="form-control" placeholder="https://example.com/backup.zip">
                 <span style="font-size:14px;color:var(--text3)">Hệ thống sẽ tự động tải file ZIP từ liên kết này về giải nén và tiến hành cài đặt WP. Tệp ZIP phải chứa mã nguồn WordPress và file DB (.sql.gz, .sql, .gz).</span>
+            </div>
+
+            <div id="inst-folder-wrapper" style="display: none;" class="form-group">
+                <label>Đường dẫn thư mục nguồn chứa source WP trên host <span style="font-weight:400;color:var(--red)">*</span></label>
+                <input type="text" id="inst-folder-path" class="form-control" placeholder="e.g. /home/<?php echo htmlspecialchars($username); ?>/wordpress-source">
+                <span style="font-size:14px;color:var(--text3);margin-top:6px;display:block;">Nhập đường dẫn tuyệt đối đến thư mục chứa mã nguồn WordPress trên máy chủ.</span>
+                
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text2); margin-top: 12px;">
+                    <input type="checkbox" id="inst-folder-fresh" checked onchange="toggleFolderFresh()" style="width:16px; height:16px; accent-color: var(--blue);">
+                    <span>Đây là bộ cài mới (Cần thiết lập tài khoản Admin)</span>
+                </label>
             </div>
         </div>
 
@@ -4337,11 +4352,27 @@ async function loadUserZipFiles() {
     }
 }
 
+function toggleFolderFresh() {
+    const isFresh = document.getElementById('inst-folder-fresh').checked;
+    const adminSec = document.getElementById('inst-admin-section');
+    const adminInputs = adminSec.querySelectorAll('input');
+    
+    if (isFresh) {
+        adminSec.style.display = 'block';
+        adminInputs.forEach(i => i.required = true);
+    } else {
+        adminSec.style.display = 'none';
+        adminInputs.forEach(i => i.required = false);
+    }
+}
+
 function toggleInstallSource(mode) {
     const zipWrapper = document.getElementById('inst-zip-wrapper');
     const zipSelect = document.getElementById('inst-zip-path');
     const zipUrlWrapper = document.getElementById('inst-zip-url-wrapper');
     const zipUrlInput = document.getElementById('inst-zip-url');
+    const folderWrapper = document.getElementById('inst-folder-wrapper');
+    const folderInput = document.getElementById('inst-folder-path');
     const adminSec = document.getElementById('inst-admin-section');
     const adminInputs = adminSec.querySelectorAll('input');
 
@@ -4350,6 +4381,8 @@ function toggleInstallSource(mode) {
         zipSelect.required = true;
         zipUrlWrapper.style.display = 'none';
         zipUrlInput.required = false;
+        folderWrapper.style.display = 'none';
+        folderInput.required = false;
         adminSec.style.display = 'none';
         adminInputs.forEach(i => i.required = false);
         loadUserZipFiles();
@@ -4358,13 +4391,25 @@ function toggleInstallSource(mode) {
         zipSelect.required = false;
         zipUrlWrapper.style.display = 'block';
         zipUrlInput.required = true;
+        folderWrapper.style.display = 'none';
+        folderInput.required = false;
         adminSec.style.display = 'none';
         adminInputs.forEach(i => i.required = false);
+    } else if (mode === 'folder') {
+        zipWrapper.style.display = 'none';
+        zipSelect.required = false;
+        zipUrlWrapper.style.display = 'none';
+        zipUrlInput.required = false;
+        folderWrapper.style.display = 'block';
+        folderInput.required = true;
+        toggleFolderFresh();
     } else {
         zipWrapper.style.display = 'none';
         zipSelect.required = false;
         zipUrlWrapper.style.display = 'none';
         zipUrlInput.required = false;
+        folderWrapper.style.display = 'none';
+        folderInput.required = false;
         adminSec.style.display = 'block';
         adminInputs.forEach(i => i.required = true);
     }
@@ -4427,7 +4472,7 @@ async function executeInstall(e) {
         );
         toast('1/3 Database created.', 'success');
         
-        btn.textContent = (mode === 'zip' || mode === 'zip_url') ? 'Downloading/Extracting ZIP & Importing database…' : 'Installing WordPress…';
+        btn.textContent = (mode === 'zip' || mode === 'zip_url') ? 'Downloading/Extracting ZIP & Importing database…' : (mode === 'folder' ? 'Copying files & configuring WordPress…' : 'Installing WordPress…');
 
         const fd = new FormData();
         fd.append('action', 'install');
@@ -4451,6 +4496,20 @@ async function executeInstall(e) {
                 throw new Error("Vui lòng nhập đường dẫn URL tệp ZIP để tiến hành cài đặt!");
             }
             fd.append('zip_url', zipUrl);
+        } else if (mode === 'folder') {
+            const folderPath = document.getElementById('inst-folder-path').value;
+            if (!folderPath) {
+                throw new Error("Vui lòng nhập đường dẫn thư mục nguồn chứa source WP!");
+            }
+            fd.append('source_folder', folderPath);
+            const isFresh = document.getElementById('inst-folder-fresh').checked;
+            fd.append('is_fresh', isFresh ? '1' : '0');
+            if (isFresh) {
+                fd.append('site_title', document.getElementById('inst-title').value);
+                fd.append('admin_user', document.getElementById('inst-adminuser').value);
+                fd.append('admin_pass', document.getElementById('inst-adminpass').value);
+                fd.append('admin_email', document.getElementById('inst-adminemail').value);
+            }
         } else {
             fd.append('site_title', document.getElementById('inst-title').value);
             fd.append('admin_user', document.getElementById('inst-adminuser').value);
@@ -4464,7 +4523,7 @@ async function executeInstall(e) {
         });
         const d = await r.json();
         if (d.success) {
-            toast(mode === 'zip' ? 'Cài đặt WordPress từ ZIP thành công!' : 'WordPress installed successfully!', 'success');
+            toast((mode === 'zip' || mode === 'zip_url') ? 'Cài đặt WordPress từ ZIP thành công!' : 'WordPress installed successfully!', 'success');
             closeModal('modal-install');
             fetchSites(false);
         } else {

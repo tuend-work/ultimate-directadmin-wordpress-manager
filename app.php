@@ -3619,9 +3619,62 @@ function install_wordpress_instance($params, $home) {
         throw new Exception("WordPress is already configured in this folder.");
     }
     
-    if ($mode === 'zip' || $mode === 'zip_url') {
+    if ($mode === 'zip' || $mode === 'zip_url' || $mode === 'folder') {
         $temp_downloaded_zip = null;
-        if ($mode === 'zip_url') {
+        
+        if ($mode === 'folder') {
+            $source_folder = $params['source_folder'] ?? '';
+            if (empty($source_folder)) {
+                throw new Exception("Không tìm thấy đường dẫn thư mục nguồn.");
+            }
+            $src_real = realpath($source_folder) ?: $source_folder;
+            
+            // Path traversal security boundary check
+            $is_root = (function_exists('posix_getuid') && posix_getuid() === 0) || (getenv('USER') === 'root') || (getenv('USERNAME') === 'root');
+            if (is_admin_user() || $is_root) {
+                $allowed_root = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'C:/Users' : '/home';
+                if (strpos($src_real, $allowed_root) !== 0) {
+                    throw new Exception("Invalid source directory access.");
+                }
+            } else {
+                if (strpos($src_real, $home) !== 0) {
+                    throw new Exception("Invalid source directory access.");
+                }
+            }
+            
+            if (!is_dir($src_real)) {
+                throw new Exception("Thư mục nguồn không tồn tại hoặc không phải thư mục.");
+            }
+            
+            // Check WP core signature
+            if (!file_exists($src_real . '/wp-load.php') && !file_exists($src_real . '/wp-config-sample.php')) {
+                throw new Exception("Thư mục nguồn không chứa mã nguồn WordPress (thiếu wp-load.php hoặc wp-config-sample.php).");
+            }
+            
+            // Copy files if target dir is different from source
+            $real_target = realpath($target_dir);
+            if ($src_real !== $real_target) {
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($src_real, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::SELF_FIRST
+                );
+                foreach ($iterator as $item) {
+                    $subPath = $iterator->getSubPathName();
+                    $target = $target_dir . '/' . $subPath;
+                    if ($item->isDir()) {
+                        if (!is_dir($target)) {
+                            mkdir($target, 0755, true);
+                        }
+                    } else {
+                        $parent = dirname($target);
+                        if (!is_dir($parent)) {
+                            mkdir($parent, 0755, true);
+                        }
+                        copy($item->getPathname(), $target);
+                    }
+                }
+            }
+        } elseif ($mode === 'zip_url') {
             $zip_url = filter_var($params['zip_url'] ?? '', FILTER_VALIDATE_URL);
             if (!$zip_url) {
                 throw new Exception("Địa chỉ URL tệp ZIP không hợp lệ.");
@@ -3671,19 +3724,21 @@ function install_wordpress_instance($params, $home) {
             @copy($zip_path, $cache_dir . '/uploaded_backup.zip');
         }
         
-        $zip = new ZipArchive;
-        if ($zip->open($zip_path) === TRUE) {
-            $zip->extractTo($target_dir);
-            $zip->close();
-        } else {
+        if ($mode === 'zip' || $mode === 'zip_url') {
+            $zip = new ZipArchive;
+            if ($zip->open($zip_path) === TRUE) {
+                $zip->extractTo($target_dir);
+                $zip->close();
+            } else {
+                if ($temp_downloaded_zip && file_exists($temp_downloaded_zip)) {
+                    @unlink($temp_downloaded_zip);
+                }
+                throw new Exception("Không thể giải nén tệp ZIP source code.");
+            }
+
             if ($temp_downloaded_zip && file_exists($temp_downloaded_zip)) {
                 @unlink($temp_downloaded_zip);
             }
-            throw new Exception("Không thể giải nén tệp ZIP source code.");
-        }
-
-        if ($temp_downloaded_zip && file_exists($temp_downloaded_zip)) {
-            @unlink($temp_downloaded_zip);
         }
         
         // Scan for database file
@@ -3842,30 +3897,36 @@ function install_wordpress_instance($params, $home) {
             } catch (Exception $e) {
                 wp_manager_log("Failed to update siteurl/home: " . $e->getMessage());
             }
+            
+            // Force cache refresh
+            $cache_file = $home . '/.ultimate_wp_manager.json';
+            if (file_exists($cache_file)) {
+                @unlink($cache_file);
+            }
+            
+            return [
+                'success' => true,
+                'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
+                'details' => 'Cài đặt từ ZIP/Thư mục nguồn hoàn tất.'
+            ];
         }
         
-        // Force cache refresh
-        $cache_file = $home . '/.ultimate_wp_manager.json';
-        if (file_exists($cache_file)) {
-            @unlink($cache_file);
+        // If there was no db_file and we are in zip/zip_url mode, throw error
+        if ($mode === 'zip' || $mode === 'zip_url') {
+            throw new Exception("Không tìm thấy tệp database backup (.sql, .sql.gz, .gz) trong tệp ZIP.");
         }
         
-        return [
-            'success' => true,
-            'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
-            'details' => 'Cài đặt từ ZIP hoàn tất.'
-        ];
-        
-    } else {
-        // Fresh install
-        $site_title = $params['site_title'];
-        $admin_user = $params['admin_user'];
-        $admin_pass = $params['admin_pass'];
-        $admin_email = $params['admin_email'];
+        // Otherwise (folder mode without DB file OR fresh mode), we do the fresh install process!
+        $site_title = $params['site_title'] ?? 'My WordPress Site';
+        $admin_user = $params['admin_user'] ?? 'admin';
+        $admin_pass = $params['admin_pass'] ?? 'password';
+        $admin_email = $params['admin_email'] ?? 'admin@' . $domain_clean;
         $request_uri = $subdir_clean !== '' ? '/' . $subdir_clean . '/' : '/';
         
-        // Download & Unpack
-        download_and_extract_wordpress($target_dir, $home);
+        if ($mode === 'fresh') {
+            // Download & Unpack
+            download_and_extract_wordpress($target_dir, $home);
+        }
         
         // Fetch security keys
         $salts = '';
@@ -5236,6 +5297,21 @@ function run_api() {
                     foreach ($required as $field) {
                         if (empty($_POST[$field])) {
                             throw new Exception("Required parameter missing: {$field}");
+                        }
+                    }
+                } else if ($mode === 'folder') {
+                    $required = ['domain', 'db_name', 'db_user', 'db_pass', 'source_folder'];
+                    foreach ($required as $field) {
+                        if (empty($_POST[$field])) {
+                            throw new Exception("Required parameter missing: {$field}");
+                        }
+                    }
+                    if (($_POST['is_fresh'] ?? '') === '1') {
+                        $required_fresh = ['site_title', 'admin_user', 'admin_pass', 'admin_email'];
+                        foreach ($required_fresh as $field) {
+                            if (empty($_POST[$field])) {
+                                throw new Exception("Required parameter missing for fresh install: {$field}");
+                            }
                         }
                     }
                 } else {
