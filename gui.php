@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.19';
+$plugin_version = '2.2.20';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3735,6 +3735,7 @@ function renderSites(sites) {
                 <!-- Badges -->
                 <div class="badges" style="margin-left:auto;">
                     ${statusBadge}
+                    ${isAdmin && s._owner_user ? `<span class="badge badge-gray" style="text-transform:none; border:1px solid var(--border);">Owner: ${esc(s._owner_user)}</span>` : ''}
                     <span class="badge badge-blue">WP ${esc(s.version)}</span>
                     ${lockBadge}
                 </div>
@@ -3750,6 +3751,7 @@ function renderSites(sites) {
                 <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> File Manager</button>
                 <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})"><span class="dashicons dashicons-database wp-admin-icon"></span> phpMyAdmin</button>
                 <button class="btn btn-secondary btn-sm" id="btn-fix-perms-${i}" onclick="fixPermissions(${i})"><span class="dashicons dashicons-admin-network wp-admin-icon"></span> Fix Permissions</button>
+                ${isAdmin && s._owner_user && s._owner_user !== DA_USER ? `<button class="btn btn-secondary btn-sm" onclick="loginAsUser('${esc(s._owner_user)}')"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Login as ${esc(s._owner_user)}</button>` : ''}
             </div>
 
             <!-- Card body (expanded) -->
@@ -6159,6 +6161,17 @@ async function fixPermissions(idx) {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<span class="dashicons dashicons-admin-network wp-admin-icon"></span> Fix Permissions';
+    }
+}
+
+/* ─── Login As User ─── */
+function loginAsUser(username) {
+    if (confirm(`Bạn có chắc muốn đăng nhập dưới quyền user "${username}" (Login as)?`)) {
+        if (window.parent && window.parent !== window) {
+            window.parent.location.href = '/CMD_LOGIN_AS?user=' + encodeURIComponent(username);
+        } else {
+            window.location.href = '/CMD_LOGIN_AS?user=' + encodeURIComponent(username);
+        }
     }
 }
 
