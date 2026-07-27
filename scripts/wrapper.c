@@ -29,6 +29,8 @@ void execute_chattr(const char *chattr_path, int recursive, const char *mode, co
         int status;
         waitpid(pid, &status, 0);
     }
+}
+
 int is_admin_or_reseller_user(const char *username) {
     // Validate username to prevent path traversal
     for (const char *p = username; *p; p++) {
