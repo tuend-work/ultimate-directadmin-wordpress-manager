@@ -2731,17 +2731,14 @@ function parse_wp_config($wp_config_path) {
         $blogname = $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
 
-    // --- AUTHORITATIVE: Prioritize deriving domain and sub_path from the folder path ---
-    // If the database has a siteurl, we extract its scheme (http/https) but keep the folder-derived domain and sub_path.
-    $protocol = 'http';
-    if (!empty($siteurl)) {
-        $parsed_db = parse_url($siteurl);
-        if (!empty($parsed_db['scheme'])) {
-            $protocol = $parsed_db['scheme'];
-        }
+    // --- AUTHORITATIVE: Prioritize the database siteurl if it is valid (including www etc.) ---
+    // We only force folder-derived domain as a fallback if siteurl is empty or database is unreachable.
+    if (!empty($siteurl) && (strpos($siteurl, 'http://') === 0 || strpos($siteurl, 'https://') === 0)) {
+        // Keep the database siteurl exactly as configured!
+    } else {
+        $protocol = 'http';
+        $siteurl = $protocol . '://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
     }
-    $siteurl = $protocol . '://' . $domain . ($sub_path !== '' ? '/' . $sub_path : '');
-    // If DB was unreachable, $domain and $sub_path remain as path-derived fallback
 
     
     // Auto Cleanup expired Magic Logins (older than 1 hour)
