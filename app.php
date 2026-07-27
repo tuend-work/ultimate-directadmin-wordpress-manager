@@ -5497,6 +5497,48 @@ function run_api() {
                 }
                 
                 echo json_encode(['success' => true, 'message' => implode("\n", $output)]);
+            case 'create_login_url':
+                if (!is_admin_user()) {
+                    throw new Exception("Forbidden: Access restricted to Administrators.");
+                }
+                $target_user = $_POST['target_user'] ?? '';
+                if (empty($target_user)) {
+                    throw new Exception("Missing target_user parameter.");
+                }
+                if (!preg_match('/^[a-zA-Z0-9\-_]+$/', $target_user)) {
+                    throw new Exception("Invalid target user format.");
+                }
+                
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    echo json_encode(['success' => true, 'url' => 'http://localhost:8443/CMD_LOGIN?user=' . $target_user]);
+                    break;
+                }
+                
+                $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+                if (!file_exists($wrapper)) {
+                    throw new Exception("Wrapper binary not found.");
+                }
+                
+                $cmd = sprintf(
+                    '%s create_login_url %s 2>&1',
+                    escapeshellarg($wrapper),
+                    escapeshellarg($target_user)
+                );
+                
+                $output = [];
+                $retval = null;
+                exec($cmd, $output, $retval);
+                
+                if ($retval !== 0) {
+                    throw new Exception("Failed to generate login URL: " . implode("\n", $output));
+                }
+                
+                $login_url = trim(implode("\n", $output));
+                if (strpos($login_url, 'http://') !== 0 && strpos($login_url, 'https://') !== 0) {
+                    throw new Exception("Invalid login URL generated: " . $login_url);
+                }
+                
+                echo json_encode(['success' => true, 'url' => $login_url]);
                 break;
 
             case 'clone':

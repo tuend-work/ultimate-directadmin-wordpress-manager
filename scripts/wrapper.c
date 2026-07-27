@@ -70,7 +70,37 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error: Failed to identify user from UID %d.\n", uid);
         return 1;
     }
-    
+    // Handle create_login_url subcommand
+    if (strcmp(action, "create_login_url") == 0) {
+        if (argc != 3) {
+            fprintf(stderr, "Usage: %s create_login_url <username>\n", argv[0]);
+            return 1;
+        }
+        const char *target_user = argv[2];
+        
+        // Security check: Only root, diradmin, and admin can create login URLs
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+            fprintf(stderr, "Error: Access denied.\n");
+            return 1;
+        }
+        
+        // Validate target_user to prevent injection
+        for (const char *p = target_user; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+                fprintf(stderr, "Error: Invalid username characters.\n");
+                return 1;
+            }
+        }
+        
+        char user_arg[128];
+        snprintf(user_arg, sizeof(user_arg), "--user=%s", target_user);
+        
+        // Execute directadmin to create the login url
+        execl("/usr/local/directadmin/directadmin", "directadmin", "create-login-url", user_arg, NULL);
+        perror("Error: execl directadmin failed");
+        return 1;
+    }
+
     // Handle get_domain_config subcommand
     if (strcmp(action, "get_domain_config") == 0) {
         if (argc != 5) {

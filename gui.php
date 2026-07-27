@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.20';
+$plugin_version = '2.2.21';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -6165,13 +6165,36 @@ async function fixPermissions(idx) {
 }
 
 /* ─── Login As User ─── */
-function loginAsUser(username) {
-    if (confirm(`Bạn có chắc muốn đăng nhập dưới quyền user "${username}" (Login as)?`)) {
-        if (window.parent && window.parent !== window) {
-            window.parent.location.href = '/CMD_LOGIN_AS?user=' + encodeURIComponent(username);
+async function loginAsUser(username) {
+    if (!confirm(`Bạn có chắc muốn đăng nhập dưới quyền user "${username}" (Login as)?`)) {
+        return;
+    }
+    toast(`Đang tạo liên kết đăng nhập dưới quyền ${username}...`);
+    try {
+        const fd = new FormData();
+        fd.append('action', 'create_login_url');
+        fd.append('target_user', username);
+        
+        const r = await fetch(apiUrl('create_login_url'), {
+            method: 'POST',
+            body: fd
+        });
+        const d = await r.json();
+        
+        if (d.success && d.url) {
+            toast('✅ Đã tạo liên kết đăng nhập thành công. Đang chuyển hướng...', 'success');
+            setTimeout(() => {
+                if (window.parent && window.parent !== window) {
+                    window.parent.location.href = d.url;
+                } else {
+                    window.location.href = d.url;
+                }
+            }, 500);
         } else {
-            window.location.href = '/CMD_LOGIN_AS?user=' + encodeURIComponent(username);
+            toast('❌ Lỗi: ' + (d.error || 'Không thể tạo liên kết đăng nhập.'), 'error');
         }
+    } catch (e) {
+        toast('❌ Lỗi kết nối máy chủ.', 'error');
     }
 }
 
