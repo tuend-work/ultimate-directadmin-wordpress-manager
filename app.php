@@ -249,6 +249,28 @@ function wp_manager_config_define_modify($wp_config_path, $constant, $value, $en
 }
 
 /**
+ * Unified helper to get PDO database connection with automatic 127.0.0.1 TCP/IP fallback on localhost socket issues.
+ */
+function wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, $timeout = 5) {
+    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+    try {
+        return new PDO($dsn, $db_user, $db_pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => $timeout
+        ]);
+    } catch (Exception $e) {
+        if (strtolower($db_host) === 'localhost') {
+            $dsn_fallback = "mysql:host=127.0.0.1;dbname={$db_name};charset=utf8mb4";
+            return new PDO($dsn_fallback, $db_user, $db_pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT => $timeout
+            ]);
+        }
+        throw $e;
+    }
+}
+
+/**
  * Helper to fetch database connection details from wp-config.php
  */
 function wp_manager_get_db_conn($wp_config_path) {
@@ -267,11 +289,7 @@ function wp_manager_get_db_conn($wp_config_path) {
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     try {
-        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 2
-        ]);
+        $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
         return ['pdo' => $pdo, 'prefix' => $db_prefix];
     } catch (Exception $e) {
         return null;
@@ -923,11 +941,7 @@ function get_active_plugins($site_path) {
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     try {
-        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 2
-        ]);
+        $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
         
         $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'active_plugins'");
         $stmt->execute();
@@ -985,11 +999,7 @@ function toggle_plugin_status($site_path, $plugin_file, $status) {
     $db_host = $db_host_match[1] ?? 'localhost';
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
-    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-    $pdo = new PDO($dsn, $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 2
-    ]);
+    $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
     
     $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'active_plugins'");
     $stmt->execute();
@@ -1103,11 +1113,7 @@ function get_active_theme($site_path) {
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     try {
-        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 2
-        ]);
+        $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
         
         $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = 'stylesheet'");
         $stmt->execute();
@@ -1158,11 +1164,7 @@ function activate_theme($site_path, $theme_folder) {
     $db_host = $db_host_match[1] ?? 'localhost';
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
-    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-    $pdo = new PDO($dsn, $db_user, $db_pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_TIMEOUT => 2
-    ]);
+    $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
     
     $template = $theme_folder;
     $theme_style_css = $site_path . '/wp-content/themes/' . $theme_folder . '/style.css';
@@ -1266,11 +1268,7 @@ function get_site_transient_from_db($site_path, $transient_name) {
     $db_prefix = $prefix_match[1] ?? 'wp_';
     
     try {
-        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 2
-        ]);
+        $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
         
         $option_name = '_site_transient_' . $transient_name;
         $stmt = $pdo->prepare("SELECT option_value FROM `{$db_prefix}options` WHERE option_name = ?");
@@ -2708,11 +2706,7 @@ function parse_wp_config($wp_config_path) {
     $pdo = null;
     
     try {
-        $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 2
-        ]);
+        $pdo = wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, 2);
         
         $stmt = $pdo->prepare("SELECT option_name, option_value FROM `{$db_prefix}options` WHERE option_name IN ('siteurl', 'blogname')");
         $stmt->execute();
@@ -3519,11 +3513,7 @@ function clone_wordpress_instance($params, $home) {
     $tgt_siteurl = rtrim($new_siteurl, '/');
     
     try {
-        $dsn = "mysql:host=localhost;dbname={$db_name};charset=utf8mb4";
-        $pdo = new PDO($dsn, $db_user, $db_pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 5
-        ]);
+        $pdo = wp_manager_get_pdo('localhost', $db_name, $db_user, $db_pass, 5);
         
         // Update siteurl and home
         $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name IN ('siteurl', 'home')");
@@ -3915,11 +3905,7 @@ function install_wordpress_instance($params, $home) {
         if ($db_imported) {
             $new_siteurl = ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : '');
             try {
-                $dsn = "mysql:host=localhost;dbname={$db_name};charset=utf8mb4";
-                $pdo = new PDO($dsn, $db_user, $db_pass, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_TIMEOUT => 5
-                ]);
+                $pdo = wp_manager_get_pdo('localhost', $db_name, $db_user, $db_pass, 5);
                 
                 $stmt = $pdo->prepare("UPDATE `{$db_prefix}options` SET option_value = ? WHERE option_name IN ('siteurl', 'home')");
                 $stmt->execute([$new_siteurl]);
