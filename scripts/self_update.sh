@@ -69,7 +69,19 @@ chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 for binary in wrapper update_wrapper; do
     if [ -f "$PLUGIN_DIR/scripts/${binary}.c" ]; then
         echo "[update] Compiling secure SUID binary ${binary}..."
-        gcc -O2 "$PLUGIN_DIR/scripts/${binary}.c" -o "$PLUGIN_DIR/scripts/${binary}"
+        if [ -f "$PLUGIN_DIR/scripts/${binary}" ]; then
+            cp -f "$PLUGIN_DIR/scripts/${binary}" "$PLUGIN_DIR/scripts/${binary}.bak"
+        fi
+        
+        if gcc -O2 "$PLUGIN_DIR/scripts/${binary}.c" -o "$PLUGIN_DIR/scripts/${binary}" 2>/dev/null; then
+            echo "[update] ✔ Compiled ${binary} successfully."
+            rm -f "$PLUGIN_DIR/scripts/${binary}.bak"
+        else
+            echo "[update] ⚠ WARNING: Failed to compile ${binary}. Restoring backup or keeping old binary."
+            if [ -f "$PLUGIN_DIR/scripts/${binary}.bak" ]; then
+                mv -f "$PLUGIN_DIR/scripts/${binary}.bak" "$PLUGIN_DIR/scripts/${binary}"
+            fi
+        fi
     fi
     if [ -f "$PLUGIN_DIR/scripts/$binary" ]; then
         chown root:diradmin "$PLUGIN_DIR/scripts/$binary"
