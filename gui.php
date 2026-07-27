@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.23';
+$plugin_version = '2.2.24';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3751,7 +3751,7 @@ function renderSites(sites) {
                 <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> File Manager</button>
                 <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})"><span class="dashicons dashicons-database wp-admin-icon"></span> phpMyAdmin</button>
                 <button class="btn btn-secondary btn-sm" id="btn-fix-perms-${i}" onclick="fixPermissions(${i})"><span class="dashicons dashicons-admin-network wp-admin-icon"></span> Fix Permissions</button>
-                ${isAdmin && s._owner_user && s._owner_user !== DA_USER ? `<button class="btn btn-secondary btn-sm" onclick="loginAsUser('${esc(s._owner_user)}')"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Login as ${esc(s._owner_user)}</button>` : ''}
+                ${isAdmin && s._owner_user && s._owner_user !== DA_USER ? `<button class="btn btn-secondary btn-sm" onclick="goToUser('${esc(s._owner_user)}')"><span class="dashicons dashicons-admin-users wp-admin-icon"></span> Go to user ${esc(s._owner_user)}</button>` : ''}
             </div>
 
             <!-- Card body (expanded) -->
@@ -6164,37 +6164,24 @@ async function fixPermissions(idx) {
     }
 }
 
-/* ─── Login As User ─── */
-async function loginAsUser(username) {
-    if (!confirm(`Bạn có chắc muốn đăng nhập dưới quyền user "${username}" (Login as)?`)) {
-        return;
-    }
-    toast(`Đang tạo liên kết đăng nhập dưới quyền ${username}...`);
+/* ─── Go to User ─── */
+function goToUser(username) {
+    let parentPath = '';
     try {
-        const fd = new FormData();
-        fd.append('action', 'create_login_url');
-        fd.append('target_user', username);
-        
-        const r = await fetch(apiUrl('create_login_url'), {
-            method: 'POST',
-            body: fd
-        });
-        const d = await r.json();
-        
-        if (d.success && d.url) {
-            toast('✅ Đã tạo liên kết đăng nhập thành công. Đang chuyển hướng...', 'success');
-            setTimeout(() => {
-                if (window.parent && window.parent !== window) {
-                    window.parent.location.href = d.url;
-                } else {
-                    window.location.href = d.url;
-                }
-            }, 500);
-        } else {
-            toast('❌ Lỗi: ' + (d.error || 'Không thể tạo liên kết đăng nhập.'), 'error');
-        }
-    } catch (e) {
-        toast('❌ Lỗi kết nối máy chủ.', 'error');
+        parentPath = window.parent.location.pathname;
+    } catch(e) {}
+    if (!parentPath) {
+        parentPath = window.location.pathname;
+    }
+    
+    let isResellerContext = parentPath.includes('/reseller/') || parentPath.includes('_RESELLER');
+    let prefix = isResellerContext ? '/reseller/users/' : '/admin/users/';
+    let url = prefix + encodeURIComponent(username) + '/view/domains';
+    
+    if (window.parent && window.parent !== window) {
+        window.parent.location.href = url;
+    } else {
+        window.location.href = url;
     }
 }
 
