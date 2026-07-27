@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     // 2. Check at least action arg is present
     if (argc < 2) {
-        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n  %s read_log <username> <domain> <access|error> <lines>\n", argv[0], argv[0], argv[0]);
+        fprintf(stderr, "Usage:\n  %s <lock|unlock|update> <site_path>\n  %s get_domain_config <username> <domain> <subdomains|conf>\n  %s read_log <username> <domain> <access|error> <lines>\n  %s fix_permissions <username> <site_path>\n", argv[0], argv[0], argv[0], argv[0]);
         return 1;
     }
 
@@ -192,6 +192,75 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Handle fix_permissions subcommand
+    if (strcmp(action, "fix_permissions") == 0) {
+        if (argc != 4) {
+            fprintf(stderr, "Usage: %s fix_permissions <username> <site_path>\n", argv[0]);
+            return 1;
+        }
+        const char *target_user = argv[2];
+        const char *site_path = argv[3];
+        
+        // Security check: Only root, diradmin, and admin can run fix_permissions for other users
+        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+            if (strcmp(target_user, pw->pw_name) != 0) {
+                fprintf(stderr, "Error: Access denied. You can only fix permissions for your own site.\n");
+                return 1;
+            }
+        }
+        
+        // Validate target_user
+        for (const char *p = target_user; *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+                fprintf(stderr, "Error: Invalid username.\n");
+                return 1;
+            }
+        }
+        
+        // Resolve absolute canonical path
+        char real_site_path[PATH_MAX];
+        if (realpath(site_path, real_site_path) == NULL) {
+            fprintf(stderr, "Error: Invalid or non-existent path: %s\n", site_path);
+            return 1;
+        }
+        
+        // Security boundary check: Ensure path lies inside target user's home directory
+        struct passwd *target_pw = getpwnam(target_user);
+        if (!target_pw) {
+            fprintf(stderr, "Error: User %s not found.\n", target_user);
+            return 1;
+        }
+        
+        size_t home_len = strlen(target_pw->pw_dir);
+        if (strncmp(real_site_path, target_pw->pw_dir, home_len) != 0 || 
+            (real_site_path[home_len] != '\0' && real_site_path[home_len] != '/')) {
+            fprintf(stderr, "Error: Access denied. Path must be inside %s's home directory (%s).\n", target_user, target_pw->pw_dir);
+            return 1;
+        }
+        
+        // Safety check: must contain wp-config.php
+        char wp_config[PATH_MAX];
+        snprintf(wp_config, sizeof(wp_config), "%s/wp-config.php", real_site_path);
+        struct stat st;
+        if (stat(wp_config, &st) != 0 || !S_ISREG(st.st_mode)) {
+            fprintf(stderr, "Error: Safety block. wp-config.php not found at %s.\n", real_site_path);
+            return 1;
+        }
+        
+        const char *fix_perms_sh = "/usr/local/directadmin/plugins/ultimate-directadmin-wordpress-manager/scripts/fix_permissions.sh";
+        if (access(fix_perms_sh, X_OK) != 0) {
+            fix_perms_sh = "./scripts/fix_permissions.sh";
+            if (access(fix_perms_sh, X_OK) != 0) {
+                fprintf(stderr, "Error: fix_permissions.sh not found or not executable.\n");
+                return 1;
+            }
+        }
+        
+        execl("/bin/bash", "bash", "-p", fix_perms_sh, target_user, real_site_path, NULL);
+        perror("Error: execl failed");
+        return 1;
+    }
+
     // Handle run_as subcommand to execute commands as another user context
     if (strcmp(action, "run_as") == 0) {
         if (argc < 4) {
@@ -233,7 +302,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(action, "lock") != 0 && strcmp(action, "unlock") != 0) {
-        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', or 'read_log'.\n");
+        fprintf(stderr, "Error: Invalid action. Use 'lock', 'unlock', 'update', 'get_domain_config', 'read_log', or 'fix_permissions'.\n");
         return 1;
     }
 

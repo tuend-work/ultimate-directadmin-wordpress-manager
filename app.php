@@ -3572,11 +3572,40 @@ function clone_wordpress_instance($params, $home) {
         }
     }
     
+    auto_fix_permissions($dest_dir);
     return [
         'success' => true,
         'siteurl' => $new_siteurl,
         'message' => 'Clone website WordPress thành công.'
     ];
+}
+
+/**
+ * Helper to fix ownership and chmod permissions for a WordPress site.
+ */
+function auto_fix_permissions($target_dir) {
+    if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+        return;
+    }
+    $site_owner = '';
+    if (preg_match('#^/home/([^/]+)/#i', $target_dir, $m)) {
+        $site_owner = $m[1];
+    }
+    if (!empty($site_owner)) {
+        $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+        if (file_exists($wrapper)) {
+            $cmd = sprintf(
+                '%s fix_permissions %s %s 2>&1',
+                escapeshellarg($wrapper),
+                escapeshellarg($site_owner),
+                escapeshellarg($target_dir)
+            );
+            $output = [];
+            $retval = null;
+            exec($cmd, $output, $retval);
+            wp_manager_log("Auto Fix Permissions: chown/chmod run on {$target_dir} for user {$site_owner} | Retval: {$retval}");
+        }
+    }
 }
 
 /**
@@ -3904,6 +3933,7 @@ function install_wordpress_instance($params, $home) {
                 @unlink($cache_file);
             }
             
+            auto_fix_permissions($target_dir);
             return [
                 'success' => true,
                 'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
@@ -3960,6 +3990,7 @@ function install_wordpress_instance($params, $home) {
                 @unlink($cache_file);
             }
             
+            auto_fix_permissions($target_dir);
             return [
                 'success' => true,
                 'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
@@ -4044,6 +4075,7 @@ function install_wordpress_instance($params, $home) {
             @unlink($cache_file);
         }
         
+        auto_fix_permissions($target_dir);
         return [
             'success' => true,
             'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
@@ -5382,6 +5414,63 @@ function run_api() {
                 }
                 echo json_encode($res);
                 break;
+            case 'fix_permissions':
+                $site_path = $_POST['site_path'] ?? '';
+                if (empty($site_path)) {
+                    throw new Exception("Missing site_path parameter.");
+                }
+                
+                $path_real = realpath($site_path) ?: $site_path;
+                
+                // Security check
+                $is_root = (function_exists('posix_getuid') && posix_getuid() === 0) || (getenv('USER') === 'root') || (getenv('USERNAME') === 'root');
+                if (is_admin_user() || $is_root) {
+                    $allowed_root = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? 'C:/Users' : '/home';
+                    if (strpos($path_real, $allowed_root) !== 0) {
+                        throw new Exception("Invalid directory access.");
+                    }
+                } else {
+                    if (strpos($path_real, $home) !== 0) {
+                        throw new Exception("Invalid directory access.");
+                    }
+                }
+                
+                $site_owner = '';
+                if (preg_match('#^/home/([^/]+)/#i', $path_real, $m)) {
+                    $site_owner = $m[1];
+                }
+                if (empty($site_owner)) {
+                    $site_owner = $username;
+                }
+                
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    echo json_encode(['success' => true, 'message' => 'Skipped on Windows.']);
+                    break;
+                }
+                
+                $wrapper = dirname(__FILE__) . '/scripts/wrapper';
+                if (!file_exists($wrapper)) {
+                    throw new Exception("Wrapper binary not found.");
+                }
+                
+                $cmd = sprintf(
+                    '%s fix_permissions %s %s 2>&1',
+                    escapeshellarg($wrapper),
+                    escapeshellarg($site_owner),
+                    escapeshellarg($path_real)
+                );
+                
+                $output = [];
+                $retval = null;
+                exec($cmd, $output, $retval);
+                
+                if ($retval !== 0) {
+                    throw new Exception("Failed to fix permissions: " . implode("\n", $output));
+                }
+                
+                echo json_encode(['success' => true, 'message' => implode("\n", $output)]);
+                break;
+
             case 'clone':
                 $required = ['src_path', 'domain', 'db_name', 'db_user', 'db_pass'];
                 foreach ($required as $field) {

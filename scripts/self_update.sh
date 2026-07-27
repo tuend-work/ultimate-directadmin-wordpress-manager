@@ -67,6 +67,10 @@ chmod 755 "$PLUGIN_DIR/user/index.raw"     2>/dev/null || true
 
 # Maintain SUID permissions for both binary wrappers
 for binary in wrapper update_wrapper; do
+    if [ -f "$PLUGIN_DIR/scripts/${binary}.c" ]; then
+        echo "[update] Compiling secure SUID binary ${binary}..."
+        gcc -O2 "$PLUGIN_DIR/scripts/${binary}.c" -o "$PLUGIN_DIR/scripts/${binary}"
+    fi
     if [ -f "$PLUGIN_DIR/scripts/$binary" ]; then
         chown root:diradmin "$PLUGIN_DIR/scripts/$binary"
         chmod 4755 "$PLUGIN_DIR/scripts/$binary"

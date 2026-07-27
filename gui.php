@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.13';
+$plugin_version = '2.2.14';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3748,6 +3748,7 @@ function renderSites(sites) {
                 <button class="btn btn-secondary btn-sm" onclick="openCloneModal(${i})"><span class="dashicons dashicons-admin-page wp-admin-icon"></span> Clone Website</button>
                 <button class="btn btn-secondary btn-sm" onclick="openFileManager(${i})"><span class="dashicons dashicons-portfolio wp-admin-icon"></span> File Manager</button>
                 <button class="btn btn-secondary btn-sm" onclick="openPhpMyAdmin(${i})"><span class="dashicons dashicons-database wp-admin-icon"></span> phpMyAdmin</button>
+                <button class="btn btn-secondary btn-sm" id="btn-fix-perms-${i}" onclick="fixPermissions(${i})"><span class="dashicons dashicons-admin-network wp-admin-icon"></span> Fix Permissions</button>
             </div>
 
             <!-- Card body (expanded) -->
@@ -6121,6 +6122,43 @@ async function executeAdminBulkAction() {
     const selectAllChk = document.getElementById('admin-select-all-sites');
     if (selectAllChk) selectAllChk.checked = false;
     fetchSites(false);
+}
+
+/* ─── Fix Permissions ─── */
+async function fixPermissions(idx) {
+    const site = allSites[idx];
+    const btn = document.getElementById(`btn-fix-perms-${idx}`);
+    if (!confirm(`Bạn có chắc chắn muốn phân quyền (Fix Permissions) lại cho website ${site.siteurl}?\nHành động này sẽ thiết lập lại quyền sở hữu chown và chmod chuẩn cho toàn bộ thư mục.`)) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="dashicons dashicons-admin-network wp-admin-icon dashicons-spin"></span> Fixing…';
+    
+    try {
+        const fd = new FormData();
+        fd.append('action', 'fix_permissions');
+        fd.append('site_path', site.path);
+        
+        const ownerUser = site['_owner_user'] || '';
+        let url = apiUrlAdmin('fix_permissions', ownerUser || activeUser);
+        
+        const r = await fetch(url, {
+            method: 'POST',
+            body: fd
+        });
+        const d = await r.json();
+        if (d.success) {
+            toast('Fix permissions completed successfully!', 'success');
+        } else {
+            toast(d.error || 'Failed to fix permissions.', 'error');
+        }
+    } catch (e) {
+        toast('Connection error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="dashicons dashicons-admin-network wp-admin-icon"></span> Fix Permissions';
+    }
 }
 
 /* ─── Init ─── */
