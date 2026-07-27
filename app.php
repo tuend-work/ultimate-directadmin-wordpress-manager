@@ -3615,7 +3615,7 @@ function install_wordpress_instance($params, $home) {
         mkdir($target_dir, 0755, true);
     }
     
-    if (file_exists($target_dir . '/wp-config.php')) {
+    if ($mode !== 'folder' && file_exists($target_dir . '/wp-config.php')) {
         throw new Exception("WordPress is already configured in this folder.");
     }
     
@@ -3914,6 +3914,57 @@ function install_wordpress_instance($params, $home) {
         // If there was no db_file and we are in zip/zip_url mode, throw error
         if ($mode === 'zip' || $mode === 'zip_url') {
             throw new Exception("Không tìm thấy tệp database backup (.sql, .sql.gz, .gz) trong tệp ZIP.");
+        }
+        
+        if ($mode === 'folder' && ($params['is_fresh'] ?? '') !== '1') {
+            // Write or update wp-config.php
+            $wp_config_path = $target_dir . '/wp-config.php';
+            if (file_exists($wp_config_path)) {
+                @chmod($wp_config_path, 0644);
+                $content = file_get_contents($wp_config_path);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_NAME['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_NAME', '" . addslashes($db_name) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_USER['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_USER', '" . addslashes($db_user) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_PASSWORD['\"]\s*,\s*['\"].*?['\"]\s*\)/", "define('DB_PASSWORD', '" . addslashes($db_pass) . "')", $content);
+                $content = preg_replace("/define\s*\(\s*['\"]DB_HOST['\"]\s*,\s*['\"](.*?)['\"]\s*\)/", "define('DB_HOST', 'localhost')", $content);
+                file_put_contents($wp_config_path, $content);
+                @chmod($wp_config_path, 0600);
+            } else {
+                // Generate a basic wp-config.php
+                $salts = '';
+                $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY', 'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT'];
+                foreach ($keys as $key) {
+                    $random_salt = bin2hex(random_bytes(32));
+                    $salts .= "define('{$key}', '{$random_salt}');\n";
+                }
+                $wp_config_content = "<?php\n" .
+                     "define('DB_NAME', '" . addslashes($db_name) . "');\n" .
+                     "define('DB_USER', '" . addslashes($db_user) . "');\n" .
+                     "define('DB_PASSWORD', '" . addslashes($db_pass) . "');\n" .
+                     "define('DB_HOST', 'localhost');\n" .
+                     "define('DB_CHARSET', 'utf8mb4');\n" .
+                     "define('DB_COLLATE', '');\n\n" .
+                     $salts . "\n" .
+                     "\$table_prefix = 'wp_';\n\n" .
+                     "define('WP_DEBUG', false);\n\n" .
+                     "if (!defined('ABSPATH')) {\n" .
+                     "    define('ABSPATH', __DIR__ . '/');\n" .
+                     "}\n\n" .
+                     "require_once ABSPATH . 'wp-settings.php';\n";
+                file_put_contents($wp_config_path, $wp_config_content);
+                @chmod($wp_config_path, 0600);
+            }
+            
+            // Force cache refresh
+            $cache_file = $home . '/.ultimate_wp_manager.json';
+            if (file_exists($cache_file)) {
+                @unlink($cache_file);
+            }
+            
+            return [
+                'success' => true,
+                'siteurl' => ($protocol === 'https' ? 'https://' : 'http://') . $site_host . ($subdir_clean !== '' ? '/' . $subdir_clean : ''),
+                'details' => 'Đã cấu hình wp-config.php và kết nối database.'
+            ];
         }
         
         // Otherwise (folder mode without DB file OR fresh mode), we do the fresh install process!
