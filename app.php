@@ -253,18 +253,25 @@ function wp_manager_config_define_modify($wp_config_path, $constant, $value, $en
  */
 function wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, $timeout = 5) {
     $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+    $err1 = '';
     try {
         return new PDO($dsn, $db_user, $db_pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_TIMEOUT => $timeout
         ]);
     } catch (Exception $e) {
+        $err1 = $e->getMessage();
         if (strtolower($db_host) === 'localhost') {
             $dsn_fallback = "mysql:host=127.0.0.1;dbname={$db_name};charset=utf8mb4";
-            return new PDO($dsn_fallback, $db_user, $db_pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_TIMEOUT => $timeout
-            ]);
+            try {
+                return new PDO($dsn_fallback, $db_user, $db_pass, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_TIMEOUT => $timeout
+                ]);
+            } catch (Exception $e2) {
+                $err2 = $e2->getMessage();
+                throw new Exception("Attempt 1 (socket): {$err1} | Attempt 2 (TCP 127.0.0.1): {$err2}");
+            }
         }
         throw $e;
     }
@@ -2716,7 +2723,14 @@ function parse_wp_config($wp_config_path) {
         $blogname = $options['blogname'] ?? '';
     } catch (Exception $e) {
         $status = 'db_error';
-        $db_error_message = $e->getMessage();
+        $db_error_message = sprintf(
+            "Host: %s | DB: %s | User: %s | Pass Length: %d | Diagnostics: %s",
+            $db_host,
+            $db_name,
+            $db_user,
+            strlen($db_pass),
+            $e->getMessage()
+        );
     }
     
     // Fallback siteurl/blogname if DB unreachable
