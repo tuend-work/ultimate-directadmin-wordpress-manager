@@ -4852,12 +4852,12 @@ function run_api() {
             
             if ($supports_run_as) {
                 // If compiled wrapper supports run_as, run the php script directly with correct user context
-                $exec_user = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets') ? 'root' : $target_user_clean;
+                $exec_user = $is_root_action ? 'root' : $target_user_clean;
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " run_as " . escapeshellarg($exec_user) . " /usr/local/bin/php -nc " . escapeshellarg(dirname(__FILE__) . '/php.ini') . " " . escapeshellarg(dirname(__FILE__) . '/user/index.raw') . " 2>&1";
             } else {
                 // Fallback: Execute the user panel raw entry point as the target user using SUID read_log bypass.
                 // If action is clone or create_database, we run as root (run-as-root) to bypass cross-user file read boundaries.
-                $prefix = ($action === 'clone' || $action === 'create_database' || $action === 'bulk_list' || $action === 'bulk_list_assets') ? 'run-as-root' : 'run-as';
+                $prefix = $is_root_action ? 'run-as-root' : 'run-as';
                 $cmd = $env_prefix . escapeshellarg($wrapper) . " read_log " . escapeshellarg($target_user_clean) . " " . escapeshellarg("{$prefix}.{$target_user_clean}") . " access 100 2>&1";
             }
             
@@ -4941,7 +4941,7 @@ function run_api() {
                 
                 // Run find command once on the entire home directory
                 $cmd = sprintf(
-                    'find %s -maxdepth 5 -name "wp-config.php" -not -path "*/wp-content/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null',
+                    'find %s -maxdepth 7 -name "wp-config.php" -not -path "*/wp-content/*" -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null',
                     escapeshellarg($home_base)
                 );
                 $output = [];
