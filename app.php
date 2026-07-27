@@ -4570,10 +4570,7 @@ function update_plugin_from_github() {
     }
 
     $plugin_dir = dirname(__FILE__);
-    $wrapper    = $plugin_dir . '/scripts/update_wrapper';
-    if (!file_exists($wrapper) || !is_executable($wrapper)) {
-        $wrapper = $plugin_dir . '/scripts/wrapper';
-    }
+    $wrapper    = $plugin_dir . '/scripts/wrapper';
     $is_win     = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
     if (!is_dir($plugin_dir)) {
