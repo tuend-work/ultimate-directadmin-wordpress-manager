@@ -6,7 +6,7 @@
 $username = getenv('USERNAME') ?: getenv('USER') ?: 'user';
 
 // Read plugin version from plugin.conf
-$plugin_version = '2.2.15';
+$plugin_version = '2.2.16';
 $conf_file = __DIR__ . '/plugin.conf';
 if (is_readable($conf_file)) {
     foreach (file($conf_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
@@ -3702,9 +3702,10 @@ function renderSites(sites) {
     }
 
     cnt.innerHTML = sites.map((s,i) => {
+        const dbErrText = esc(s.db_error || 'Database connection failed.');
         const statusBadge = s.status === 'active'
             ? '<span class="badge badge-green">● Connected</span>'
-            : '<span class="badge badge-red">● DB Error</span>';
+            : `<span class="badge badge-red" title="${dbErrText}" style="cursor: help;">● DB Error</span>`;
         const lockBadge = s.locked
             ? `<span class="badge badge-yellow" id="hb-lock-${i}"><span class="dashicons dashicons-lock wp-admin-icon"></span> Lockdown</span>`
             : `<span class="badge badge-gray" id="hb-lock-${i}"><span class="dashicons dashicons-unlock wp-admin-icon"></span> Unlocked</span>`;

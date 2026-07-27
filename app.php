@@ -2704,6 +2704,7 @@ function parse_wp_config($wp_config_path) {
     $siteurl = '';
     $blogname = '';
     $status = 'active';
+    $db_error_message = '';
     $pdo = null;
     
     try {
@@ -2721,6 +2722,7 @@ function parse_wp_config($wp_config_path) {
         $blogname = $options['blogname'] ?? '';
     } catch (Exception $e) {
         $status = 'db_error';
+        $db_error_message = $e->getMessage();
     }
     
     // Fallback siteurl/blogname if DB unreachable
@@ -2789,6 +2791,7 @@ function parse_wp_config($wp_config_path) {
         'db_host' => $db_host,
         'db_prefix' => $db_prefix,
         'status' => $status,
+        'db_error' => $db_error_message,
         'locked' => is_wordpress_locked(dirname($wp_config_path)),
         'disable_wp_cron' => $disable_wp_cron,
         'disable_auto_update' => $disable_auto_update,
