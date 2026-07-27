@@ -29,6 +29,44 @@ void execute_chattr(const char *chattr_path, int recursive, const char *mode, co
         int status;
         waitpid(pid, &status, 0);
     }
+int is_admin_or_reseller_user(const char *username) {
+    // Validate username to prevent path traversal
+    for (const char *p = username; *p; p++) {
+        if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) {
+            return 0;
+        }
+    }
+    
+    if (strcmp(username, "admin") == 0 || strcmp(username, "diradmin") == 0 || strcmp(username, "root") == 0) {
+        return 1;
+    }
+    
+    char conf_path[PATH_MAX];
+    snprintf(conf_path, sizeof(conf_path), "/usr/local/directadmin/data/users/%s/user.conf", username);
+    
+    FILE *f = fopen(conf_path, "r");
+    if (!f) {
+        return 0;
+    }
+    
+    char line[256];
+    int ok = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "usertype=", 9) == 0) {
+            char *val = line + 9;
+            size_t len = strlen(val);
+            while (len > 0 && (val[len - 1] == '\n' || val[len - 1] == '\r')) {
+                val[len - 1] = '\0';
+                len--;
+            }
+            if (strcmp(val, "admin") == 0 || strcmp(val, "reseller") == 0) {
+                ok = 1;
+            }
+            break;
+        }
+    }
+    fclose(f);
+    return ok;
 }
 
 int main(int argc, char *argv[]) {
@@ -78,8 +116,8 @@ int main(int argc, char *argv[]) {
         }
         const char *target_user = argv[2];
         
-        // Security check: Only root, diradmin, and admin can create login URLs
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+        // Security check: Only root, diradmin, and admin/reseller can create login URLs
+        if (uid != 0 && !is_admin_or_reseller_user(pw->pw_name)) {
             fprintf(stderr, "Error: Access denied.\n");
             return 1;
         }
@@ -111,8 +149,8 @@ int main(int argc, char *argv[]) {
         const char *domain = argv[3];
         const char *type = argv[4];
         
-        // Security check: Only root, diradmin, and admin can query other users' domain configurations
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+        // Security check: Only root, diradmin, and admin/reseller can query other users' domain configurations
+        if (uid != 0 && !is_admin_or_reseller_user(pw->pw_name)) {
             if (strcmp(target_user, pw->pw_name) != 0) {
                 fprintf(stderr, "Error: Access denied. You can only query your own configurations.\n");
                 return 1;
@@ -171,8 +209,8 @@ int main(int argc, char *argv[]) {
         const char *log_type = argv[4];
         const char *lines_str = argv[5];
         
-        // Security check: Only root, diradmin, and admin can read logs of other users
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+        // Security check: Only root, diradmin, and admin/reseller can read logs of other users
+        if (uid != 0 && !is_admin_or_reseller_user(pw->pw_name)) {
             if (strcmp(target_user, pw->pw_name) != 0) {
                 fprintf(stderr, "Error: Access denied. You can only read logs for your own domain.\n");
                 return 1;
@@ -231,8 +269,8 @@ int main(int argc, char *argv[]) {
         const char *target_user = argv[2];
         const char *site_path = argv[3];
         
-        // Security check: Only root, diradmin, and admin can run fix_permissions for other users
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+        // Security check: Only root, diradmin, and admin/reseller can run fix_permissions for other users
+        if (uid != 0 && !is_admin_or_reseller_user(pw->pw_name)) {
             if (strcmp(target_user, pw->pw_name) != 0) {
                 fprintf(stderr, "Error: Access denied. You can only fix permissions for your own site.\n");
                 return 1;
@@ -299,8 +337,8 @@ int main(int argc, char *argv[]) {
         }
         const char *target_user = argv[2];
         
-        // Security check: Only root, diradmin, and admin can run_as other users
-        if (uid != 0 && strcmp(pw->pw_name, "diradmin") != 0 && strcmp(pw->pw_name, "admin") != 0) {
+        // Security check: Only root, diradmin, and admin/reseller can run_as other users
+        if (uid != 0 && !is_admin_or_reseller_user(pw->pw_name)) {
             fprintf(stderr, "Error: Access denied.\n");
             return 1;
         }

@@ -54,13 +54,40 @@ function is_admin_user() {
         $current_user = getenv('USERNAME') ?: getenv('USER');
         return ($current_user === 'admin') || (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', 'admin') !== false);
     }
-    // Check script path (canonical admin path in DirectAdmin)
-    if (strpos($_SERVER['SCRIPT_FILENAME'] ?? '', '/admin/') !== false) {
+    
+    // 1. Check script path (canonical admin/reseller path in DirectAdmin)
+    $script = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    if (strpos($script, '/admin/') !== false || strpos($script, '/reseller/') !== false) {
         return true;
     }
-    // Fallback: DA Access Level switcher keeps /user/ URL but CGI runs as system user 'admin'
+    
+    // 2. Check current system user user.conf
     $sys_user = getenv('USER') ?: getenv('USERNAME') ?: '';
-    return $sys_user === 'admin';
+    if (empty($sys_user)) {
+        return false;
+    }
+    
+    if ($sys_user === 'admin') {
+        return true;
+    }
+    
+    $conf_path = "/usr/local/directadmin/data/users/{$sys_user}/user.conf";
+    if (is_readable($conf_path)) {
+        $lines = @file($conf_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                if (strncmp($line, 'usertype=', 9) === 0) {
+                    $usertype = trim(substr($line, 9));
+                    if ($usertype === 'admin' || $usertype === 'reseller') {
+                        return true;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    return false;
 }
 
 /**
