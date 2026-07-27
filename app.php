@@ -252,7 +252,30 @@ function wp_manager_config_define_modify($wp_config_path, $constant, $value, $en
  * Unified helper to get PDO database connection with automatic 127.0.0.1 TCP/IP fallback on localhost socket issues.
  */
 function wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, $timeout = 5) {
-    $dsn = "mysql:host={$db_host};dbname={$db_name};charset=utf8mb4";
+    $host = $db_host;
+    $port = '';
+    $socket = '';
+    
+    // Parse port or socket from host (WordPress wp-db style)
+    if (strpos($host, ':') !== false) {
+        list($host, $extra) = explode(':', $host, 2);
+        if (is_numeric($extra)) {
+            $port = $extra;
+        } else {
+            $socket = $extra;
+        }
+    }
+    
+    // Build DSN
+    $dsn = "mysql:host={$host}";
+    if ($port !== '') {
+        $dsn .= ";port={$port}";
+    }
+    if ($socket !== '') {
+        $dsn .= ";unix_socket={$socket}";
+    }
+    $dsn .= ";dbname={$db_name};charset=utf8mb4";
+    
     $err1 = '';
     try {
         return new PDO($dsn, $db_user, $db_pass, [
@@ -261,8 +284,13 @@ function wp_manager_get_pdo($db_host, $db_name, $db_user, $db_pass, $timeout = 5
         ]);
     } catch (Exception $e) {
         $err1 = $e->getMessage();
-        if (strtolower($db_host) === 'localhost') {
-            $dsn_fallback = "mysql:host=127.0.0.1;dbname={$db_name};charset=utf8mb4";
+        if (strtolower($host) === 'localhost' && empty($socket)) {
+            $dsn_fallback = "mysql:host=127.0.0.1";
+            if ($port !== '') {
+                $dsn_fallback .= ";port={$port}";
+            }
+            $dsn_fallback .= ";dbname={$db_name};charset=utf8mb4";
+            
             try {
                 return new PDO($dsn_fallback, $db_user, $db_pass, [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
